@@ -1,29 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import {
-  X,
-  Check,
-  Copy,
-  ExternalLink,
-  Lock,
-  ShieldCheck,
-  Clock,
-  ArrowRight,
-  ArrowLeft,
-  Sparkles,
-  Smartphone,
-  QrCode,
-  Store,
-  LayoutDashboard,
-  Palette,
-  Package,
-  RefreshCw,
-  AlertCircle,
-  CheckCircle2,
-  HelpCircle,
-} from "lucide-react";
-import { PLATFORM_PLANS, PlanFeature, calculatePlanPrice, BILLING_CYCLES, type BillingCycle } from "@/lib/plans";
+import { ArrowLeft, Check, Clock, Loader2 } from "lucide-react";
+import { PLATFORM_PLANS, calculatePlanPrice, BILLING_CYCLES, type BillingCycle } from "@/lib/plans";
 import { siteConfig } from "@/lib/config/site";
 import { storeService, StoreData, SubscriptionRequest } from "@/lib/store-service";
 import { UpiPayPanel } from "@/components/payments/upi-pay-panel";
@@ -42,8 +21,8 @@ interface SubscriptionPaymentModalProps {
 
 type ModalStep = "review" | "payment" | "verifying";
 
-// The checkout lives in the URL (?checkout=pro&cycle=monthly&step=payment&ref=...) so a refresh
-// lands on the same plan, step and payment reference.
+// The checkout lives in the URL (?checkout=pro&cycle=monthly&step=payment) so a refresh lands on
+// the same plan and step.
 const CHECKOUT_PARAMS = ["checkout", "upgrade", "cycle", "step", "ref"];
 
 function readParam(key: string): string | null {
@@ -59,6 +38,14 @@ function writeCheckoutParams(values: Record<string, string> | null) {
   if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url.href);
 }
 
+const inr = (rupees: number) => `₹${rupees.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+const CYCLE_NAME: Record<BillingCycle, string> = { monthly: "Monthly", quarterly: "Every 3 months", yearly: "Yearly" };
+const STEPS: { id: ModalStep; label: string }[] = [
+  { id: "review", label: "Plan" },
+  { id: "payment", label: "Payment" },
+  { id: "verifying", label: "Confirmation" },
+];
+
 export function SubscriptionPaymentModal({
   isOpen,
   onClose,
@@ -71,33 +58,11 @@ export function SubscriptionPaymentModal({
 }: SubscriptionPaymentModalProps) {
   const [selectedPlanId, setSelectedPlanId] = useState<"starter" | "pro">(initialPlanId);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>(initialBillingCycle);
-  // Where sellers pay (set by the admin); follows changes live
-  const [platformPayment, setPlatformPayment] = useState(() => storeService.getPlatformPayment());
-  useEffect(() => storeService.subscribe(() => setPlatformPayment(storeService.getPlatformPayment())), []);
-
   const [step, setStep] = useState<ModalStep>(() => (readParam("step") === "payment" ? "payment" : "review"));
-  // One payment reference per checkout, kept across re-renders and refreshes
-  const [generatedRef, setGeneratedRef] = useState(() => {
-    const fromUrl = readParam("ref");
-    return fromUrl && /^REF-SUB-\d{6}$/.test(fromUrl) ? fromUrl : `REF-SUB-${Math.floor(100000 + Math.random() * 900000)}`;
-  });
-  const utrKey = `shopersite_checkout_utr_${store.subdomain}`;
-  const [paymentUtr, setPaymentUtr] = useState(() => {
-    try {
-      return sessionStorage.getItem(utrKey) || "";
-    } catch {
-      return "";
-    }
-  });
-  const [utrError, setUtrError] = useState("");
-  const [copiedUpi, setCopiedUpi] = useState(false);
-  const [copiedAmount, setCopiedAmount] = useState(false);
-  const [submittedRequest, setSubmittedRequest] = useState<SubscriptionRequest | null>(
-    store?.pendingSubscription || null
-  );
-  const [simulatingVerification, setSimulatingVerification] = useState(false);
+  const [submittedRequest, setSubmittedRequest] = useState<SubscriptionRequest | null>(store?.pendingSubscription || null);
+  const [cancelling, setCancelling] = useState(false);
 
-  // If there is already a pending subscription for this store, show the verifying step by default
+  // If there is already a pending subscription for this store, show the confirmation step
   useEffect(() => {
     if (!isOpen) return;
     if (store?.pendingSubscription) {
@@ -114,22 +79,20 @@ export function SubscriptionPaymentModal({
   // Mirror the checkout into the URL so a refresh comes back to the same place
   useEffect(() => {
     if (!isOpen) return;
-    writeCheckoutParams({ checkout: selectedPlanId, cycle: billingCycle, step, ref: generatedRef });
-  }, [isOpen, selectedPlanId, billingCycle, step, generatedRef]);
+    writeCheckoutParams({ checkout: selectedPlanId, cycle: billingCycle, step });
+  }, [isOpen, selectedPlanId, billingCycle, step]);
 
+  // Escape closes the page
   useEffect(() => {
-    try {
-      if (paymentUtr) sessionStorage.setItem(utrKey, paymentUtr);
-      else sessionStorage.removeItem(utrKey);
-    } catch {
-      // storage unavailable (private mode); the UTR just isn't remembered
-    }
-  }, [paymentUtr, utrKey]);
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   const close = () => {
     writeCheckoutParams(null);
     setStep("review");
-    setGeneratedRef(`REF-SUB-${Math.floor(100000 + Math.random() * 900000)}`);
     onClose();
   };
 
@@ -137,50 +100,20 @@ export function SubscriptionPaymentModal({
 
   const currentPlan = PLATFORM_PLANS[selectedPlanId] || PLATFORM_PLANS.starter;
   const pricing = calculatePlanPrice(selectedPlanId, billingCycle);
-  const amountRupees = pricing.totalRupees;
-  // Strictly format to 2 decimal places so UPI apps receive a fixed, non-editable amount
-  const fixedAmountStr = amountRupees.toFixed(2);
-
-  const platformUpiId = platformPayment.upiId;
-  const platformMerchant = platformPayment.payeeName;
-  const transactionRef = submittedRequest?.referenceId || generatedRef;
-  const transactionNote = `Sub ${currentPlan.name} - ${store.subdomain}`.slice(0, 48);
-
-  // UPI deep link specification: &am=<fixed> locks the amount field in compliant UPI apps
-  const upiPayUrl = `upi://pay?pa=${encodeURIComponent(platformUpiId)}&pn=${encodeURIComponent(
-    platformMerchant
-  )}&am=${fixedAmountStr}&cu=INR&tn=${encodeURIComponent(transactionNote)}&tr=${encodeURIComponent(
-    transactionRef
-  )}`;
-
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(
-    upiPayUrl
-  )}`;
-
-  const handleCopyUpi = () => {
-    navigator.clipboard.writeText(platformUpiId);
-    setCopiedUpi(true);
-    setTimeout(() => setCopiedUpi(false), 2000);
-  };
-
-  const handleCopyAmount = () => {
-    navigator.clipboard.writeText(fixedAmountStr);
-    setCopiedAmount(true);
-    setTimeout(() => setCopiedAmount(false), 2000);
-  };
-
+  const months = BILLING_CYCLES.find((c) => c.id === billingCycle)?.months || 1;
+  const listTotal = (currentPlan.priceMonthly / 100) * months;
 
   /** Sends the UTR to the server; the plan starts only when an admin approves the payment. */
   const handleSubmitPayment = async (utr: string) => {
     const req = await storeService.createSubscriptionPayment(store.subdomain, { planId: selectedPlanId, billingCycle, paymentUtr: utr });
     setSubmittedRequest(req);
-    setPaymentUtr("");
     setStep("verifying");
     if (onSuccess) onSuccess();
   };
 
   const handleCancelPending = async () => {
-    if (!confirm("Cancel this plan payment request? Do this only if you haven't paid, or entered the wrong reference number.")) return;
+    if (!confirm("Cancel this payment request? Only do this if you haven't paid, or entered the wrong reference number.")) return;
+    setCancelling(true);
     try {
       await storeService.cancelSubscriptionRequest(store.subdomain);
       setSubmittedRequest(null);
@@ -188,508 +121,322 @@ export function SubscriptionPaymentModal({
       if (onSuccess) onSuccess();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Couldn't cancel. Please try again.");
+    } finally {
+      setCancelling(false);
     }
   };
 
+  const stepIndex = STEPS.findIndex((s) => s.id === step);
+
+  const summary = (
+    <div className="rounded-xl border border-neutral-200 bg-white">
+      <div className="px-5 pt-5">
+        <h3 className="text-sm font-semibold">Order summary</h3>
+        <dl className="mt-4 space-y-2.5 text-[13px]">
+          <div className="flex justify-between gap-3">
+            <dt className="text-neutral-600">
+              {currentPlan.name} plan · {CYCLE_NAME[billingCycle]}
+            </dt>
+            <dd className="tabular-nums">{inr(listTotal)}</dd>
+          </div>
+          {pricing.savedRupees > 0 && (
+            <div className="flex justify-between gap-3">
+              <dt className="text-neutral-600">Discount ({pricing.discountPercent}%)</dt>
+              <dd className="tabular-nums text-emerald-700">−{inr(pricing.savedRupees)}</dd>
+            </div>
+          )}
+        </dl>
+      </div>
+      <div className="mt-4 flex items-baseline justify-between border-t border-neutral-200 px-5 py-4">
+        <span className="text-sm font-semibold">Total</span>
+        <span className="text-lg font-semibold tabular-nums">{inr(pricing.totalRupees)}</span>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col bg-[#FAFAFA] text-neutral-900 animate-in fade-in duration-200">
-      <div className="flex min-h-0 flex-1 flex-col">
-        {/* Page header */}
-        <div className="shrink-0 border-b border-neutral-200 bg-white">
-          <div className="mx-auto flex h-16 max-w-2xl items-center gap-3 px-4 sm:px-6">
-            <button
-              type="button"
-              onClick={close}
-              aria-label="Back to dashboard"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border border-neutral-200 bg-white text-neutral-700 transition-colors hover:border-neutral-900 hover:text-black"
-            >
-              <ArrowLeft className="h-[18px] w-[18px]" />
-            </button>
-            <div className="min-w-0">
-              <h1 className="text-lg font-semibold leading-tight tracking-tight">Upgrade your plan</h1>
-              <p className="truncate text-xs text-neutral-500">
-                {store.name} · {store.subdomain}.{siteConfig.domain}
-              </p>
-            </div>
+    <div className="[&_:is(h1,h2,h3)]:[font-family:inherit] [&_:is(h1,h2,h3)]:tracking-tight fixed inset-0 z-[70] flex flex-col bg-neutral-50 text-neutral-900 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-label="Upgrade plan">
+      {/* header */}
+      <header className="shrink-0 border-b border-neutral-200 bg-white">
+        <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4 sm:px-6">
+          <button
+            type="button"
+            onClick={close}
+            aria-label="Back to dashboard"
+            style={{ minHeight: 0 }}
+            className="-ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+          >
+            <ArrowLeft className="h-[18px] w-[18px]" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[15px] font-semibold leading-tight">Upgrade plan</h1>
+            <p className="truncate text-xs text-neutral-500">
+              {store.subdomain}.{siteConfig.domain}
+            </p>
+          </div>
+          <ol className="hidden items-center gap-2 text-[13px] sm:flex" aria-label="Steps">
+            {STEPS.map((s, i) => (
+              <li key={s.id} className="flex items-center gap-2">
+                {i > 0 && <span className="h-px w-5 bg-neutral-300" />}
+                <span className={i === stepIndex ? "font-medium text-neutral-900" : i < stepIndex ? "text-neutral-600" : "text-neutral-400"}>
+                  {i < stepIndex && <Check className="mr-1 inline h-3.5 w-3.5 -translate-y-px" />}
+                  {s.label}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+        {/* phone: step x of 3 with a thin progress bar */}
+        <div className="mx-auto max-w-5xl px-4 pb-2.5 sm:hidden">
+          <p className="text-xs text-neutral-500">
+            Step {stepIndex + 1} of 3 · <span className="font-medium text-neutral-800">{STEPS[stepIndex].label}</span>
+          </p>
+          <div className="mt-1.5 grid grid-cols-3 gap-1">
+            {STEPS.map((s, i) => (
+              <span key={s.id} className={`h-0.5 rounded-full ${i <= stepIndex ? "bg-neutral-900" : "bg-neutral-200"}`} />
+            ))}
           </div>
         </div>
+      </header>
 
-        {/* Step Progression Indicators */}
-        <div className="shrink-0 border-b border-neutral-200 bg-white">
-          <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3 text-xs font-semibold sm:px-6">
-            <div
-              className={`flex items-center gap-1.5 ${
-                step === "review" ? "text-neutral-950 font-bold" : "text-emerald-700"
-              }`}
-            >
-              <span
-                className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${
-                  step === "review"
-                    ? "bg-neutral-900 text-white"
-                    : "bg-emerald-600 text-white"
-                }`}
-              >
-                {step === "review" ? "1" : <Check className="h-3 w-3" />}
-              </span>
-              <span>1. Choose Plan</span>
-            </div>
-            <div className="h-px w-8 bg-neutral-200" />
-            <div
-              className={`flex items-center gap-1.5 ${
-                step === "payment"
-                  ? "text-neutral-950 font-bold"
-                  : step === "verifying"
-                  ? "text-emerald-700"
-                  : "text-neutral-400"
-              }`}
-            >
-              <span
-                className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${
-                  step === "payment"
-                    ? "bg-neutral-900 text-white"
-                    : step === "verifying"
-                    ? "bg-emerald-600 text-white"
-                    : "bg-neutral-200 text-neutral-600"
-                }`}
-              >
-                {step === "verifying" ? <Check className="h-3 w-3" /> : "2"}
-              </span>
-              <span>2. UPI Payment</span>
-            </div>
-            <div className="h-px w-8 bg-neutral-200" />
-            <div
-              className={`flex items-center gap-1.5 ${
-                step === "verifying" ? "text-amber-800 font-bold" : "text-neutral-400"
-              }`}
-            >
-              <span
-                className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${
-                  step === "verifying"
-                    ? "bg-amber-500 text-white animate-pulse"
-                    : "bg-neutral-200 text-neutral-600"
-                }`}
-              >
-                3
-              </span>
-              <span>3. Verification</span>
-            </div>
-          </div>
-        </div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {/* STEP 1: choose a plan */}
+        {step === "review" && (
+          <div className="mx-auto grid max-w-5xl gap-6 px-4 pb-28 pt-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:pb-10 lg:pt-8">
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight">Choose a plan</h2>
+              <p className="mt-1 text-sm text-neutral-500">Prices in INR. You pay once for the period you pick.</p>
 
-        {/* Page body */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
-          {/* STEP 1: REVIEW & PLAN SELECTION */}
-          {step === "review" && (
-            <div className="space-y-5 animate-in fade-in duration-150">
-              {/* Billing Cycle Toggle (Monthly, Quarterly save 5%, Annually save 10%) */}
-              <div className="flex flex-col items-center justify-center gap-1.5">
-                <div className="inline-flex flex-wrap items-center justify-center rounded-xl bg-neutral-100 p-1 text-xs font-semibold gap-1">
-                  {BILLING_CYCLES.map((cycleOption) => {
-                    const isCycleSelected = billingCycle === cycleOption.id;
-                    return (
-                      <button
-                        key={cycleOption.id}
-                        type="button"
-                        onClick={() => setBillingCycle(cycleOption.id)}
-                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all cursor-pointer ${
-                          isCycleSelected
-                            ? "bg-white text-neutral-900 shadow-xs"
-                            : "text-neutral-500 hover:text-neutral-900"
-                        }`}
-                      >
-                        <span>{cycleOption.shortLabel}</span>
-                        {cycleOption.tag && (
-                          <span
-                            className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                              cycleOption.id === "yearly"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-blue-100 text-blue-800"
-                            }`}
-                          >
-                            {cycleOption.tag}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Tier Cards Selector */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {(["starter", "pro"] as const).map((planKey) => {
-                  const p = PLATFORM_PLANS[planKey];
-                  const isSelected = selectedPlanId === planKey;
-                  const cardPricing = calculatePlanPrice(planKey, billingCycle);
-
+              {/* billing period */}
+              <div role="radiogroup" aria-label="Billing period" className="mt-5 grid grid-cols-3 rounded-lg border border-neutral-200 bg-white p-1">
+                {BILLING_CYCLES.map((c) => {
+                  const on = billingCycle === c.id;
                   return (
-                    <div
-                      key={planKey}
-                      onClick={() => setSelectedPlanId(planKey)}
-                      className={`relative cursor-pointer rounded-2xl border p-4.5 transition-all ${
-                        isSelected
-                          ? "border-neutral-950 bg-neutral-950 text-white shadow-lg ring-2 ring-neutral-950"
-                          : "border-neutral-200 bg-white hover:border-neutral-300 text-neutral-900"
+                    <button
+                      key={c.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => setBillingCycle(c.id)}
+                      style={{ minHeight: 0 }}
+                      className={`flex h-10 flex-col items-center justify-center rounded-md text-[13px] leading-tight transition-colors ${
+                        on ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
                       }`}
                     >
-                      {p.highlight && (
-                        <span
-                          className={`absolute -top-2.5 right-4 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                            isSelected
-                              ? "bg-amber-400 text-neutral-950"
-                              : "bg-neutral-900 text-white"
-                          }`}
-                        >
-                          Most Popular
-                        </span>
+                      <span className="font-medium">{c.shortLabel}</span>
+                      {c.discountPercent > 0 && (
+                        <span className={`text-[11px] ${on ? "text-white/70" : "text-emerald-700"}`}>Save {c.discountPercent}%</span>
                       )}
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-base font-bold">{p.name}</span>
-                        <div
-                          className={`h-4.5 w-4.5 rounded-full border flex items-center justify-center ${
-                            isSelected
-                              ? "border-amber-400 bg-amber-400 text-neutral-950"
-                              : "border-neutral-300 bg-transparent"
-                          }`}
-                        >
-                          {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
-                        </div>
-                      </div>
-
-                      <div className="mt-2.5 flex items-baseline gap-1">
-                        <span className="text-2xl font-bold tracking-tight">
-                          {cardPricing.formattedMonthly}
-                        </span>
-                        <span
-                          className={`text-xs ${
-                            isSelected ? "text-neutral-400" : "text-neutral-500"
-                          }`}
-                        >
-                          /month
-                        </span>
-                      </div>
-
-                      <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                        <span className={`text-[11px] ${isSelected ? "text-neutral-300" : "text-neutral-500"}`}>
-                          {billingCycle === "monthly" ? "Billed monthly" : `Billed ${billingCycle === "quarterly" ? "quarterly" : "annually"} (${cardPricing.formattedTotal})`}
-                        </span>
-                        {cardPricing.discountPercent > 0 && (
-                          <span className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${isSelected ? "bg-amber-400 text-neutral-950" : "bg-emerald-100 text-emerald-800"}`}>
-                            Save {cardPricing.discountPercent}%
-                          </span>
-                        )}
-                      </div>
-
-                      <p
-                        className={`mt-1.5 text-xs line-clamp-2 ${
-                          isSelected ? "text-neutral-300" : "text-neutral-600"
-                        }`}
-                      >
-                        {p.description}
-                      </p>
-
-                      <ul className="mt-3.5 space-y-1.5 border-t pt-3 text-xs">
-                        <li className="flex items-center gap-2">
-                          <Check
-                            className={`h-3.5 w-3.5 shrink-0 ${
-                              isSelected ? "text-amber-400" : "text-emerald-600"
-                            }`}
-                          />
-                          <span>
-                            {p.maxProducts >= 999999
-                              ? "Unlimited products in catalog"
-                              : `Up to ${p.maxProducts} products in catalog`}
-                          </span>
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <Check
-                            className={`h-3.5 w-3.5 shrink-0 ${
-                              isSelected ? "text-amber-400" : "text-emerald-600"
-                            }`}
-                          />
-                          <span>
-                            {planKey === "pro"
-                              ? "All 5+ designer templates"
-                              : "3 designer themes (Bento, Botanical)"}
-                          </span>
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <Check
-                            className={`h-3.5 w-3.5 shrink-0 ${
-                              isSelected ? "text-amber-400" : "text-emerald-600"
-                            }`}
-                          />
-                          <span>
-                            {planKey === "pro"
-                              ? "Custom domain support (yourbrand.in)"
-                              : "Discount coupons & marketing banners"}
-                          </span>
-                        </li>
-                      </ul>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
 
-              {/* Order Summary Box */}
-              <div className="rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4">
-                <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">
-                  Billing Summary
-                </span>
-                <div className="mt-2.5 space-y-2 text-xs">
-                  <div className="flex justify-between text-neutral-700">
-                    <span>
-                      {currentPlan.name} ({pricing.cycleLabel})
-                    </span>
-                    <span className="font-semibold text-neutral-900 font-mono">
-                      ₹{((currentPlan.priceMonthly / 100) * (billingCycle === "yearly" ? 12 : billingCycle === "quarterly" ? 3 : 1)).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  {pricing.savedRupees > 0 && (
-                    <div className="flex justify-between text-emerald-700 font-semibold">
-                      <span>{pricing.cycleLabel} Savings ({pricing.discountPercent}%)</span>
-                      <span className="font-mono">-₹{pricing.savedRupees.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-neutral-700">
-                    <span className="inline-flex items-center gap-1">
-                      <span>GST & Platform Processing Fees</span>
-                      <span className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-[10px] font-semibold text-emerald-800">
-                        Inclusive
-                      </span>
-                    </span>
-                    <span className="font-semibold text-neutral-900">₹0.00</span>
-                  </div>
-                  <div className="border-t border-neutral-200 pt-2 flex justify-between text-sm font-bold text-neutral-900">
-                    <span>Total Payable:</span>
-                    <span className="text-base text-emerald-700 font-mono">
-                      {pricing.formattedTotal}.00
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Proceed CTA, pinned to the bottom so it's always reachable */}
-              <div className="sticky bottom-0 -mx-4 -mb-6 border-t border-neutral-200 bg-[#FAFAFA]/95 px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur sm:-mx-6 sm:px-6">
-              <button
-                type="button"
-                onClick={() => setStep("payment")}
-                className="w-full h-12 rounded-xl bg-neutral-900 text-white font-semibold text-sm inline-flex items-center justify-center gap-2 hover:bg-black transition-all shadow-md cursor-pointer hover:translate-y-[-1px]"
-              >
-                <span>Proceed to UPI Payment (₹{amountRupees.toLocaleString("en-IN")})</span>
-                <ArrowRight className="h-4 w-4" />
-              </button>
+              {/* plans */}
+              <div role="radiogroup" aria-label="Plan" className="mt-4 grid gap-3 sm:grid-cols-2">
+                {(["starter", "pro"] as const).map((planKey) => {
+                  const p = PLATFORM_PLANS[planKey];
+                  const on = selectedPlanId === planKey;
+                  const cardPricing = calculatePlanPrice(planKey, billingCycle);
+                  return (
+                    <button
+                      key={planKey}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => setSelectedPlanId(planKey)}
+                      style={{ minHeight: 0 }}
+                      className={`flex flex-col rounded-xl border bg-white p-5 text-left transition-shadow ${
+                        on ? "border-neutral-900 shadow-[0_0_0_1px_#171717]" : "border-neutral-200 hover:border-neutral-400"
+                      }`}
+                    >
+                      <div className="flex w-full items-center justify-between gap-2">
+                        <span className="flex items-center gap-2">
+                          <span className="text-[15px] font-semibold">{p.name}</span>
+                          {p.highlight && <span className="rounded border border-neutral-200 px-1.5 py-px text-[11px] text-neutral-600">Popular</span>}
+                        </span>
+                        <span
+                          aria-hidden
+                          className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border ${on ? "border-neutral-900 bg-neutral-900" : "border-neutral-300"}`}
+                        >
+                          {on && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[13px] text-neutral-500">{p.description}</p>
+                      <p className="mt-4">
+                        <span className="text-[26px] font-semibold tracking-tight tabular-nums">{cardPricing.formattedMonthly}</span>
+                        <span className="text-[13px] text-neutral-500"> / month</span>
+                      </p>
+                      <p className="mt-0.5 h-4 text-xs text-neutral-500">
+                        {billingCycle === "monthly" ? "Billed monthly" : `${cardPricing.formattedTotal} billed ${billingCycle === "yearly" ? "yearly" : "every 3 months"}`}
+                      </p>
+                      <ul className="mt-4 space-y-2 border-t border-neutral-100 pt-4 text-[13px] text-neutral-700">
+                        {p.features.map((f) => (
+                          <li key={f} className="flex gap-2">
+                            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-900" />
+                            <span>{f}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          )}
 
-          {/* STEP 2: gateway-style UPI payment (amount and payee confirmed by the server) */}
-          {step === "payment" && (
+            {/* summary (desktop: sticky side column) */}
+            <aside className="hidden lg:block">
+              <div className="sticky top-8 space-y-3">
+                {summary}
+                <button
+                  type="button"
+                  onClick={() => setStep("payment")}
+                  className="h-11 w-full rounded-lg bg-neutral-900 text-sm font-medium text-white hover:bg-black"
+                >
+                  Continue to payment
+                </button>
+                <p className="px-1 text-xs leading-relaxed text-neutral-500">
+                  You&apos;ll pay by UPI on the next step. Your plan starts once we confirm the payment.
+                </p>
+              </div>
+            </aside>
+
+            {/* phone / tablet: total + continue pinned at the bottom */}
+            <div className="fixed inset-x-0 bottom-0 z-10 border-t border-neutral-200 bg-white px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 lg:hidden">
+              <div className="mx-auto flex max-w-5xl items-center gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-neutral-500">
+                    {currentPlan.name} · {CYCLE_NAME[billingCycle]}
+                  </p>
+                  <p className="text-lg font-semibold leading-tight tabular-nums">{inr(pricing.totalRupees)}</p>
+                </div>
+                <button type="button" onClick={() => setStep("payment")} className="h-11 shrink-0 rounded-lg bg-neutral-900 px-5 text-sm font-medium text-white hover:bg-black">
+                  Continue to payment
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2: UPI payment (amount and payee come from the server) */}
+        {step === "payment" && (
+          <div className="mx-auto grid max-w-5xl items-start gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:py-8">
             <PlanPaymentStep
               planId={selectedPlanId}
               cycle={billingCycle}
-              storeLabel={`${store.name} · ${store.subdomain}`}
+              storeLabel={store.subdomain}
               onBack={() => setStep("review")}
               onSubmit={handleSubmitPayment}
             />
-          )}
+            <aside className="hidden lg:block">
+              <div className="sticky top-8 space-y-3">
+                {summary}
+                <ol className="space-y-2 px-1 text-xs leading-relaxed text-neutral-500">
+                  <li>1. Pay the exact amount to the UPI ID shown.</li>
+                  <li>2. Enter the 12-digit UTR from your UPI app.</li>
+                  <li>3. We match it with our bank account and switch your plan on.</li>
+                </ol>
+              </div>
+            </aside>
+          </div>
+        )}
 
-          {/* STEP 3: VERIFICATION IN PROGRESS (Reassurance + "You can quit now" + Productive options) */}
-          {step === "verifying" && (
-            <div className="space-y-6 animate-in fade-in duration-150">
-              {/* Radar Status Badge */}
-              <div className="rounded-3xl border border-amber-200 bg-amber-50/70 p-5 sm:p-6 text-center space-y-3">
-                <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-500/25">
-                  <Clock className="h-8 w-8 animate-spin-slow" />
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-600" />
-                  </span>
-                </div>
-
-                <div>
-                  <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-200/80 px-3 py-1 text-xs font-bold text-amber-900">
-                    <Clock className="h-3.5 w-3.5" />
-                    <span>Verification Underway</span>
-                  </div>
-                  <h3 className="mt-2 text-xl font-bold tracking-tight text-neutral-950">
-                    Payment Submitted for Verification
-                  </h3>
-                </div>
-
-                {/* Prominent "You can quit now" Alert Box */}
-                <div className="rounded-2xl border border-amber-300/80 bg-white p-4 text-left space-y-1.5 text-xs text-neutral-800 shadow-2xs">
-                  <div className="flex items-center gap-2 font-bold text-amber-900 text-sm">
-                    <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
-                    <span>You can safely quit or close this window now</span>
-                  </div>
-                  <p className="leading-relaxed text-neutral-600 pl-6">
-                    Bank verification and automated reconciliation may take up to{" "}
-                    <b className="text-neutral-900">1–2 hours</b> during peak banking hours. You don&apos;t
-                    need to wait on this screen — your plan limits and features will activate
-                    automatically the moment verification clears.
-                  </p>
-                </div>
-
-                {/* Details Pills */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-left pt-1">
-                  <div className="rounded-xl bg-white border border-neutral-200/80 p-2.5">
-                    <span className="block text-[10px] text-neutral-500 uppercase">Plan</span>
-                    <span className="font-bold text-xs truncate block text-neutral-900">
-                      {submittedRequest?.planName || currentPlan.name}
-                    </span>
-                  </div>
-                  <div className="rounded-xl bg-white border border-neutral-200/80 p-2.5">
-                    <span className="block text-[10px] text-neutral-500 uppercase">Amount</span>
-                    <span className="font-bold text-xs font-mono text-emerald-700 block">
-                      {submittedRequest?.amountFormatted || `₹${fixedAmountStr}`}
-                    </span>
-                  </div>
-                  <div className="rounded-xl bg-white border border-neutral-200/80 p-2.5 col-span-2 sm:col-span-1">
-                    <span className="block text-[10px] text-neutral-500 uppercase">Reference</span>
-                    <span className="font-mono font-bold text-xs truncate block text-neutral-900">
-                      {submittedRequest?.referenceId || transactionRef}
-                    </span>
-                  </div>
-                </div>
-
-                {submittedRequest?.paymentUtr && (
-                  <p className="text-[11px] text-neutral-500 text-left font-mono">
-                    Bank UTR: <span className="font-semibold text-neutral-800">{submittedRequest.paymentUtr}</span>
-                  </p>
-                )}
+        {/* STEP 3: submitted, waiting for us to confirm */}
+        {step === "verifying" && (
+          <div className="mx-auto max-w-lg px-4 py-8 sm:px-6 sm:py-12">
+            <div className="rounded-xl border border-neutral-200 bg-white">
+              <div className="px-6 pb-6 pt-7">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-amber-700">
+                  <Clock className="h-5 w-5" />
+                </span>
+                <h2 className="mt-4 text-xl font-semibold tracking-tight">Payment submitted</h2>
+                <p className="mt-1.5 text-sm leading-relaxed text-neutral-600">
+                  We&apos;ll match your UTR with the payment in our bank account and switch your store to{" "}
+                  {submittedRequest?.planName || currentPlan.name}. This usually takes{" "}
+                  {submittedRequest?.estimatedVerificationTime || "a few hours"}. You can close this page; the change shows up
+                  in your dashboard by itself.
+                </p>
               </div>
 
-              {/* "While you wait: explore and stay productive" */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold tracking-tight text-neutral-900">
-                    What you can do while we verify:
-                  </h4>
-                  <span className="text-xs text-neutral-500">Pick any task</span>
-                </div>
+              <dl className="divide-y divide-neutral-100 border-t border-neutral-200 px-6 text-[13px]">
+                <Detail label="Status">
+                  <span className="inline-flex items-center gap-1.5 font-medium text-amber-800">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Awaiting confirmation
+                  </span>
+                </Detail>
+                <Detail label="Plan">
+                  {submittedRequest?.planName || currentPlan.name} · {CYCLE_NAME[submittedRequest?.billingCycle || billingCycle]}
+                </Detail>
+                <Detail label="Amount">
+                  <span className="tabular-nums">{submittedRequest?.amountFormatted || inr(pricing.totalRupees)}</span>
+                </Detail>
+                {submittedRequest?.paymentUtr && (
+                  <Detail label="UTR">
+                    <span className="tabular-nums">{submittedRequest.paymentUtr}</span>
+                  </Detail>
+                )}
+                {submittedRequest?.referenceId && (
+                  <Detail label="Reference">
+                    <span className="tabular-nums">{submittedRequest.referenceId}</span>
+                  </Detail>
+                )}
+                {submittedRequest?.createdAt && (
+                  <Detail label="Submitted">
+                    {new Date(submittedRequest.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
+                  </Detail>
+                )}
+              </dl>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {/* Option 1: Setup store */}
-                  <div
+              <div className="flex flex-col-reverse gap-2 border-t border-neutral-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <button
+                  type="button"
+                  onClick={handleCancelPending}
+                  disabled={cancelling}
+                  style={{ minHeight: 0 }}
+                  className="h-10 rounded-lg px-1 text-left text-[13px] text-neutral-500 hover:text-rose-600 disabled:opacity-60"
+                >
+                  {cancelling ? "Cancelling…" : "Cancel request"}
+                </button>
+                <button type="button" onClick={close} className="h-10 rounded-lg bg-neutral-900 px-5 text-sm font-medium text-white hover:bg-black">
+                  Back to dashboard
+                </button>
+              </div>
+            </div>
+
+            <p className="mt-4 px-1 text-xs leading-relaxed text-neutral-500">
+              Entered the wrong UTR? Cancel this request and submit it again with the right number.
+              {(onOpenSetupWizard || onNavigateTab) && (
+                <>
+                  {" "}
+                  Meanwhile, you can keep{" "}
+                  <button
+                    type="button"
+                    style={{ minHeight: 0 }}
+                    className="font-medium text-neutral-800 underline underline-offset-2"
                     onClick={() => {
                       close();
                       if (onOpenSetupWizard) onOpenSetupWizard();
-                      else if (onNavigateTab) onNavigateTab("settings");
+                      else onNavigateTab?.("settings");
                     }}
-                    className="group cursor-pointer rounded-2xl border border-neutral-200 p-3.5 transition-all hover:border-neutral-950 hover:bg-neutral-50 flex items-start gap-3"
                   >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 transition-transform group-hover:scale-105">
-                      <Store className="h-4.5 w-4.5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <span className="block text-xs font-bold text-neutral-900 group-hover:text-black">
-                        Complete Store Setup
-                      </span>
-                      <span className="block text-[11px] text-neutral-500 line-clamp-2">
-                        Add store logo, shipping rates, and WhatsApp number.
-                      </span>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-neutral-300 group-hover:translate-x-0.5 group-hover:text-neutral-900 transition-all shrink-0 mt-1" />
-                  </div>
-
-                  {/* Option 2: Explore Dashboard */}
-                  <div
-                    onClick={() => {
-                      close();
-                      if (onNavigateTab) onNavigateTab("overview");
-                    }}
-                    className="group cursor-pointer rounded-2xl border border-neutral-200 p-3.5 transition-all hover:border-neutral-950 hover:bg-neutral-50 flex items-start gap-3"
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600 transition-transform group-hover:scale-105">
-                      <LayoutDashboard className="h-4.5 w-4.5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <span className="block text-xs font-bold text-neutral-900 group-hover:text-black">
-                        Explore Dashboard
-                      </span>
-                      <span className="block text-[11px] text-neutral-500 line-clamp-2">
-                        Check live orders, view stats, and configure alerts.
-                      </span>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-neutral-300 group-hover:translate-x-0.5 group-hover:text-neutral-900 transition-all shrink-0 mt-1" />
-                  </div>
-
-                  {/* Option 3: Designer themes */}
-                  <div
-                    onClick={() => {
-                      close();
-                      if (onNavigateTab) onNavigateTab("themes");
-                    }}
-                    className="group cursor-pointer rounded-2xl border border-neutral-200 p-3.5 transition-all hover:border-neutral-950 hover:bg-neutral-50 flex items-start gap-3"
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 transition-transform group-hover:scale-105">
-                      <Palette className="h-4.5 w-4.5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <span className="block text-xs font-bold text-neutral-900 group-hover:text-black">
-                        Browse Designer Themes
-                      </span>
-                      <span className="block text-[11px] text-neutral-500 line-clamp-2">
-                        Preview Bento Tech, Kyoto Botanical, and Lookbook.
-                      </span>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-neutral-300 group-hover:translate-x-0.5 group-hover:text-neutral-900 transition-all shrink-0 mt-1" />
-                  </div>
-
-                  {/* Option 4: Add Products */}
-                  <div
-                    onClick={() => {
-                      close();
-                      if (onNavigateTab) onNavigateTab("products");
-                    }}
-                    className="group cursor-pointer rounded-2xl border border-neutral-200 p-3.5 transition-all hover:border-neutral-950 hover:bg-neutral-50 flex items-start gap-3"
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition-transform group-hover:scale-105">
-                      <Package className="h-4.5 w-4.5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <span className="block text-xs font-bold text-neutral-900 group-hover:text-black">
-                        Draft & Organize Products
-                      </span>
-                      <span className="block text-[11px] text-neutral-500 line-clamp-2">
-                        Add photos, organize categories, and set stock counts.
-                      </span>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-neutral-300 group-hover:translate-x-0.5 group-hover:text-neutral-900 transition-all shrink-0 mt-1" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Actions & Dev Sandbox Helper */}
-              <div className="border-t border-neutral-100 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={close}
-                  className="w-full sm:w-auto h-11 px-5 rounded-xl bg-neutral-900 text-white font-semibold text-xs hover:bg-black transition-colors"
-                >
-                  Close & Return to Dashboard
-                </button>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCancelPending}
-                    className="text-xs text-neutral-500 hover:text-rose-600 transition-colors"
-                  >
-                    Cancel request
+                    setting up your store
                   </button>
-
-
-                </div>
-              </div>
-            </div>
-          )}
+                  .
+                </>
+              )}
+            </p>
           </div>
-        </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function Detail({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-3">
+      <dt className="shrink-0 text-neutral-500">{label}</dt>
+      <dd className="min-w-0 truncate text-right text-neutral-900">{children}</dd>
     </div>
   );
 }
@@ -733,9 +480,9 @@ function PlanPaymentStep({
 
   if (error) {
     return (
-      <div className="mx-auto max-w-md rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
-        <p className="font-semibold">{error}</p>
-        <button type="button" onClick={onBack} className="mt-3 text-xs font-semibold underline">
+      <div className="mx-auto w-full max-w-[440px] rounded-xl border border-rose-200 bg-white p-5 text-sm">
+        <p className="font-medium text-rose-700">{error}</p>
+        <button type="button" onClick={onBack} style={{ minHeight: 0 }} className="mt-3 text-[13px] font-medium text-neutral-700 underline underline-offset-2">
           Back to plans
         </button>
       </div>
@@ -743,8 +490,8 @@ function PlanPaymentStep({
   }
   if (!quote) {
     return (
-      <div className="flex justify-center py-16">
-        <RefreshCw className="h-5 w-5 animate-spin text-neutral-400" />
+      <div className="mx-auto flex w-full max-w-[440px] items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white py-20 text-sm text-neutral-500">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading payment details…
       </div>
     );
   }
@@ -756,7 +503,7 @@ function PlanPaymentStep({
       payeeUpiId={quote.payee.upiId}
       payeeName={quote.payee.payeeName}
       note={`${quote.label}`.slice(0, 48)}
-      submitLabel="Submit for verification"
+      submitLabel="Submit payment"
       onBack={onBack}
       onSubmit={onSubmit}
     />

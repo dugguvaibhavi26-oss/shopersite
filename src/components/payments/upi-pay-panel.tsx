@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import QRCode from "qrcode";
-import { AlertCircle, Check, ChevronDown, Clock, Copy, Loader2, Lock, ShieldCheck, Smartphone } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, Copy, Loader2, Lock } from "lucide-react";
 
 /**
  * A payment-gateway style UPI screen: amount, payee, QR code (made in the browser), "open UPI app",
@@ -40,7 +40,7 @@ export function UpiPayPanel({ merchantName, purpose, amount, payeeUpiId, payeeNa
   );
   const [qr, setQr] = React.useState("");
   React.useEffect(() => {
-    QRCode.toDataURL(upiUrl, { margin: 1, width: 440, errorCorrectionLevel: "M" }).then(setQr).catch(() => setQr(""));
+    QRCode.toDataURL(upiUrl, { margin: 0, width: 400, errorCorrectionLevel: "M" }).then(setQr).catch(() => setQr(""));
   }, [upiUrl]);
 
   const [deadline, setDeadline] = React.useState(() => Date.now() + minutes * 60_000);
@@ -80,8 +80,8 @@ export function UpiPayPanel({ merchantName, purpose, amount, payeeUpiId, payeeNa
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!utrOk) return setError("The UPI reference (UTR) is the 12-digit number shown in your payment app after paying.");
-    if (!confirmed) return setError(`Please confirm you've paid ${rupees(amount)}.`);
+    if (!utrOk) return setError("Enter the 12-digit UPI reference number (UTR) from your payment app.");
+    if (!confirmed) return setError(`Confirm that you've paid ${rupees(amount)}.`);
     setBusy(true);
     try {
       await onSubmit(utr);
@@ -92,103 +92,101 @@ export function UpiPayPanel({ merchantName, purpose, amount, payeeUpiId, payeeNa
   };
 
   return (
-    <div className="mx-auto w-full max-w-[440px] overflow-hidden rounded-[22px] border border-neutral-200 bg-white text-neutral-900 shadow-[0_24px_60px_-28px_rgba(0,0,0,0.35)]">
-      {/* header: who you're paying and how much */}
-      <div className="bg-neutral-950 px-5 pb-5 pt-4 text-white">
-        <div className="flex items-center justify-between gap-3">
+    <div className="[&_:is(h1,h2,h3)]:[font-family:inherit] [&_:is(h1,h2,h3)]:tracking-tight mx-auto w-full max-w-[440px] overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)]">
+      {/* amount and payee */}
+      <div className="border-b border-neutral-200 px-5 pb-5 pt-4">
+        <div className="flex h-6 items-center justify-between text-[13px]">
           {onBack ? (
-            <button type="button" onClick={onBack} className="text-xs font-medium text-white/60 hover:text-white">
-              ← Change method
+            <button type="button" onClick={onBack} style={{ minHeight: 0 }} className="-ml-1 inline-flex items-center gap-1 rounded px-1 text-neutral-500 hover:text-neutral-900">
+              <ArrowLeft className="h-3.5 w-3.5" /> Back
             </button>
           ) : (
             <span />
           )}
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/80">
-            <Lock className="h-3 w-3" /> Secure UPI payment
-          </span>
+          {!expired && (
+            <span className={`tabular-nums ${left < 60_000 ? "text-rose-600" : "text-neutral-500"}`}>
+              Expires in {mm}:{ss}
+            </span>
+          )}
         </div>
-        <p className="mt-4 truncate text-sm text-white/60">{merchantName}</p>
-        <p className="mt-0.5 text-[34px] font-semibold leading-none tracking-tight tabular-nums">{rupees(amount)}</p>
-        <p className="mt-2 truncate text-xs text-white/50">{purpose}</p>
+        <p className="mt-4 text-[13px] text-neutral-500">Amount to pay</p>
+        <p className="mt-0.5 text-[30px] font-semibold leading-tight tracking-tight tabular-nums">{rupees(amount)}</p>
+        <p className="mt-1 truncate text-[13px] text-neutral-500">
+          {merchantName} · {purpose}
+        </p>
       </div>
 
       {expired ? (
         <div className="px-6 py-10 text-center">
-          <Clock className="mx-auto h-10 w-10 text-neutral-300" />
-          <p className="mt-4 font-semibold">This payment page timed out</p>
-          <p className="mt-1 text-sm text-neutral-500">If you already paid, start again and enter your UPI reference number.</p>
+          <p className="font-semibold">This payment page has expired</p>
+          <p className="mx-auto mt-1 max-w-xs text-sm text-neutral-500">If you already paid, start again and enter the UPI reference number from that payment.</p>
           <button
             type="button"
             onClick={() => setDeadline(Date.now() + minutes * 60_000)}
-            className="mt-5 h-11 rounded-xl bg-neutral-950 px-6 text-sm font-semibold text-white hover:bg-black"
+            className="mt-5 h-11 rounded-lg bg-neutral-900 px-6 text-sm font-medium text-white hover:bg-black"
           >
             Start again
           </button>
         </div>
       ) : (
         <form onSubmit={submit} noValidate>
-          {/* step 1: pay */}
-          <div className="px-5 pt-5">
-            <div className="flex items-center justify-between">
-              <p className="text-[13px] font-semibold">
-                <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-neutral-900 text-[11px] text-white">1</span>
-                Pay with any UPI app
-              </p>
-              <span className={`inline-flex items-center gap-1 text-xs font-medium tabular-nums ${left < 60_000 ? "text-rose-600" : "text-neutral-500"}`}>
-                <Clock className="h-3.5 w-3.5" /> {mm}:{ss}
-              </span>
-            </div>
+          {/* pay */}
+          <section className="px-5 pt-5">
+            <h3 className="text-sm font-semibold">Pay by UPI</h3>
 
-            <div className="mt-4 flex flex-col items-center rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-              {mobile && (
-                <a href={upiUrl} className="mb-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-neutral-950 text-sm font-semibold text-white hover:bg-black">
-                  <Smartphone className="h-4 w-4" /> Open UPI app to pay {rupees(amount)}
-                </a>
-              )}
-              <div className="rounded-xl bg-white p-2.5 shadow-sm ring-1 ring-neutral-200">
+            {mobile && (
+              <a
+                href={upiUrl}
+                className="mt-3 flex h-12 w-full items-center justify-center rounded-lg bg-neutral-900 text-sm font-medium text-white hover:bg-black"
+              >
+                Open UPI app
+              </a>
+            )}
+
+            <div className="mt-3 flex items-center gap-4 rounded-xl border border-neutral-200 p-3">
+              <div className="shrink-0 rounded-md bg-white">
                 {qr ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={qr} alt={`UPI QR code to pay ${rupees(amount)} to ${payeeUpiId}`} width={188} height={188} className="h-[188px] w-[188px]" />
+                  <img src={qr} alt={`UPI QR code to pay ${rupees(amount)} to ${payeeUpiId}`} width={132} height={132} className="h-[132px] w-[132px]" />
                 ) : (
-                  <div className="flex h-[188px] w-[188px] items-center justify-center">
-                    <Loader2 className="h-5 w-5 animate-spin text-neutral-400" />
+                  <div className="flex h-[132px] w-[132px] items-center justify-center bg-neutral-50">
+                    <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />
                   </div>
                 )}
               </div>
-              <p className="mt-3 text-center text-xs text-neutral-500">
-                {mobile ? "Or scan from another phone" : "Scan with GPay, PhonePe, Paytm or any UPI app"}
-              </p>
-
-              <div className="mt-4 w-full divide-y divide-neutral-200 rounded-xl border border-neutral-200 bg-white text-sm">
-                <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
-                  <span className="text-neutral-500">Pay to</span>
-                  <button type="button" onClick={() => copy("upi")} className="flex min-w-0 items-center gap-1.5 font-medium" title="Copy UPI ID">
-                    <span className="truncate">{payeeUpiId}</span>
-                    {copied === "upi" ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 shrink-0 text-neutral-400" />}
-                  </button>
-                </div>
-                <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
-                  <span className="text-neutral-500">Name</span>
-                  <span className="truncate font-medium">{payeeName}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
-                  <span className="text-neutral-500">Exact amount</span>
-                  <button type="button" onClick={() => copy("amount")} className="flex items-center gap-1.5 font-semibold tabular-nums" title="Copy amount">
-                    {rupees(amount)}
-                    {copied === "amount" ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-neutral-400" />}
-                  </button>
-                </div>
+              <div className="min-w-0 text-[13px] leading-relaxed text-neutral-600">
+                <p className="font-medium text-neutral-900">{mobile ? "Or scan from another phone" : "Scan to pay"}</p>
+                <p className="mt-0.5">Google Pay, PhonePe, Paytm, BHIM or any UPI app. The amount is filled in for you.</p>
               </div>
             </div>
-          </div>
 
-          {/* step 2: tell us the UTR */}
-          <div className="px-5 pb-5 pt-6">
-            <p className="text-[13px] font-semibold">
-              <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-neutral-900 text-[11px] text-white">2</span>
-              Enter the UPI reference number
-            </p>
+            <dl className="mt-3 divide-y divide-neutral-100 text-[13px]">
+              <Row label="UPI ID">
+                <button type="button" onClick={() => copy("upi")} style={{ minHeight: 0 }} className="flex min-w-0 items-center gap-1.5 font-medium" title="Copy UPI ID">
+                  <span className="truncate">{payeeUpiId}</span>
+                  {copied === "upi" ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 shrink-0 text-neutral-400" />}
+                </button>
+              </Row>
+              <Row label="Name">
+                <span className="truncate font-medium">{payeeName}</span>
+              </Row>
+              <Row label="Amount">
+                <button type="button" onClick={() => copy("amount")} style={{ minHeight: 0 }} className="flex items-center gap-1.5 font-medium tabular-nums" title="Copy amount">
+                  {rupees(amount)}
+                  {copied === "amount" ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-neutral-400" />}
+                </button>
+              </Row>
+            </dl>
+          </section>
+
+          {/* confirm */}
+          <section className="mt-2 border-t border-neutral-200 px-5 pb-5 pt-5">
+            <label htmlFor="upi-utr" className="text-sm font-semibold">
+              UPI reference number (UTR)
+            </label>
+            <p className="mt-0.5 text-[13px] text-neutral-500">The 12-digit number in your UPI app after you pay.</p>
             <input
+              id="upi-utr"
               value={utr}
               onChange={(e) => {
                 setUtr(e.target.value.replace(/\D/g, "").slice(0, 12));
@@ -196,27 +194,27 @@ export function UpiPayPanel({ merchantName, purpose, amount, payeeUpiId, payeeNa
               }}
               inputMode="numeric"
               autoComplete="off"
-              placeholder="12-digit UTR, e.g. 412345678901"
-              aria-label="UPI reference number (UTR)"
+              placeholder="e.g. 412345678901"
               aria-invalid={!!utr && !utrOk}
-              className={`mt-3 h-12 w-full rounded-xl border bg-white px-4 font-mono text-[15px] tracking-[0.12em] outline-none transition-colors placeholder:font-sans placeholder:tracking-normal ${
-                utr && !utrOk ? "border-amber-400" : utrOk ? "border-emerald-500" : "border-neutral-300 focus:border-neutral-900"
+              className={`mt-2.5 h-11 w-full rounded-lg border bg-white px-3.5 text-[15px] tabular-nums tracking-wider outline-none transition-shadow placeholder:tracking-normal placeholder:text-neutral-400 focus:ring-4 ${
+                utr && !utrOk ? "border-neutral-300 focus:border-neutral-900 focus:ring-neutral-100" : utrOk ? "border-emerald-600 focus:ring-emerald-50" : "border-neutral-300 focus:border-neutral-900 focus:ring-neutral-100"
               }`}
             />
-            <div className="mt-1.5 flex items-center justify-between text-xs">
-              <span className={utrOk ? "text-emerald-700" : "text-neutral-500"}>{utrOk ? "Looks right" : `${utr.length}/12 digits`}</span>
-              <button type="button" onClick={() => setHelp((h) => !h)} className="inline-flex items-center gap-1 font-medium text-neutral-600">
-                Where do I find it? <ChevronDown className={`h-3.5 w-3.5 transition-transform ${help ? "rotate-180" : ""}`} />
+            <div className="mt-1.5 flex items-center justify-between text-[12px]">
+              <span className={utrOk ? "text-emerald-700" : "text-neutral-400"}>{utrOk ? "12 digits" : `${utr.length} of 12 digits`}</span>
+              <button type="button" onClick={() => setHelp((h) => !h)} style={{ minHeight: 0 }} className="font-medium text-neutral-600 underline-offset-2 hover:underline">
+                {help ? "Hide help" : "Where do I find it?"}
               </button>
             </div>
             {help && (
-              <div className="mt-2 rounded-xl bg-neutral-50 p-3 text-xs leading-relaxed text-neutral-600">
-                After paying, open the payment in your UPI app. It's called <b>UTR</b>, <b>UPI Ref. No.</b> or <b>UPI transaction ID</b>:
-                12 digits. GPay: tap the payment › &quot;UPI transaction ID&quot;. PhonePe: History › the payment › &quot;UTR&quot;. Paytm: Balance &amp; History › the payment.
-              </div>
+              <ul className="mt-2 space-y-1 rounded-lg bg-neutral-50 px-3.5 py-3 text-[12.5px] leading-relaxed text-neutral-600">
+                <li><span className="font-medium text-neutral-800">Google Pay:</span> open the payment › UPI transaction ID</li>
+                <li><span className="font-medium text-neutral-800">PhonePe:</span> History › the payment › UTR</li>
+                <li><span className="font-medium text-neutral-800">Paytm:</span> Balance &amp; History › the payment › UPI Ref. No.</li>
+              </ul>
             )}
 
-            <label className="mt-4 flex cursor-pointer items-start gap-2.5 text-sm">
+            <label className="mt-4 flex cursor-pointer items-start gap-2.5 text-[13px] leading-snug text-neutral-700">
               <input
                 type="checkbox"
                 checked={confirmed}
@@ -224,15 +222,16 @@ export function UpiPayPanel({ merchantName, purpose, amount, payeeUpiId, payeeNa
                   setConfirmed(e.target.checked);
                   setError("");
                 }}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-neutral-900"
+                style={{ minHeight: 0, minWidth: 0 }}
+                className="mt-px h-4 w-4 shrink-0 rounded accent-neutral-900"
               />
-              <span className="text-neutral-700">
-                I&apos;ve paid <b>{rupees(amount)}</b> to <b>{payeeUpiId}</b>
+              <span>
+                I have paid {rupees(amount)} to {payeeUpiId}
               </span>
             </label>
 
             {error && (
-              <p className="mt-4 flex gap-2 rounded-xl bg-rose-50 px-3.5 py-3 text-sm text-rose-700">
+              <p role="alert" className="mt-4 flex gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-[13px] text-rose-700">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {error}
               </p>
             )}
@@ -240,22 +239,28 @@ export function UpiPayPanel({ merchantName, purpose, amount, payeeUpiId, payeeNa
             <button
               type="submit"
               disabled={busy}
-              className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-neutral-950 text-sm font-semibold text-white transition-colors hover:bg-black disabled:opacity-60"
+              className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-neutral-900 text-sm font-medium text-white transition-colors hover:bg-black disabled:opacity-60"
             >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
               {busy ? "Sending…" : submitLabel || "Submit payment details"}
             </button>
-          </div>
+          </section>
 
-          <div className="flex items-start gap-2 border-t border-neutral-100 bg-neutral-50 px-5 py-3.5 text-[11.5px] leading-relaxed text-neutral-500">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-            <span>
-              Pay only to the UPI ID above. Your UPI PIN is entered only inside your UPI app; nobody here will ever ask for it.
-              Your payment is confirmed once {payeeName} checks it.
-            </span>
-          </div>
+          <p className="flex items-center justify-center gap-1.5 border-t border-neutral-100 bg-neutral-50 px-5 py-3 text-center text-[12px] text-neutral-500">
+            <Lock className="h-3 w-3 shrink-0" />
+            Pay only to the UPI ID above. Never share your UPI PIN.
+          </p>
         </form>
       )}
+    </div>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2.5">
+      <dt className="shrink-0 text-neutral-500">{label}</dt>
+      <dd className="flex min-w-0 justify-end">{children}</dd>
     </div>
   );
 }
