@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "849711979912",
+    "project_id": "rox-shoppersite",
+    "storage_bucket": "rox-shoppersite.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:849711979912:android:29873109483837c89b6e3d",
+        "android_client_info": {
+          "package_name": "com.roxten.shopersite"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "849711979912-61h6iq3sauuthuib357baeoo69joi9tl.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDbL5oYdk9URgpGAXuaF1j80b4MQWRczUs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "849711979912-61h6iq3sauuthuib357baeoo69joi9tl.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

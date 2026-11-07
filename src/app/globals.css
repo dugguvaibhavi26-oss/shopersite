@@ -1,0 +1,2471 @@
+@import "tailwindcss";
+
+/* `hot:` = hover on mouse devices, or `.is-active` (set while a card crosses the
+   middle of the screen on touch devices) so phones get the same effects. */
+@custom-variant hot {
+  @media (hover: hover) {
+    &:hover {
+      @slot;
+    }
+  }
+  &.is-active {
+    @slot;
+  }
+}
+@custom-variant group-hot {
+  @media (hover: hover) {
+    :where(.group):hover & {
+      @slot;
+    }
+  }
+  :where(.group.is-active) & {
+    @slot;
+  }
+}
+
+@layer base {
+  :root {
+    /* Classic monochrome palette: black ink on white */
+    --background: #FFFFFF;
+    --foreground: #111111;
+
+    --card: #FFFFFF;
+    --card-foreground: #111111;
+
+    --popover: #FFFFFF;
+    --popover-foreground: #111111;
+
+    --primary: #111111;
+    --primary-foreground: #FFFFFF;
+
+    --accent: #111111;
+    --accent-foreground: #FFFFFF;
+
+    --gold: #111111;
+    --gold-light: #EEEEEE;
+
+    --muted: #F5F5F5;
+    --muted-foreground: #555555;
+
+    --border: #E5E5E5;
+    --input: #CCCCCC;
+    --ring: #111111;
+
+    --radius-sm: 2px;
+    --radius-md: 3px;
+    --radius-lg: 4px;
+    --radius-full: 9999px;
+
+    /* Semantic Status Tokens */
+    --success: #2F6B3A;
+    --success-light: #E6EFDF;
+    --warning: #8A5A12;
+    --warning-light: #F6ECD3;
+    --error: #9B2C2C;
+    --error-light: #F6E0DC;
+    --info: #2C4F73;
+    --info-light: #E2EAF2;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: "DM Sans", "Inter", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4,
+  .font-serif-title {
+    font-family: "Playfair Display", "Cormorant Garamond", "Didot", "Bodoni MT", Georgia, "Times New Roman", serif;
+    letter-spacing: -0.01em;
+  }
+
+  ::selection {
+    background: var(--gold-light);
+    color: var(--primary);
+  }
+}
+
+/* Classic ornaments */
+.classic-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.classic-rule {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--gold);
+}
+.classic-rule::before,
+.classic-rule::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.classic-frame {
+  outline: 1px solid var(--border);
+  outline-offset: -6px;
+}
+
+/* Enforce 44px minimum touch targets on mobile interactive controls. In the base layer so a
+   component can still size its own inline text links (breadcrumbs, footer lists). */
+@layer base {
+  @media (max-width: 640px) {
+    button, input, select, [role="button"], a {
+      min-height: 44px;
+    }
+  }
+}
+
+/* =========================================================================
+   LUXURY TRANSITIONS & ENTRANCE ANIMATIONS
+   Fluid spring physics, 3D perspective unfolds, elastic pops, and wave cascades
+   ========================================================================= */
+
+@keyframes enterScale {
+  0% {
+    opacity: 0;
+    transform: scale(0.91) translateY(24px);
+    filter: blur(6px);
+  }
+  65% {
+    transform: scale(1.02) translateY(-3px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0px);
+  }
+}
+
+@keyframes enterSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(38px);
+  }
+  70% {
+    transform: translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes card3dUnfold {
+  0% {
+    opacity: 0;
+    transform: perspective(1200px) rotateX(16deg) translateY(45px) scale(0.92);
+    filter: blur(3px);
+  }
+  65% {
+    transform: perspective(1200px) rotateX(-2deg) translateY(-4px) scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1200px) rotateX(0deg) translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes waveSwingLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-40px) translateY(22px) rotate(-3deg);
+  }
+  70% {
+    transform: translateX(4px) translateY(-2px) rotate(0.5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0) rotate(0deg);
+  }
+}
+
+@keyframes waveSwingRight {
+  0% {
+    opacity: 0;
+    transform: translateX(40px) translateY(22px) rotate(3deg);
+  }
+  70% {
+    transform: translateX(-4px) translateY(-2px) rotate(-0.5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0) rotate(0deg);
+  }
+}
+
+@keyframes elasticPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.72) translateY(28px);
+  }
+  55% {
+    transform: scale(1.08) translateY(-6px);
+  }
+  75% {
+    transform: scale(0.97) translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes enterSlideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-28px);
+  }
+  70% {
+    transform: translateY(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes enterSlideRight {
+  0% {
+    opacity: 0;
+    transform: translateX(-35px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes enterSlideLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(35px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes enterBlur {
+  0% {
+    opacity: 0;
+    filter: blur(14px);
+    transform: scale(0.96) translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes revealFlip {
+  0% {
+    opacity: 0;
+    transform: perspective(1000px) rotateX(-12deg) translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1000px) rotateX(0deg) translateY(0);
+  }
+}
+
+@keyframes pillPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  60% {
+    transform: scale(1.14);
+  }
+  85% {
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes drawerInRight {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes drawerInLeft {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes backdropFade {
+  0% {
+    opacity: 0;
+    backdrop-filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    backdrop-filter: blur(8px);
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes enterFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInFromTop2 {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInFromBottom2 {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes zoomIn95 {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Primary Animation Utility Classes */
+.animate-enter-scale {
+  animation: enterScale 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-enter-slide-up {
+  animation: enterSlideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-enter-slide-down {
+  animation: enterSlideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-enter-slide-right {
+  animation: enterSlideRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-enter-slide-left {
+  animation: enterSlideLeft 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-enter-blur {
+  animation: enterBlur 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-reveal-flip {
+  animation: revealFlip 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-pill-pop {
+  animation: pillPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-drawer-right {
+  animation: drawerInRight 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-drawer-left {
+  animation: drawerInLeft 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes sheetUp {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-sheet-up {
+  animation: sheetUp 0.42s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+/* Locked (premium) tiles: a light sweep across the sealed foil */
+.seal-shine {
+  overflow: visible;
+  isolation: isolate;
+}
+.seal-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.85) 50%, transparent 65%) no-repeat;
+  background-size: 250% 100%;
+  animation: sealShine 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes sealShine {
+  0%, 55% { background-position: 130% 0; }
+  100% { background-position: -30% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .seal-shine::after { animation: none; }
+}
+
+.animate-backdrop-in {
+  animation: backdropFade 0.3s ease-out both;
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 2.5s infinite;
+}
+
+.animate-float-gentle {
+  animation: floatGentle 3s ease-in-out infinite;
+}
+
+.animate-card-3d {
+  animation: card3dUnfold 0.58s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-elastic-pop {
+  animation: elasticPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-wave-left {
+  animation: waveSwingLeft 0.52s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-wave-right {
+  animation: waveSwingRight 0.52s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Stagger Delays for Grid / List Items */
+.stagger-1 { animation-delay: 45ms !important; }
+.stagger-2 { animation-delay: 90ms !important; }
+.stagger-3 { animation-delay: 135ms !important; }
+.stagger-4 { animation-delay: 180ms !important; }
+.stagger-5 { animation-delay: 225ms !important; }
+.stagger-6 { animation-delay: 270ms !important; }
+.stagger-7 { animation-delay: 315ms !important; }
+.stagger-8 { animation-delay: 360ms !important; }
+
+/* Interactive Micro-Interactions */
+.smooth-all {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hover-lift {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 28px -10px rgba(0, 0, 0, 0.14);
+}
+.hover-lift:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.hover-3d-lift {
+  transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease, border-color 0.3s ease;
+  will-change: transform, box-shadow;
+}
+.hover-3d-lift:hover {
+  transform: translateY(-7px) scale(1.018);
+  box-shadow: 0 24px 36px -12px rgba(0, 0, 0, 0.16), 0 8px 16px -6px rgba(0, 0, 0, 0.08);
+}
+.hover-3d-lift:active {
+  transform: translateY(-2px) scale(0.985);
+}
+
+.shimmer-card {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 70%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  transform: translateX(-180%) skewX(-20deg);
+  pointer-events: none;
+  transition: transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.shimmer-card:hover::after {
+  transform: translateX(320%) skewX(-20deg);
+}
+
+.press-scale {
+  transition: transform 0.15s ease-out;
+}
+.press-scale:active {
+  transform: scale(0.96);
+}
+
+.theme-preview-transition {
+  transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Tailwind Animate Compatibility in Tailwind v4 */
+.animate-in {
+  animation-duration: 0.38s;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
+}
+.fade-in {
+  animation-name: enterFade;
+}
+.slide-in-from-top-2 {
+  animation-name: slideInFromTop2;
+}
+.slide-in-from-bottom-2 {
+  animation-name: slideInFromBottom2;
+}
+.zoom-in-95 {
+  animation-name: zoomIn95;
+}
+
+/* =========================================================================
+   HOME PAGE (marketing) — bold sans display type, marquee, floating cards
+   ========================================================================= */
+/* Marketing + auth pages font — change it here */
+.home-sans {
+  --font-display: "Plus Jakarta Sans", "Inter", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-family: var(--font-display);
+}
+.home-sans h1,
+.home-sans h2,
+.home-sans h3,
+.home-sans h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.03em;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 40s linear infinite;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee,
+  .animate-float-gentle {
+    animation: none;
+  }
+}
+
+/* Scroll reveal (home) */
+/* Lists every property hover effects use too, since this rule replaces
+   any Tailwind `transition-*` utility on the same element. */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    translate 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    scale 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    rotate 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.5s ease,
+    color 0.5s ease,
+    border-color 0.5s ease,
+    box-shadow 0.5s ease;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Hero load-in sequence */
+@keyframes heroRise {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
+.hero-rise {
+  animation: heroRise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Underline that draws in on hover */
+.link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 0.35s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s;
+}
+.link-underline:hover {
+  background-size: 100% 1px;
+}
+
+/* Vertical marquee columns (auth showcase) */
+@keyframes marqueeUp {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+@keyframes marqueeDown {
+  from { transform: translateY(-50%); }
+  to { transform: translateY(0); }
+}
+.animate-marquee-up {
+  animation: marqueeUp 45s linear infinite;
+}
+.animate-marquee-down {
+  animation: marqueeDown 45s linear infinite;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .hero-rise,
+  .animate-marquee-up,
+  .animate-marquee-down {
+    animation: none;
+  }
+}
+
+/* Reveal variants (combine with .reveal) */
+.reveal.reveal-left { transform: translateX(-32px); }
+.reveal.reveal-right { transform: translateX(32px); }
+.reveal.reveal-zoom { transform: scale(0.96); }
+.reveal.reveal-flip { transform: translateY(28px); }
+.reveal.reveal-pop { transform: scale(0.96) translateY(16px); }
+.reveal.reveal-blur { transform: translateY(16px); filter: blur(6px); }
+.reveal.is-visible.reveal-left,
+.reveal.is-visible.reveal-right,
+.reveal.is-visible.reveal-zoom,
+.reveal.is-visible.reveal-flip,
+.reveal.is-visible.reveal-pop,
+.reveal.is-visible.reveal-blur {
+  transform: none;
+  filter: none;
+}
+
+.reveal.reveal-zoom,
+.reveal.reveal-blur { transition-property: opacity, transform, filter, translate, scale, rotate, background-color, color, border-color, box-shadow; }
+
+/* Auto-playing tab progress bar */
+@keyframes tabProgress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.animate-tab-progress {
+  transform-origin: left;
+  animation: tabProgress 4.5s linear forwards;
+}
+
+/* Scroll-linked effects (Chrome, Edge, Android; others simply skip them) */
+@keyframes heroExit {
+  to { opacity: 0; transform: translateY(-40px); }
+}
+@keyframes collageDrift {
+  to { transform: scale(1.25) rotate(4deg); }
+}
+@keyframes stageRise {
+  from { transform: perspective(1200px) rotateX(8deg) scale(0.96); opacity: 0.6; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes carouselFocus {
+  0%, 100% { transform: scale(0.94); opacity: 0.75; }
+  40%, 60% { transform: scale(1); opacity: 1; }
+}
+@keyframes parallaxImg {
+  from { transform: translateY(-8%) scale(1.15); }
+  to { transform: translateY(8%) scale(1.15); }
+}
+@keyframes textSweep {
+  from { background-size: 0% 100%; }
+  to { background-size: 100% 100%; }
+}
+
+@supports (animation-timeline: view()) {
+  .scroll-hero-exit {
+    animation: heroExit linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 75vh;
+  }
+  .scroll-collage {
+    animation: collageDrift linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 100vh;
+  }
+  .scroll-stage {
+    animation: stageRise linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 45%;
+  }
+  .scroll-carousel {
+    animation: carouselFocus linear both;
+    animation-timeline: view(inline);
+  }
+  .scroll-parallax {
+    animation: parallaxImg linear both;
+    animation-timeline: view();
+  }
+  /* words fill from grey to black as they scroll past */
+  .scroll-text-fill {
+    color: transparent;
+    background: linear-gradient(#000, #000) no-repeat, #d4d4d4;
+    background-clip: text;
+    -webkit-background-clip: text;
+    animation: textSweep linear both;
+    animation-timeline: view();
+    animation-range: entry 40% cover 55%;
+  }
+}
+
+/* Scroll progress bar */
+.scroll-progress {
+  transform-origin: left;
+  transform: scaleX(var(--progress, 0));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal.reveal-left,
+  .reveal.reveal-right,
+  .reveal.reveal-zoom,
+  .reveal.reveal-flip,
+  .reveal.reveal-pop,
+  .reveal.reveal-blur { transform: none; filter: none; }
+  .scroll-hero-exit,
+  .scroll-collage,
+  .scroll-stage,
+  .scroll-carousel,
+  .scroll-parallax,
+  .scroll-text-fill,
+  .animate-tab-progress { animation: none; }
+  .scroll-text-fill { color: inherit; background: none; }
+}
+
+/* =========================================================================
+   Heading text effects (AnimatedTitle) — start when the parent .reveal is visible
+   ========================================================================= */
+.reveal.reveal-none { opacity: 1; transform: none; }
+
+.fx-word { display: inline-block; white-space: nowrap; }
+.fx-unit { display: inline-block; }
+
+/* words rise out of a mask */
+.fx-words-up .fx-word { overflow: hidden; padding-bottom: 0.12em; margin-bottom: -0.12em; vertical-align: bottom; }
+.fx-words-up .fx-unit { transform: translateY(110%); }
+.is-visible .fx-words-up .fx-unit { animation: fxUp 0.9s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(var(--i) * 80ms); }
+@keyframes fxUp { from { transform: translateY(110%); } to { transform: none; } }
+
+/* words sharpen from a blur */
+.fx-words-blur .fx-unit { opacity: 0; filter: blur(14px); }
+.is-visible .fx-words-blur .fx-unit { animation: fxBlur 1s ease-out both; animation-delay: calc(var(--i) * 110ms); }
+@keyframes fxBlur {
+  from { opacity: 0; filter: blur(8px); transform: translateY(0.2em); }
+  to { opacity: 1; filter: none; transform: none; }
+}
+
+/* words flip up in 3D */
+.fx-words-flip { perspective: 900px; }
+.fx-words-flip .fx-unit { opacity: 0; transform: rotateX(-95deg); transform-origin: 50% 100%; }
+.is-visible .fx-words-flip .fx-unit { animation: fxFlip 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both; animation-delay: calc(var(--i) * 90ms); }
+@keyframes fxFlip { from { opacity: 0; transform: rotateX(-95deg); } to { opacity: 1; transform: none; } }
+
+/* letters cascade with a spin */
+.fx-chars .fx-unit { opacity: 0; transform: translateY(0.7em) rotate(14deg); }
+.is-visible .fx-chars .fx-unit { animation: fxChar 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; animation-delay: calc(var(--i) * 28ms); }
+@keyframes fxChar { from { opacity: 0; transform: translateY(0.7em) rotate(14deg); } to { opacity: 1; transform: none; } }
+
+/* whole line shrinks into place */
+.fx-zoom { opacity: 0; }
+.is-visible .fx-zoom { animation: fxZoom 1.1s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes fxZoom {
+  from { opacity: 0; transform: scale(1.45); letter-spacing: 0.12em; filter: blur(10px); }
+  to { opacity: 1; transform: none; letter-spacing: -0.035em; filter: none; }
+}
+
+/* typewriter */
+.fx-type .fx-unit { opacity: 0; }
+.is-visible .fx-type .fx-unit { animation: fxType 0.01s linear both; animation-delay: calc(var(--i) * 55ms); }
+@keyframes fxType { to { opacity: 1; } }
+.fx-caret {
+  display: inline-block; width: 0.08em; height: 0.9em; margin-left: 0.08em;
+  background: currentColor; vertical-align: -0.08em;
+  animation: fxCaret 1s steps(1) infinite;
+}
+@keyframes fxCaret { 50% { opacity: 0; } }
+
+/* sub text (eyebrow / paragraph) styles that also vary per section */
+.fx-sub { opacity: 0; }
+.is-visible .fx-sub-rise { animation: heroRise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0ms); }
+.is-visible .fx-sub-track { animation: fxTrack 1s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0ms); }
+.is-visible .fx-sub-side { animation: fxSide 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0ms); }
+@keyframes fxTrack { from { opacity: 0; letter-spacing: 0.6em; } to { opacity: 1; } }
+@keyframes fxSide { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fx .fx-unit,
+  .fx-zoom,
+  .fx-sub { opacity: 1 !important; transform: none !important; filter: none !important; animation: none !important; }
+  .fx-caret { animation: none; }
+}
+
+/* Pause the category strip on hover (a Tailwind hover: utility can't beat the
+   unlayered .animate-marquee shorthand above) */
+@media (hover: hover) {
+  .home-sans section .animate-marquee:hover { animation-play-state: paused; }
+}
+
+/* Marketing + auth pages: hide the page scrollbar (scrolling still works) */
+html:has(.home-sans) {
+  scrollbar-width: none;
+}
+html:has(.home-sans)::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hero: hand-drawn underline under "60 seconds" draws itself in after the headline */
+.hero-underline {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: drawLine 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.75s forwards;
+}
+@keyframes drawLine {
+  to { stroke-dashoffset: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-underline { animation: none; stroke-dashoffset: 0; }
+}
+
+/* Hero card: slowly rotating pastel border + matching glow */
+@property --ring-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.hero-ring {
+  background: conic-gradient(from var(--ring-angle), #f9a8d4, #c4b5fd, #93c5fd, #6ee7b7, #fde68a, #fdba74, #f9a8d4);
+  animation: ringSpin 8s linear infinite;
+}
+@keyframes ringSpin {
+  to { --ring-angle: 360deg; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-ring { animation: none; }
+}
+
+/* =========================================================================
+   Auth showcase panel effects (black left side of login / signup / register)
+   ========================================================================= */
+.fx-aurora {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.45;
+  mix-blend-mode: screen;
+  animation: auroraDrift 16s ease-in-out infinite alternate;
+}
+@keyframes auroraDrift {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(14%, -12%) scale(1.2); }
+  100% { transform: translate(-12%, 10%) scale(0.9); }
+}
+
+.fx-outline {
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.16);
+}
+
+.fx-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.16) 1px, transparent 1px);
+  background-size: 56px 56px;
+  transform: perspective(420px) rotateX(64deg);
+  transform-origin: 50% 0;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 35%, black 100%);
+  animation: gridRush 1.8s linear infinite;
+}
+@keyframes gridRush {
+  to { background-position: 0 56px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-aurora,
+  .fx-grid { animation: none; }
+}
+
+/* Auth showcase: boxes that softly glow on and off */
+.fx-cell-glow {
+  animation: cellGlow 8s ease-in-out infinite;
+}
+@keyframes cellGlow {
+  0%, 100% { background-color: transparent; }
+  12% { background-color: rgba(255, 255, 255, 0.22); }
+  28% { background-color: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-cell-glow { animation: none; }
+}
+
+/* =========================================================================
+   Dashboard — classic monochrome pass applied across every tab.
+   Scoped to `.dash` (the dashboard root) so other pages are untouched.
+   ========================================================================= */
+.dash .font-black,
+.dash .font-extrabold,
+.dash .font-bold {
+  font-weight: 600;
+}
+/* flat surfaces: borders instead of drop shadows */
+.dash .shadow-2xs,
+.dash .shadow-xs,
+.dash .shadow-sm {
+  box-shadow: none;
+}
+/* one consistent corner scale */
+.dash .rounded-2xl { border-radius: 14px; }
+.dash .rounded-xl { border-radius: 10px; }
+.dash .rounded-lg { border-radius: 8px; }
+.dash .hover-lift:hover,
+.dash .hover-3d-lift:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Dashboard chart + bar motion */
+.chart-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: drawLine 1.3s cubic-bezier(0.65, 0, 0.35, 1) 0.15s forwards;
+}
+.chart-fade {
+  animation: enterFade 0.9s ease-out 0.5s both;
+}
+.chart-pop {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pillPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.bar-grow {
+  transform-origin: left;
+  animation: barGrow 1.1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+}
+@keyframes barGrow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.bar-rise {
+  transform-origin: bottom;
+  animation: barRise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes barRise {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-draw { animation: none; stroke-dashoffset: 0; }
+  .bar-rise,
+  .chart-fade,
+  .chart-pop,
+  .bar-grow { animation: none; }
+}
+
+/* Homepage: hide the pinned hero the moment the page sheet has covered it. Driven by scroll on the
+   compositor, so even a very fast scroll on a slow laptop can't flash the hero through the sheet. */
+@keyframes hero-covered {
+  0%, 99% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@supports (animation-timeline: scroll()) {
+  .hero-pinned {
+    animation: hero-covered linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 max(calc(100svh - 68px), 600px);
+  }
+}
+
+/* Admin: same monochrome pass as the seller dashboard (via .dash). Decorative blues, purples and
+   pinks are muted to greys; green, amber and red keep their meaning (live, waiting, danger). */
+.admin :is(.text-blue-600, .text-blue-700, .text-blue-800, .text-purple-600, .text-purple-700, .text-purple-800,
+  .text-indigo-600, .text-indigo-700, .text-pink-600, .text-violet-600, .text-sky-600, .text-cyan-600, .text-teal-600) {
+  color: #404040;
+}
+.admin :is(.bg-blue-50, .bg-purple-50, .bg-indigo-50, .bg-pink-50, .bg-violet-50, .bg-sky-50, .bg-cyan-50, .bg-teal-50) {
+  background-color: #f5f5f5;
+}
+.admin :is(.border-blue-200, .border-purple-200, .border-indigo-200, .border-pink-200, .border-blue-200\/60, .border-purple-200\/60) {
+  border-color: #e5e5e5;
+}
+.admin :is(.bg-blue-600, .bg-purple-600, .bg-indigo-600) {
+  background-color: #0a0a0a;
+}
+
+/* ---------------------------------------------------------------------------
+   Android / iOS app shell (Capacitor)
+   These classes are added to <html> by NativeBridge only inside the installed app,
+   so nothing here changes the website in a browser.
+   --------------------------------------------------------------------------- */
+html.cap-native {
+  /* no grey flash on tap, and no rubber-band "pull" past the page edges on Android */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  /* the app screen never pans sideways, even if something is a few pixels too wide */
+  overflow-x: clip;
+}
+
+html.cap-native body {
+  overflow-x: clip;
+  /* stop long-press text-size boost on rotated phones */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* iOS: the status bar is kept out of the web view natively; keep page ends clear of the home indicator */
+html.cap-ios body {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ---------------------------------------------------------------------------
+   App launch intro (/app). Before .launch-play is added, only the still bag shows,
+   matching Android's launch screen. --k scales every delay and duration
+   (1 = first launch, 0.6 = returning users).
+   --------------------------------------------------------------------------- */
+.launch { --k: 1; }
+.launch.launch-fast { --k: 0.6; }
+
+.launch .launch-tile,
+.launch .launch-letter,
+.launch .launch-tagline,
+.launch .launch-ring { opacity: 0; }
+.launch .launch-letter { transform: translateY(110%); }
+.launch .launch-glow {
+  transform: scale(0);
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.07) 0%, rgba(0, 0, 0, 0.025) 40%, transparent 68%);
+}
+.launch .launch-handle { transform-box: fill-box; transform-origin: 50% 100%; }
+
+.launch-play .launch-bag { animation: launch-bag calc(var(--k) * 820ms) cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+.launch-play .launch-handle { animation: launch-handle calc(var(--k) * 950ms) ease-in-out calc(var(--k) * 80ms) both; }
+.launch-play .launch-ring { animation: launch-ring calc(var(--k) * 1100ms) cubic-bezier(0.2, 0.7, 0.3, 1) calc(var(--k) * 140ms) both; }
+.launch-play .launch-glow { animation: launch-glow calc(var(--k) * 1200ms) cubic-bezier(0.16, 1, 0.3, 1) both; }
+.launch-play .launch-tile { animation: launch-tile-in calc(var(--k) * 950ms) cubic-bezier(0.16, 1, 0.3, 1) both; }
+.launch-play .launch-tile-img { animation: launch-float 3.2s ease-in-out infinite; }
+.launch-play .launch-letter { animation: launch-letter calc(var(--k) * 560ms) cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.launch-play .launch-tagline { animation: launch-fade-up calc(var(--k) * 600ms) ease-out calc(var(--k) * 980ms) both; }
+/* leaving: photos drift off and the glow fades; the bag and wordmark stay until the next screen appears */
+.launch-exit .launch-tile-img { animation: launch-tile-out 300ms cubic-bezier(0.4, 0, 1, 1) forwards; }
+.launch-exit .launch-glow { opacity: 0; transition: opacity 300ms ease; }
+
+@keyframes launch-bag {
+  0% { transform: scale(1); }
+  16% { transform: scale(0.9, 0.93); }
+  40% { transform: translateY(-12px) scale(1.07); }
+  62% { transform: translateY(0) scale(0.97); }
+  80% { transform: scale(1.015); }
+  100% { transform: scale(1); }
+}
+@keyframes launch-handle {
+  0% { transform: rotate(0); }
+  28% { transform: rotate(-18deg); }
+  52% { transform: rotate(12deg); }
+  74% { transform: rotate(-5deg); }
+  100% { transform: rotate(0); }
+}
+@keyframes launch-ring {
+  0% { opacity: 0.7; transform: scale(1); }
+  100% { opacity: 0; transform: scale(4.2); }
+}
+@keyframes launch-glow {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+@keyframes launch-tile-in {
+  from { opacity: 0; transform: translate(0, 0) scale(0.35) rotate(0deg); filter: blur(10px); }
+  to { opacity: 1; transform: translate(var(--x), var(--y)) scale(1) rotate(var(--r)); filter: blur(0); }
+}
+@keyframes launch-float {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -7px; }
+}
+@keyframes launch-letter {
+  from { opacity: 0; transform: translateY(110%); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes launch-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes launch-tile-out {
+  to { opacity: 0; scale: 0.85; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launch-play .launch-bag,
+  .launch-play .launch-handle,
+  .launch-play .launch-ring,
+  .launch-play .launch-glow,
+  .launch-play .launch-tile,
+  .launch-play .launch-tile-img,
+  .launch-play .launch-letter,
+  .launch-play .launch-tagline { animation: none; }
+  .launch-play .launch-letter,
+  .launch-play .launch-tagline { opacity: 1; transform: none; }
+  .launch-exit .launch-tile-img { animation: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   Motion: page opening, dashboard sections, taps and loading
+   --------------------------------------------------------------------------- */
+
+/* Every page fades in as it opens (app/template.tsx). Opacity only, so fixed bars don't move. */
+.page-enter { animation: page-enter 260ms ease-out both; }
+@keyframes page-enter { from { opacity: 0; } to { opacity: 1; } }
+/* the app launch screen must match Android's launch screen from the first frame, so no fade */
+.page-enter:has(.launch) { animation: none; }
+
+/* Dashboard sections slide up as you switch to them. Ends at transform: none, so fixed
+   modals inside a section position normally once it has settled. */
+.tab-enter { animation: tab-enter 340ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes tab-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Loading bar at the top while the next page loads (components/nav-progress.tsx) */
+.nav-progress-bar {
+  height: 100%;
+  background: #111;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.25);
+  transform-origin: left;
+}
+.nav-progress-bar.is-loading { animation: nav-progress 8s cubic-bezier(0.1, 0.7, 0.2, 1) forwards; }
+.nav-progress-bar.is-done { animation: nav-progress-done 380ms ease-out forwards; }
+@keyframes nav-progress {
+  from { transform: scaleX(0); }
+  8% { transform: scaleX(0.35); }
+  to { transform: scaleX(0.92); }
+}
+@keyframes nav-progress-done {
+  from { transform: scaleX(0.92); opacity: 1; }
+  60% { transform: scaleX(1); opacity: 1; }
+  to { transform: scaleX(1); opacity: 0; }
+}
+
+/* Touch screens: buttons and links press in slightly when tapped. In the base layer, so any
+   component's own transition or scale utilities still win. Desktop hover is unchanged. */
+@layer base {
+  @media (hover: none) {
+    button:not(:disabled),
+    a[href],
+    [role="button"],
+    [role="tab"],
+    summary {
+      transition-property: scale, opacity, background-color, color, border-color;
+      transition-duration: 160ms;
+      transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    button:not(:disabled):active,
+    a[href]:active,
+    [role="button"]:active,
+    [role="tab"]:active,
+    summary:active {
+      scale: 0.97;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .tab-enter { animation: none; }
+  .nav-progress-bar.is-loading { animation: none; transform: scaleX(0.6); }
+}
+
+
+/* --- Mono Studio storefront theme (src/components/storefront/site) ------------------------- */
+/* in the components layer so Tailwind utilities (hidden, sm:flex, w-full…) still override it */
+@layer components {
+  .site {
+    background: var(--m-bg);
+    color: var(--m-text);
+    font-family: var(--m-body);
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* type sizes: --m-scale is the shop's text size (editor), --m-hs a section's heading size */
+  .site {
+    --m-scale: 1;
+    --m-hs: 1;
+    /* page margin and header height grow with the screen, like the reference layout */
+    --g: clamp(16px, 5.8vw, 96px);
+    --hh: clamp(56px, 5.4vw, 76px);
+    font-size: calc(14px * var(--m-scale));
+  }
+  .site .t-hero {
+    font-size: calc(clamp(1.85rem, 5.2vw, 4.6rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site .t-title {
+    font-size: calc(clamp(1.4rem, 3vw, 2.6rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site .t-section {
+    font-size: calc(clamp(1.15rem, 2.5vw, 2.2rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site .t-product {
+    font-size: calc(clamp(1.05rem, 1.6vw, 1.45rem) * var(--m-scale));
+  }
+  .site .m-h {
+    font-family: var(--m-head);
+    font-weight: var(--m-hw, 600);
+    letter-spacing: -0.01em;
+    line-height: 1.02;
+  }
+  /* the biggest headlines (hero, "50%") can use their own display font */
+  .site .m-h.m-display {
+    font-family: var(--m-display);
+  }
+  .site[data-condensed="yes"] .m-h.m-display {
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.005em;
+    line-height: 0.92;
+  }
+  .site[data-condensed="yes"] .m-display.t-hero {
+    font-size: calc(clamp(2.9rem, 8.6vw, 8.2rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site[data-display="Big Shoulders Display"] .m-h.m-display,
+  .site[data-display="Oswald"] .m-h.m-display {
+    font-weight: 700;
+  }
+  /* tall narrow heading fonts (Anton, Bebas Neue…) come in one weight and read best in capitals */
+  .site[data-head-condensed="yes"] .m-h {
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.005em;
+    line-height: 0.95;
+  }
+  .site[data-head-condensed="yes"] .t-section {
+    font-size: calc(clamp(1.7rem, 3.6vw, 3.2rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site[data-head-condensed="yes"] .t-title {
+    font-size: calc(clamp(2.1rem, 5vw, 4.6rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site[data-head="Onest"] .m-h,
+  .site[data-head="Inter Tight"] .m-h,
+  .site[data-head="Schibsted Grotesk"] .m-h {
+    font-weight: 650;
+    letter-spacing: -0.035em;
+  }
+  .site[data-head="Bricolage Grotesque"] .m-h {
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    font-variation-settings: "opsz" 96;
+  }
+  .site[data-display="Instrument Serif"] .m-h.m-display,
+  .site[data-display="Playfair Display"] .m-h.m-display {
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    line-height: 0.98;
+  }
+  .site[data-head="Instrument Serif"] .m-h {
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+  /* words between *stars* in a heading */
+  .site .m-em {
+    font-style: italic;
+  }
+  .site[data-display="Instrument Serif"] .m-em,
+  .site[data-display="Playfair Display"] .m-em,
+  .site[data-display="Cormorant Garamond"] .m-em {
+    font-family: var(--m-display);
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    padding-right: 0.04em;
+  }
+  /* Theme 05: tight grotesk headings with serif italic accents, a serif shop name */
+  .site[data-theme="theme05"] {
+    letter-spacing: -0.006em;
+    font-feature-settings: "cv11", "ss01";
+  }
+  .site[data-theme="theme05"][data-head="Inter Tight"] .m-h,
+  .site[data-theme="theme05"][data-head="Inter"] .m-h {
+    font-weight: 500;
+    letter-spacing: -0.045em;
+    line-height: 1;
+  }
+  .site[data-theme="theme05"] .t-section {
+    font-size: calc(clamp(1.7rem, 3.4vw, 3.15rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site[data-theme="theme05"] .t-title {
+    font-size: calc(clamp(2rem, 4.3vw, 4rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site[data-theme="theme05"] .m-h .m-em {
+    font-size: 1.08em;
+    letter-spacing: -0.025em;
+  }
+  .site[data-theme="theme05"] .m-h.m-display {
+    letter-spacing: -0.03em;
+    line-height: 0.9;
+  }
+  .site[data-theme="theme05"] .m-h.m-display .m-em {
+    font-size: 1em;
+  }
+  .site[data-theme="theme05"] .m-display.t-hero {
+    font-size: calc(clamp(3rem, 7.2vw, 7rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site[data-theme="theme05"] .m-brand {
+    font-family: var(--m-display);
+    font-weight: 400;
+    font-size: calc(clamp(22px, 2vw, 30px) * var(--m-scale));
+    letter-spacing: -0.02em;
+  }
+  .site[data-theme="theme05"] .t-story {
+    font-family: var(--m-display);
+    /* important: these replace the panel's own Tailwind size, weight and capitals */
+    font-size: calc(clamp(34px, 4.4vw, 64px) * var(--m-scale)) !important;
+    font-style: italic;
+    font-weight: 400 !important;
+    letter-spacing: -0.025em !important;
+    text-transform: none !important;
+  }
+  .site[data-theme="theme05"] nav {
+    letter-spacing: -0.01em;
+  }
+  /* a corner cut out of a card (price tag, arrow, stat), with curved inside corners; --nr sets the curve */
+  .site .m-notch {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    background: var(--m-bg);
+    border-bottom-left-radius: var(--nr, 14px);
+  }
+  .site .m-notch::before,
+  .site .m-notch::after {
+    content: "";
+    position: absolute;
+    width: var(--nr, 14px);
+    height: var(--nr, 14px);
+    background: radial-gradient(circle at 0 100%, transparent calc(var(--nr, 14px) - 0.5px), var(--m-bg) var(--nr, 14px));
+    pointer-events: none;
+  }
+  .site .m-notch::before {
+    top: 0;
+    right: 100%;
+  }
+  .site .m-notch::after {
+    top: 100%;
+    right: 0;
+  }
+  /* the same cut-out in the bottom-right corner */
+  .site .m-notch.m-notch-br {
+    top: auto;
+    bottom: 0;
+    border-bottom-left-radius: 0;
+    border-top-left-radius: var(--nr, 14px);
+  }
+  .site .m-notch.m-notch-br::before,
+  .site .m-notch.m-notch-br::after {
+    background: radial-gradient(circle at 0 0, transparent calc(var(--nr, 14px) - 0.5px), var(--m-bg) var(--nr, 14px));
+  }
+  .site .m-notch.m-notch-br::before {
+    top: auto;
+    bottom: 0;
+  }
+  .site .m-notch.m-notch-br::after {
+    top: auto;
+    bottom: 100%;
+  }
+  /* the shop name written huge across a hero photo */
+  .site .t-wordmark {
+    font-size: calc(clamp(58px, 14.5vw, 220px) * var(--fit, 1) * var(--m-scale));
+    font-weight: 700;
+    letter-spacing: -0.055em;
+    line-height: 0.82;
+  }
+  .site .t-wordmark-sub {
+    font-size: clamp(18px, 2.2vw, 34px);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  /* Theme 24: peeking slides */
+  .site .t-peek-wrap {
+    --peek-w: 88%;
+    --peek-gap: 10px;
+  }
+  @media (min-width: 768px) {
+    .site .t-peek-wrap {
+      --peek-w: min(76%, 1120px);
+      --peek-gap: 16px;
+    }
+  }
+  .site .t-peek {
+    width: var(--peek-w);
+    height: clamp(380px, 40vw, 600px);
+  }
+  .site[data-theme="theme24"] .m-display.t-hero {
+    font-size: calc(clamp(2rem, 3.6vw, 3.4rem) * var(--m-scale) * var(--m-hs));
+    letter-spacing: -0.02em;
+  }
+  /* Theme 25: chunky, friendly headings and a wobbling sticker */
+  .site .t-feast {
+    font-size: calc(clamp(2.8rem, 7vw, 6.6rem) * var(--m-scale) * var(--m-hs));
+    line-height: 0.95 !important;
+    letter-spacing: -0.02em;
+  }
+  .site[data-theme="theme25"] .t-section {
+    font-size: calc(clamp(1.9rem, 3.6vw, 3.2rem) * var(--m-scale) * var(--m-hs));
+    color: var(--m-accent);
+  }
+  @keyframes siteWobble {
+    0%,
+    100% {
+      transform: rotate(-8deg) scale(1);
+    }
+    50% {
+      transform: rotate(6deg) scale(1.06);
+    }
+  }
+  .site .t-wobble {
+    animation: siteWobble 4s ease-in-out infinite;
+  }
+  /* Theme 26: a quiet serif in warm white and gold on black */
+  .site[data-theme="theme26"] .m-em {
+    font-family: inherit;
+    font-style: normal;
+    display: inline-block;
+    padding-left: 2.2em;
+  }
+  .site[data-theme="theme26"] .t-section {
+    font-size: calc(clamp(1.4rem, 2.2vw, 2rem) * var(--m-scale) * var(--m-hs));
+    line-height: 1.25;
+  }
+  .site[data-theme="theme26"] .m-brand {
+    font-family: var(--m-display);
+    font-size: calc(clamp(20px, 2.2vw, 30px) * var(--m-scale));
+  }
+  /* Theme 27: a soft grotesk, highlighted words in pink, a scalloped band */
+  .site[data-theme="theme27"] .m-h {
+    letter-spacing: -0.02em;
+  }
+  .site .t-mission {
+    font-size: calc(clamp(1.6rem, 3.2vw, 2.9rem) * var(--m-scale) * var(--m-hs));
+    line-height: 1.2 !important;
+  }
+  .site .t-mission .m-em {
+    font-family: inherit;
+    font-style: normal;
+    color: #e9b7d0;
+  }
+  .site .t-scallop::before {
+    content: "";
+    position: absolute;
+    inset: -9px 0 auto;
+    height: 10px;
+    background: radial-gradient(circle at 6px 10px, var(--m-accent) 5px, transparent 5.5px) 0 0 / 12px 10px repeat-x;
+  }
+  /* slide progress under the active number */
+  @keyframes siteProgress {
+    from {
+      width: 0;
+    }
+    to {
+      width: 100%;
+    }
+  }
+  .site .t-progress {
+    animation: siteProgress 6.5s linear forwards;
+  }
+  /* the photo fades in from the left over a coloured band */
+  .site .t-fade-left {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 45%);
+    mask-image: linear-gradient(to right, transparent, #000 45%);
+  }
+  /* Theme 28: light headings with the highlighted word in pink */
+  .site[data-theme="theme28"] .m-em {
+    font-family: inherit;
+    font-style: normal;
+    font-weight: 600;
+    color: var(--m-accent);
+  }
+  .site[data-theme="theme28"] .m-display.t-hero {
+    font-size: calc(clamp(2.6rem, 6vw, 5.4rem) * var(--m-scale) * var(--m-hs));
+    font-weight: 300;
+    letter-spacing: -0.02em;
+  }
+  .site[data-theme="theme28"] .m-display.t-hero .m-em {
+    font-weight: 700;
+  }
+  .site[data-theme="theme28"] .t-section {
+    font-size: calc(clamp(1.2rem, 2vw, 1.75rem) * var(--m-scale) * var(--m-hs));
+    font-weight: 500;
+  }
+  .site[data-theme="theme28"] .t-circles h2 {
+    text-align: center;
+    line-height: 1.25;
+  }
+  .site[data-theme="theme28"] .t-circles a > span:first-child {
+    box-shadow: 0 0 0 2px var(--m-bg), 0 0 0 3.5px color-mix(in srgb, var(--m-accent) 55%, transparent);
+  }
+  /* Theme 29: maroon and gold — a crest logo, arched windows and framed photos */
+  .site[data-theme="theme29"] .t-crest .m-brand {
+    font-size: calc(clamp(24px, 3vw, 44px) * var(--m-scale));
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--m-accent);
+  }
+  .site[data-theme="theme29"] .m-h {
+    letter-spacing: 0.02em;
+  }
+  .site[data-theme="theme29"] main :is(h2, h3).m-h {
+    color: var(--m-accent);
+  }
+  .site[data-theme="theme29"] p.m-h.t-title {
+    text-transform: none;
+    font-style: italic;
+    line-height: 1.15;
+  }
+  .site[data-theme="theme29"] footer {
+    --f-bg: #4a0e1c !important;
+    --f-fg: #f6e7c8 !important;
+  }
+  .site[data-theme="theme30"] footer {
+    --f-bg: #1e1220 !important;
+  }
+  .site[data-theme="theme29"] .t-arches .m-h.t-hero {
+    color: #e8c987;
+    letter-spacing: 0.08em;
+  }
+  .site[data-theme="theme29"] .t-section {
+    font-size: calc(clamp(1.3rem, 2.4vw, 2.1rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site[data-theme="theme29"] .m-marquee {
+    color: #ecd29b;
+  }
+  .site .t-arches {
+    background-image: radial-gradient(circle at 50% 0%, rgba(232, 201, 135, 0.18), transparent 60%), repeating-linear-gradient(45deg, rgba(232, 201, 135, 0.05) 0 2px, transparent 2px 14px);
+  }
+  .site .t-arch {
+    border-radius: 999px 999px 0 0;
+    box-shadow: 0 0 0 2px #c8963e, 0 0 0 6px color-mix(in srgb, #c8963e 25%, transparent);
+  }
+  .site .t-drape::after {
+    content: "";
+    position: absolute;
+    inset: 7px;
+    border: 1px solid rgba(232, 201, 135, 0.85);
+    pointer-events: none;
+  }
+  .site .t-drape::before {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 0;
+    z-index: 1;
+    width: 22px;
+    height: 22px;
+    background: linear-gradient(225deg, #c8963e 50%, transparent 50%);
+    pointer-events: none;
+  }
+  /* Theme 30: a plum serif boutique */
+  .site[data-theme="theme30"] .m-display.t-hero {
+    font-size: calc(clamp(2.3rem, 4.8vw, 4.4rem) * var(--m-scale) * var(--m-hs));
+    line-height: 1.04;
+  }
+  .site[data-theme="theme30"] .t-section {
+    font-size: calc(clamp(1.5rem, 2.6vw, 2.4rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site[data-theme="theme30"] .m-em {
+    color: var(--m-accent);
+  }
+  /* Theme 31: an italic terracotta accent and a spaced-out wordmark */
+  .site[data-theme="theme31"] .m-em {
+    color: var(--m-accent);
+    font-style: italic;
+  }
+  .site[data-theme="theme31"] .m-display.t-hero {
+    font-size: calc(clamp(2.3rem, 4.6vw, 4.2rem) * var(--m-scale) * var(--m-hs));
+    font-weight: 600;
+    line-height: 1.02;
+  }
+  .site[data-theme="theme31"] .m-brand {
+    font-family: var(--m-display);
+    font-weight: 600;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    font-size: calc(clamp(14px, 1.4vw, 20px) * var(--m-scale));
+  }
+  .site[data-theme="theme31"] .t-section {
+    font-size: calc(clamp(1.35rem, 2.2vw, 2rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site .t-ring {
+    background: conic-gradient(from 210deg, var(--m-accent), #e9a23b, #d9488a, var(--m-accent));
+  }
+  /* a sparkle that gently pulses */
+  @keyframes siteTwinkle {
+    0%,
+    100% {
+      transform: scale(1) rotate(0deg);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(0.8) rotate(20deg);
+      opacity: 0.7;
+    }
+  }
+  .site .t-twinkle {
+    animation: siteTwinkle 3.2s ease-in-out infinite;
+  }
+  /* words in a flowing script */
+  .site .t-script {
+    font-family: "Great Vibes", cursive;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  /* a scalloped top edge on a coloured band */
+  .site .t-scallop-top::before {
+    content: "";
+    position: absolute;
+    inset: -13px 0 auto;
+    height: 14px;
+    background: radial-gradient(circle at 14px 14px, #ebc9ec 13px, transparent 13.5px) 0 0 / 28px 14px repeat-x;
+  }
+  /* a wavy top edge in the accent colour */
+  .site .t-wave-top::before {
+    content: "";
+    position: absolute;
+    inset: -23px 0 auto;
+    height: 24px;
+    background: var(--m-accent);
+    -webkit-mask: radial-gradient(28px 24px at 50% 100%, #000 98%, transparent) 0 0 / 56px 24px repeat-x;
+    mask: radial-gradient(28px 24px at 50% 100%, #000 98%, transparent) 0 0 / 56px 24px repeat-x;
+  }
+  /* "crest" header with a soft band: no gold lines between the cells */
+  .site .t-band[data-soft] * {
+    border-color: transparent !important;
+  }
+  /* Theme 32: red serif headings with a sparkle */
+  .site[data-theme="theme32"] .m-display.t-hero {
+    font-size: calc(clamp(2.8rem, 5.6vw, 5.4rem) * var(--m-scale) * var(--m-hs));
+    font-weight: 700;
+    line-height: 0.98;
+  }
+  .site[data-theme="theme32"] main h2.t-section {
+    color: var(--m-accent);
+  }
+  .site[data-theme="theme32"] main h2.t-section::before {
+    content: "✦";
+    margin-right: 0.4em;
+    font-size: 0.6em;
+    vertical-align: 0.25em;
+  }
+  .site[data-theme="theme32"] .m-em {
+    font-style: normal;
+  }
+  /* Theme 33: pastel and playful — a scalloped lilac top bar and chunky moving text */
+  .site[data-theme="theme33"] .t-announce {
+    position: relative;
+    background: #ebc9ec !important;
+    color: #3b3340 !important;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    padding-bottom: 14px;
+    -webkit-mask: radial-gradient(10px 9px at 50% 100%, transparent 98%, #000) 0 0 / 20px 100% repeat-x;
+    mask: radial-gradient(10px 9px at 50% 100%, transparent 98%, #000) 0 0 / 20px 100% repeat-x;
+  }
+  .site[data-theme="theme33"] .t-marquee .m-h {
+    font-family: "Unbounded", sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .site[data-theme="theme33"] .t-section,
+  .site[data-theme="theme33"] .t-title:not(.m-display) {
+    font-weight: 400;
+  }
+  .site[data-theme="theme33"] .m-display.t-title {
+    font-size: calc(clamp(1.1rem, 1.8vw, 1.6rem) * var(--m-scale) * var(--m-hs));
+    font-weight: 800;
+    letter-spacing: 0.02em;
+  }
+  .site[data-theme="theme33"] .t-crest .m-brand {
+    font-family: "Unbounded", sans-serif;
+    font-weight: 700;
+    color: #e8b53a;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: calc(clamp(16px, 1.8vw, 24px) * var(--m-scale));
+  }
+  .site[data-theme="theme33"] [role="tablist"] button {
+    border-radius: 0 !important;
+  }
+  .site[data-theme="theme33"] [role="tablist"] button[aria-selected="true"] {
+    background: #f4b6c0 !important;
+    color: #3b3340 !important;
+    border-color: #f4b6c0 !important;
+    box-shadow: 3px 3px 0 #e8772e;
+  }
+  /* Theme 34: burgundy capitals with words in script */
+  .site[data-theme="theme34"] .m-em {
+    font-family: "Great Vibes", cursive;
+    font-style: normal;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 1.12em;
+  }
+  .site[data-theme="theme34"] .m-display.t-hero {
+    font-size: calc(clamp(2.6rem, 5vw, 4.4rem) * var(--m-scale) * var(--m-hs));
+    font-weight: 400;
+    letter-spacing: 0.06em;
+  }
+  .site[data-theme="theme34"] .t-section {
+    font-size: calc(clamp(1.15rem, 1.8vw, 1.6rem) * var(--m-scale) * var(--m-hs));
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--m-accent);
+  }
+  .site[data-theme="theme34"] .t-crest .m-brand {
+    font-size: calc(clamp(24px, 2.8vw, 40px) * var(--m-scale));
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--m-accent);
+  }
+  .site[data-theme="theme34"] footer {
+    --f-bg: #4a0814 !important;
+    --f-fg: #f7e7e9 !important;
+  }
+  /* Theme 35: a tall italic display and orange highlights */
+  .site[data-theme="theme35"] .m-display.t-hero {
+    font-size: calc(clamp(3rem, 7.4vw, 6.6rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site[data-theme="theme35"] .m-em {
+    font-style: normal;
+    color: var(--m-accent);
+  }
+  /* Theme 21: small capitals for titles, like a jewellery house */
+  .site[data-theme="theme21"] .t-section {
+    font-size: calc(clamp(0.95rem, 1.1vw, 1.1rem) * var(--m-scale) * var(--m-hs));
+    letter-spacing: 0.04em;
+  }
+  .site[data-theme="theme21"] .t-title {
+    font-size: calc(clamp(1.4rem, 2.2vw, 2rem) * var(--m-scale) * var(--m-hs));
+    letter-spacing: 0.02em;
+  }
+  .site .t-engrave {
+    font-family: "Instrument Serif", serif;
+    font-style: italic;
+    font-size: calc(clamp(22px, 2.6vw, 34px) * var(--m-scale));
+    color: #6b5a3b;
+    letter-spacing: 0.04em;
+  }
+  /* Theme 22: a terracotta serif with italic accents */
+  .site[data-theme="theme22"] .m-em {
+    font-family: inherit;
+    font-style: italic;
+  }
+  .site[data-theme="theme22"] .m-display.t-hero {
+    font-size: calc(clamp(2.8rem, 6.4vw, 6.4rem) * var(--m-scale) * var(--m-hs));
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+  .site .t-collage {
+    font-size: calc(clamp(44px, 7.4vw, 120px) * var(--m-scale));
+    line-height: 0.98 !important;
+    letter-spacing: -0.015em;
+  }
+  /* Theme 23: a quiet serif */
+  .site[data-theme="theme23"] .m-h {
+    letter-spacing: 0;
+    line-height: 1.12;
+  }
+  .site[data-theme="theme23"] .t-section {
+    font-size: calc(clamp(1.3rem, 1.8vw, 1.7rem) * var(--m-scale) * var(--m-hs));
+  }
+  /* Theme 17: a highlighted word with a hand-drawn underline */
+  .site[data-theme="theme17"] .m-em {
+    font-family: inherit;
+    font-style: normal;
+    color: var(--m-accent);
+    background: no-repeat 0 92% / 100% 0.12em linear-gradient(var(--m-accent), var(--m-accent));
+    padding-bottom: 0.06em;
+  }
+  .site[data-theme="theme17"] .m-h {
+    letter-spacing: -0.03em;
+  }
+  .site[data-theme="theme17"] .m-display.t-hero {
+    font-size: calc(clamp(2.4rem, 4.6vw, 4.4rem) * var(--m-scale) * var(--m-hs));
+    line-height: 1.05;
+  }
+  /* Theme 18: wide grotesk, a huge word behind the product */
+  .site[data-theme="theme18"] .m-h {
+    letter-spacing: -0.01em;
+  }
+  .site[data-theme="theme18"] .m-display.t-hero {
+    font-size: calc(clamp(2.3rem, 4.4vw, 4.2rem) * var(--m-scale) * var(--m-hs));
+    line-height: 1.02;
+  }
+  .site .t-bigword {
+    font-size: calc(clamp(96px, 20vw, 330px) * var(--m-scale));
+    font-weight: 500 !important;
+    letter-spacing: -0.02em;
+    line-height: 0.85 !important;
+    color: var(--m-text);
+  }
+  /* Theme 19: heavy serif, the second line lighter */
+  .site[data-theme="theme19"] .m-em {
+    font-family: inherit;
+    font-style: normal;
+    font-weight: 500;
+  }
+  .site[data-theme="theme19"] .m-display.t-hero {
+    font-size: calc(clamp(2.4rem, 4.8vw, 4.6rem) * var(--m-scale) * var(--m-hs));
+    line-height: 1.02;
+  }
+  @keyframes siteSpin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .site .t-spin {
+    animation: siteSpin 14s linear infinite;
+  }
+  /* Theme 20: a huge thin wordmark */
+  .site .t-word {
+    font-size: calc(clamp(56px, 19vw, 330px) * var(--fit, 1) * var(--m-scale));
+    font-weight: 300 !important;
+    letter-spacing: -0.06em;
+    line-height: 0.8 !important;
+  }
+  .site[data-theme="theme20"] .m-h {
+    letter-spacing: -0.03em;
+  }
+  /* a yellow starburst sticker beside headings */
+  .site .m-burst {
+    background: #ffe68a;
+    color: #2e2a2b;
+    clip-path: polygon(50% 0%, 58% 14%, 74% 5%, 76% 21%, 94% 18%, 88% 34%, 100% 44%, 88% 54%, 97% 70%, 80% 72%, 78% 90%, 62% 84%, 50% 100%, 38% 84%, 22% 90%, 20% 72%, 3% 70%, 12% 54%, 0% 44%, 12% 34%, 6% 18%, 24% 21%, 26% 5%, 42% 14%);
+    text-align: center;
+  }
+  /* an eight-petal star sticker (Theme 14) and a flower badge on its cards */
+  .site .t-star {
+    clip-path: polygon(50% 0%, 59% 32%, 85% 15%, 68% 41%, 100% 50%, 68% 59%, 85% 85%, 59% 68%, 50% 100%, 41% 68%, 15% 85%, 32% 59%, 0% 50%, 32% 41%, 15% 15%, 41% 32%);
+  }
+  .site .t-flower {
+    background: #f6a9c5;
+    border-radius: 42% 58% 46% 54% / 55% 45% 55% 45%;
+    transform: rotate(-10deg);
+  }
+  /* Theme 13: a heavy rounded name on the colour block, squarish section titles */
+  .site .t-block {
+    font-size: calc(clamp(44px, 6.6vw, 112px) * var(--fit, 1) * var(--m-scale) * var(--m-hs));
+    font-weight: 900 !important;
+    line-height: 0.95 !important;
+    letter-spacing: -0.02em;
+    color: color-mix(in srgb, var(--m-text) 82%, transparent);
+  }
+  .site[data-theme="theme13"] .t-section,
+  .site[data-theme="theme13"] .t-title {
+    font-size: calc(clamp(2rem, 4.2vw, 3.6rem) * var(--m-scale) * var(--m-hs));
+    letter-spacing: 0.01em;
+    line-height: 1.05;
+  }
+  /* Theme 14: heavy grotesk capitals */
+  .site[data-theme="theme14"] .m-h {
+    letter-spacing: -0.02em;
+    line-height: 0.95;
+  }
+  .site[data-theme="theme14"] .m-display.t-hero {
+    font-size: calc(clamp(2.6rem, 5.6vw, 5.4rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site[data-theme="theme14"] .t-section {
+    font-size: calc(clamp(1.9rem, 3.6vw, 3.4rem) * var(--m-scale) * var(--m-hs));
+  }
+  /* Theme 15: chunky retro capitals in the accent colour */
+  .site[data-theme="theme15"] .m-h {
+    letter-spacing: -0.01em;
+    line-height: 0.95;
+  }
+  .site[data-theme="theme15"] .t-section {
+    color: var(--m-accent);
+    font-size: calc(clamp(2.1rem, 4.6vw, 4.2rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site .t-pop {
+    font-size: calc(clamp(2.5rem, 5.6vw, 5.6rem) * var(--m-scale) * var(--m-hs));
+    line-height: 0.92 !important;
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.18);
+  }
+  /* Theme 16: a warm serif */
+  .site[data-theme="theme16"] .m-h {
+    letter-spacing: -0.01em;
+    line-height: 1.12;
+  }
+  .site[data-theme="theme16"] .t-section {
+    font-size: calc(clamp(1.8rem, 3vw, 2.8rem) * var(--m-scale) * var(--m-hs));
+  }
+  /* Theme 10: light, airy grotesk headings */
+  .site[data-theme="theme10"] .m-h {
+    letter-spacing: -0.03em;
+    line-height: 1.04;
+  }
+  .site[data-theme="theme10"] .m-display.t-hero {
+    font-size: calc(clamp(2.6rem, 5.4vw, 5.2rem) * var(--m-scale) * var(--m-hs));
+    line-height: 0.98;
+  }
+  .site[data-theme="theme10"] .t-title {
+    font-size: calc(clamp(1.9rem, 3.2vw, 3.1rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site[data-theme="theme10"] .t-section {
+    font-size: calc(clamp(1.3rem, 1.9vw, 1.8rem) * var(--m-scale) * var(--m-hs));
+  }
+  /* Theme 11: tall condensed product names, an outline word behind the hero shoe */
+  .site .t-spec {
+    font-size: calc(clamp(52px, 7.2vw, 118px) * var(--m-scale) * var(--m-hs));
+    line-height: 0.9 !important;
+  }
+  .site .t-outline {
+    font-family: var(--m-display);
+    font-size: calc(clamp(170px, 27vw, 440px) * var(--m-scale));
+    line-height: 0.8;
+    text-transform: uppercase;
+    color: transparent;
+    -webkit-text-stroke: 2px color-mix(in srgb, #c8644c 75%, transparent);
+  }
+  /* product photos with their own backdrop fade softly into the panel */
+  .site .t-soft {
+    mask-image: radial-gradient(ellipse 72% 72% at 50% 50%, #000 58%, transparent 100%);
+  }
+  .site[data-theme="theme11"] .t-title {
+    font-size: calc(clamp(2rem, 3.8vw, 3.6rem) * var(--m-scale) * var(--m-hs));
+  }
+  /* Theme 12: the shop name huge across the hero photo; light headings elsewhere */
+  .site .t-duo {
+    font-size: calc(clamp(88px, 14vw, 250px) * var(--fit, 1) * var(--m-scale));
+    line-height: 0.82 !important;
+    letter-spacing: 0.005em;
+    text-transform: uppercase;
+  }
+  .site[data-theme="theme12"] .t-section {
+    font-size: calc(clamp(1.35rem, 2vw, 1.9rem) * var(--m-scale) * var(--m-hs));
+    letter-spacing: -0.01em;
+  }
+  .site[data-theme="theme12"] .m-brand {
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+  /* F02: quiet headings on a rule, olive highlights, a wide wordmark */
+  .site[data-theme="f02"] .m-em {
+    font-family: inherit;
+    font-style: normal;
+    font-weight: inherit;
+    padding: 0;
+    color: var(--m-accent);
+  }
+  .site[data-theme="f02"] .t-section {
+    font-size: calc(clamp(1.1rem, 1.6vw, 1.55rem) * var(--m-scale) * var(--m-hs));
+    letter-spacing: -0.01em;
+  }
+  .site .t-banner-word {
+    font-size: calc(clamp(50px, 12vw, 210px) * var(--fit, 1) * var(--m-scale));
+    font-weight: 600;
+    letter-spacing: -0.05em;
+    line-height: 0.86;
+  }
+  /* Theme 07: bold red headings in capitals, a quirky display wordmark */
+  .site[data-theme="theme07"] .m-h {
+    color: var(--m-accent);
+  }
+  .site[data-theme="theme07"] .t-section {
+    font-size: calc(clamp(1.1rem, 1.7vw, 1.5rem) * var(--m-scale) * var(--m-hs));
+    letter-spacing: 0.01em;
+  }
+  .site[data-theme="theme07"] .m-em {
+    font-style: normal;
+    font-family: inherit;
+    opacity: 0.55;
+  }
+  .site .t-split-word {
+    font-size: calc(clamp(60px, 9.6vw, 168px) * var(--fit, 1) * var(--m-scale));
+    font-weight: 700;
+    letter-spacing: -0.045em;
+    line-height: 0.85;
+    text-transform: none !important;
+  }
+  .site .t-split-sub {
+    font-size: 0.3em;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+  /* Theme 08: tall condensed headings in the accent colour */
+  .site[data-theme="theme08"] .m-h {
+    color: var(--m-accent);
+  }
+  .site .t-poster {
+    font-size: calc(clamp(88px, 16vw, 290px) * var(--fit, 1) * var(--m-scale));
+    font-weight: 500 !important;
+    letter-spacing: -0.01em;
+    line-height: 0.84 !important;
+    text-transform: uppercase;
+  }
+  /* Theme 09: small spaced capitals for section titles, a thin serif name over the hero */
+  .site[data-theme="theme09"] .t-section {
+    font-size: calc(clamp(0.8rem, 1vw, 0.95rem) * var(--m-scale));
+    letter-spacing: 0.12em;
+    line-height: 1.5;
+    text-transform: uppercase;
+  }
+  .site[data-theme="theme09"] .m-display.t-hero {
+    font-weight: 300;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: calc(clamp(3rem, 9vw, 9.5rem) * var(--m-scale) * var(--m-hs));
+  }
+  /* F01: light geometric headings; words between *stars* show in a soft olive grey */
+  .site[data-theme="f01"] .m-h {
+    letter-spacing: -0.035em;
+    line-height: 1.04;
+  }
+  .site[data-theme="f01"] .m-h .m-em {
+    font-family: inherit;
+    font-style: normal;
+    font-weight: inherit;
+    padding: 0;
+    color: color-mix(in srgb, var(--m-text) 35%, #9a9c86);
+  }
+  .site[data-theme="f01"] .t-section {
+    font-size: calc(clamp(1.6rem, 2.9vw, 2.7rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site[data-theme="f01"] .t-title {
+    font-size: calc(clamp(1.75rem, 3.2vw, 3rem) * var(--m-scale) * var(--m-hs));
+  }
+  /* the shop name across the top of the showcase hero; *stars* make part of it bold */
+  .site .t-showcase {
+    font-size: calc(clamp(58px, 15.4vw, 250px) * var(--fit, 1) * var(--m-scale));
+    font-weight: 400;
+    letter-spacing: -0.065em;
+    line-height: 0.8;
+  }
+  .site .t-showcase .m-em,
+  .site[data-theme="f01"] .t-showcase .m-em {
+    font-family: inherit;
+    font-style: normal;
+    font-weight: 600;
+    color: inherit;
+  }
+  /* a product photo that floats gently */
+  @keyframes siteFloat {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  .site .m-float {
+    animation: siteFloat 6s ease-in-out infinite;
+  }
+  /* E01 (theme06): clean grotesk headings, slightly tight */
+  .site[data-theme="theme06"] .m-h {
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+  }
+  .site[data-theme="theme06"] .t-section {
+    font-size: calc(clamp(1.35rem, 2.3vw, 2.1rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site[data-theme="theme06"] .t-title {
+    font-size: calc(clamp(1.6rem, 2.8vw, 2.6rem) * var(--m-scale) * var(--m-hs));
+  }
+  .site[data-upper="yes"] .m-h,
+  .site[data-upper="yes"] .m-cap {
+    text-transform: uppercase;
+  }
+  .site .m-muted {
+    color: color-mix(in srgb, var(--m-text) 58%, transparent);
+  }
+  .site .m-faint {
+    color: color-mix(in srgb, var(--m-text) 38%, transparent);
+  }
+  .site .m-line {
+    border-color: color-mix(in srgb, var(--m-text) 11%, transparent);
+  }
+  .site .m-panel {
+    background: var(--m-panel);
+  }
+  .site .m-card {
+    border-radius: var(--m-card, 0px);
+  }
+  .site .m-soft {
+    background: color-mix(in srgb, var(--m-text) 4%, var(--m-bg));
+  }
+  .site .m-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding: 0 1.6rem;
+    border-radius: var(--m-radius);
+    background: var(--m-accent);
+    color: var(--m-accent-text);
+    font-family: var(--m-head);
+    font-size: calc(0.75rem * var(--m-scale));
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  /* without capital headings the buttons read normally too ("Shop now") */
+  .site[data-upper="no"] .m-btn {
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 600;
+  }
+  /* the big pill buttons of the hero and section headings */
+  .site .m-btn-lg {
+    min-height: clamp(46px, 4.6vw, 68px);
+    min-width: clamp(140px, 13vw, 196px);
+    padding: 0 clamp(20px, 2.4vw, 40px);
+    font-size: calc(clamp(11px, 0.85vw, 13px) * var(--m-scale));
+  }
+  .site .m-btn:hover {
+    opacity: 0.88;
+  }
+  .site .m-btn:active {
+    transform: scale(0.98);
+  }
+  .site .m-btn:disabled {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  .site .m-btn-outline {
+    background: transparent;
+    color: var(--m-text);
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--m-text) 80%, transparent);
+  }
+  .site .m-btn-outline:hover {
+    opacity: 1;
+    background: var(--m-text);
+    color: var(--m-bg);
+  }
+  .site .m-field {
+    width: 100%;
+    height: 3.25rem;
+    padding: 0 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--m-text) 16%, transparent);
+    background: var(--m-bg);
+    color: var(--m-text);
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .site textarea.m-field {
+    height: auto;
+    padding: 0.85rem 1rem;
+  }
+  .site .m-field:focus {
+    border-color: var(--m-text);
+  }
+  .site .m-field::placeholder {
+    color: color-mix(in srgb, var(--m-text) 38%, transparent);
+  }
+  .site .m-scroll {
+    scrollbar-width: none;
+  }
+  .site .m-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  @keyframes monoMarquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  .site .m-marquee {
+    animation: monoMarquee 28s linear infinite;
+  }
+  @keyframes monoRise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .site .m-rise {
+    animation: monoRise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* ---- motion: scroll reveal, staggered cards, hover feedback ---- */
+  .site {
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  /* each page fades in when you move between pages */
+  @keyframes sitePageIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  .site .m-page {
+    animation: sitePageIn 0.45s ease both;
+  }
+  /* the first section's photo settles in from slightly larger */
+  @keyframes siteHeroZoom {
+    from {
+      transform: scale(1.06);
+    }
+    to {
+      transform: none;
+    }
+  }
+  .site [data-editor-section]:first-child section img.object-cover {
+    animation: siteHeroZoom 1.6s var(--ease-out) both;
+  }
+  /* homepage sections rise in as they scroll into view */
+  .site [data-reveal] {
+    transition:
+      opacity 0.9s var(--ease-out),
+      transform 0.9s var(--ease-out);
+  }
+  .site [data-reveal]:not([data-shown]) {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  /* and their cards follow one after another */
+  .site .m-stagger > * {
+    transition:
+      opacity 0.8s var(--ease-out),
+      transform 0.8s var(--ease-out),
+      box-shadow 0.35s ease;
+    transition-delay: calc(var(--n, 0) * 70ms);
+  }
+  .site [data-reveal]:not([data-shown]) .m-stagger > * {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  .site .m-stagger > :nth-child(2) { --n: 1; }
+  .site .m-stagger > :nth-child(3) { --n: 2; }
+  .site .m-stagger > :nth-child(4) { --n: 3; }
+  .site .m-stagger > :nth-child(5) { --n: 4; }
+  .site .m-stagger > :nth-child(6) { --n: 5; }
+  .site .m-stagger > :nth-child(7) { --n: 6; }
+  .site .m-stagger > :nth-child(n + 8) { --n: 7; }
+  /* once shown, hover is instant again */
+  .site [data-shown] .m-stagger > * {
+    transition-delay: 0s;
+  }
+  .site [data-editing="true"] [data-reveal],
+  .site[data-editing="true"] [data-reveal],
+  .site[data-editing="true"] [data-reveal] .m-stagger > * {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  /* tiles lift a little when pointed at */
+  @media (hover: hover) {
+    .site .m-lift-kids > * {
+      transition:
+        opacity 0.8s var(--ease-out),
+        transform 0.45s var(--ease-out),
+        box-shadow 0.45s var(--ease-out);
+    }
+    .site [data-shown] .m-lift-kids > *:hover,
+    .site .m-lift-kids > *:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 22px 40px -28px rgba(0, 0, 0, 0.45);
+    }
+    /* buttons lift, and their arrows nudge forward */
+    .site .m-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px -14px color-mix(in srgb, var(--m-accent) 80%, transparent);
+    }
+    .site .m-btn-outline:hover {
+      box-shadow: inset 0 0 0 1.5px var(--m-text);
+    }
+    .site a svg.lucide-arrow-right,
+    .site a svg.lucide-arrow-up-right,
+    .site button svg.lucide-arrow-right {
+      transition: transform 0.3s var(--ease-out);
+    }
+    .site a:hover svg.lucide-arrow-right,
+    .site button:hover svg.lucide-arrow-right {
+      transform: translateX(4px);
+    }
+    .site a:hover svg.lucide-arrow-up-right {
+      transform: translate(2px, -2px);
+    }
+    /* menu links get an underline that fades in */
+    .site header nav a:not([class*="rounded"]) {
+      text-decoration-line: underline;
+      text-decoration-color: transparent;
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 6px;
+      transition:
+        text-decoration-color 0.25s ease,
+        opacity 0.25s ease;
+    }
+    .site header nav a:not([class*="rounded"]):hover {
+      text-decoration-color: currentColor;
+      opacity: 1;
+    }
+    /* footer links slide over a touch */
+    .site footer a.block {
+      transition:
+        transform 0.3s var(--ease-out),
+        color 0.2s;
+    }
+    .site footer a.block:hover {
+      transform: translateX(3px);
+    }
+    /* header icons */
+    .site header a svg,
+    .site header button svg {
+      transition: transform 0.3s var(--ease-out);
+    }
+    .site header a:hover svg,
+    .site header button:hover svg {
+      transform: scale(1.1);
+    }
+  }
+  /* wishlist hearts pop when switched on */
+  @keyframes siteHeartPop {
+    0% {
+      transform: scale(1);
+    }
+    40% {
+      transform: scale(1.35);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  .site button[aria-pressed="true"] svg.lucide-heart {
+    animation: siteHeartPop 0.4s var(--ease-out);
+  }
+  /* the bag icon bumps when something is added */
+  @keyframes siteBagBump {
+    0% {
+      transform: scale(1);
+    }
+    30% {
+      transform: scale(1.22) rotate(-6deg);
+    }
+    60% {
+      transform: scale(0.94) rotate(3deg);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  .site [data-bump] a[aria-label^="Bag"] {
+    animation: siteBagBump 0.6s var(--ease-out);
+  }
+  /* banner and hero photos drift slowly when pointed at */
+  @media (hover: hover) {
+    .site [data-editor-section] section a > img,
+    .site .m-card > img {
+      transition: transform 1.2s var(--ease-out);
+    }
+  }
+  .site [data-editor-section] {
+    position: relative;
+  }
+  .site [data-editor-section][data-selected="true"]::after,
+  .site[data-editing="true"] [data-editor-section]:hover::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 2px #2563eb;
+    z-index: 30;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .site .m-marquee,
+    .site .m-rise,
+    .site .m-page,
+    .site [data-editor-section]:first-child section img.object-cover,
+    .site [data-bump] a[aria-label^="Bag"],
+    .site .m-float,
+    .site .t-spin,
+    .site .t-progress,
+    .site .t-twinkle,
+    .site .t-wobble,
+    .site button[aria-pressed="true"] svg.lucide-heart {
+      animation: none;
+    }
+    .site [data-reveal],
+    .site .m-stagger > *,
+    .site .m-lift-kids > * {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+    }
+  }
+}
+
+/* Dashboard sidebar rail: black and white, with a soft pulse for live/needs-attention dots */
+@keyframes dashRailPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+.dash-rail-pulse { animation: dashRailPulse 2.4s ease-in-out infinite; }
+.dash-rail-scroll { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.15) transparent; }
+@media (prefers-reduced-motion: reduce) {
+  .dash-rail-pulse { animation: none; }
+}
+.dash-panel-scroll { scrollbar-width: thin; scrollbar-color: rgba(0, 0, 0, 0.18) transparent; }

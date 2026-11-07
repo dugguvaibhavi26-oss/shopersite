@@ -1,0 +1,21 @@
+# Never upload these to Vercel: signing keys, passwords, local env files, native app projects
+release-keys/
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+android/
+ios/
+mobile/builds/
+mobile/assets/
+.env
+.env.*
+!.env.example
+node_modules/
+.next/
+coverage/
+tests/
+backups/
+rules-out/
+scripts/migrate-private.mjs
+scripts/deploy-rules.mjs

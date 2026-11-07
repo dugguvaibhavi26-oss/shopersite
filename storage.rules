@@ -1,0 +1,40 @@
+rules_version = '2';
+
+// Shopersite Storage security rules. Deploy with: node scripts/deploy-rules.mjs
+// - store_assets/{store}/...   theme photos uploaded by signed-in sellers: images only, max 8 MB,
+//                              new files only (nobody can overwrite or delete someone else's photo)
+// - platform_banners/...       admin only
+// Files are public to view (they're shown on storefronts).
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function adminEmails() {
+      return [/*ADMIN_EMAILS*/'tejaswithreddy0101@gmail.com'/*END_ADMIN_EMAILS*/];
+    }
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email_verified == true
+        && request.auth.token.email is string && request.auth.token.email.lower() in adminEmails();
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*') && request.resource.size < 8 * 1024 * 1024;
+    }
+
+    match /store_assets/{store}/{file=**} {
+      allow read: if true;
+      allow create: if request.auth != null && resource == null && isImage();
+      allow update, delete: if isAdmin();
+    }
+
+    match /platform_banners/{file=**} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isImage();
+      allow delete: if isAdmin();
+    }
+
+    match /{other=**} {
+      allow read: if true;
+    }
+  }
+}

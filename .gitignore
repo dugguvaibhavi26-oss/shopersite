@@ -1,0 +1,60 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+.env
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# mobile (Capacitor)
+.env.mobile
+# Android signing: never commit keystores or their passwords
+*.jks
+*.keystore
+android/keystore.properties
+# iOS signing
+*.p12
+*.mobileprovision
+*.ipa
+release-keys/
+# built app files to share
+mobile/builds/
+
+.vercel
+.env*
+
+# local data backups and rendered rules
+backups/
+rules-out/
+
+# local logs and keys
+firestore-debug.log
+*-debug.log
+*adminsdk*.json
+service-account*.json
+!.env.example
+!.env.mobile.example

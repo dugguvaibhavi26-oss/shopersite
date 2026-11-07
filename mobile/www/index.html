@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>shopersite</title>
+  <style>html,body{margin:0;height:100%;background:#fff}</style>
+</head>
+<body>
+  <!-- Not normally shown: the app loads the live site from server.url in capacitor.config.ts.
+       This page only exists because Capacitor needs a web directory. It forwards to the site. -->
+  <script src="config.js"></script>
+  <script>
+    if (window.SHOPERSITE_APP && window.SHOPERSITE_APP.serverUrl) {
+      window.location.replace(window.SHOPERSITE_APP.serverUrl);
+    } else {
+      window.location.replace("offline.html");
+    }
+  </script>
+</body>
+</html>

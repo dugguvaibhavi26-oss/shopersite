@@ -1,0 +1,115 @@
+rules_version = '2';
+
+// Shopersite Firestore security rules.
+// Deploy with: node scripts/deploy-rules.mjs   (it fills in the admin list from NEXT_PUBLIC_ADMIN_EMAILS)
+//
+// - stores/{sub}                 public storefront data. Anyone reads; only the owner edits, and
+//                                never the plan, ownership, suspension or payment fields.
+// - stores/{sub}/private/data    buyers' orders, customers, subscribers and payment requests.
+//                                Only the owner and admins can read; only the server/admin can
+//                                change payment requests.
+// - platform_*                   platform settings: everyone reads, only admins write.
+// - everything else              (orders, subscribers, payments, cashfree_merchants, upi_claims…)
+//                                server only, through the app's API routes.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function adminEmails() {
+      return [/*ADMIN_EMAILS*/'tejaswithreddy0101@gmail.com'/*END_ADMIN_EMAILS*/];
+    }
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function verifiedEmail() {
+      return signedIn() && request.auth.token.email_verified == true && request.auth.token.email is string;
+    }
+
+    function isAdmin() {
+      return verifiedEmail() && request.auth.token.email.lower() in adminEmails();
+    }
+
+    // the store's owner: by account id, or (older stores with no id) by verified email
+    function ownsStore(data) {
+      return signedIn() && (
+        data.get('ownerId', '') == request.auth.uid ||
+        (data.get('ownerId', '') == '' && verifiedEmail() &&
+          data.get('ownerEmail', '').lower() == request.auth.token.email.lower())
+      );
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // public fields an owner may never change, plus private fields that never belong here
+    function lockedPublicKeys() {
+      return ['id', 'subdomain', 'ownerId', 'ownerEmail', 'planId', 'planPaidUntil', 'ownedThemes',
+              'isPaused', 'pauseMessage', 'status', 'createdAt',
+              'orders', 'customers', 'subscribers', 'pendingSubscription', 'subscriptionHistory', 'themePurchases'];
+    }
+
+    match /stores/{sub} {
+      allow read: if true;
+
+      // a new store: owned by the creator, on the Free plan, nothing paid or private in it
+      allow create: if signedIn()
+        && sub.matches('^[a-z0-9-]{1,63}$')
+        && request.resource.data.subdomain == sub
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.planId == 'free'
+        && request.resource.data.get('isPaused', false) == false
+        && request.resource.data.get('status', 'published') in ['published', 'draft']
+        && !request.resource.data.keys().hasAny(['planPaidUntil', 'ownedThemes', 'orders', 'customers', 'subscribers',
+                                                'pendingSubscription', 'subscriptionHistory', 'themePurchases']);
+
+      allow update: if isAdmin()
+        || (ownsStore(resource.data) && !changedKeys().hasAny(lockedPublicKeys()));
+
+      allow delete: if isAdmin();
+
+      match /private/{docId} {
+        allow read: if isAdmin() || ownsStore(get(/databases/$(database)/documents/stores/$(sub)).data);
+
+        allow create: if isAdmin() || (
+          docId == 'data'
+          && ownsStore(get(/databases/$(database)/documents/stores/$(sub)).data)
+          && request.resource.data.keys().hasOnly(['orders', 'customers', 'subscribers', 'subscriptionHistory',
+                                                   'themePurchases', 'pendingSubscription', 'updatedAt'])
+          && request.resource.data.get('subscriptionHistory', []).size() == 0
+          && request.resource.data.get('themePurchases', []).size() == 0
+          && request.resource.data.get('pendingSubscription', null) == null);
+
+        // owners manage their orders / customers; payment requests change only via server or admin
+        allow update: if isAdmin() || (
+          ownsStore(get(/databases/$(database)/documents/stores/$(sub)).data)
+          && !changedKeys().hasAny(['pendingSubscription', 'subscriptionHistory', 'themePurchases']));
+
+        allow delete: if isAdmin();
+      }
+    }
+
+    // the admin panel follows every store's private document
+    match /{path=**}/private/{docId} {
+      allow read: if isAdmin();
+    }
+
+    match /platform_settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /platform_banners/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /platform_broadcasts/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // orders, subscribers, payments, cashfree_merchants, upi_claims and anything else: server only
+  }
+}
