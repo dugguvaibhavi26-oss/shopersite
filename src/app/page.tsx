@@ -283,14 +283,14 @@ function Hero({ onClaim }: { onClaim: (v: string) => void }) {
           <div className="hero-rise w-full rounded-[24px] sm:rounded-[36px] bg-white px-5 py-8 sm:px-10 sm:py-11 flex flex-col items-center text-center">
           <a
             href="#pricing"
-            className="hero-rise group/pill inline-flex items-center gap-2 rounded-[10px] border border-neutral-200 bg-white pl-1.5 pr-3 py-1 text-xs font-medium text-neutral-700 hover:border-neutral-400 transition-colors"
+            className="hero-rise hidden sm:inline-flex items-center gap-2 rounded-[10px] border border-neutral-200 bg-white pl-1.5 pr-3 py-1 text-xs font-medium text-neutral-700 hover:border-neutral-400 transition-colors group/pill"
           >
             <span className="rounded-[7px] bg-black text-white px-2 py-0.5 text-[10px] font-semibold">NEW</span>
             Free plan with {PLATFORM_PLANS.free.maxProducts} products — no card needed
             <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover/pill:translate-x-0.5" />
           </a>
 
-          <h1 style={{ animationDelay: "90ms" }} className="hero-rise mt-6 text-[2.15rem] leading-[1.08] sm:text-5xl lg:text-[3.6rem] font-medium !tracking-[-0.04em] mx-auto text-neutral-950 text-balance">
+          <h1 style={{ animationDelay: "90ms" }} className="hero-rise mt-4 sm:mt-6 text-[1.95rem] leading-[1.08] sm:text-5xl lg:text-[3.6rem] font-medium !tracking-[-0.04em] mx-auto text-neutral-950 text-balance">
             Your shop, online
             <br />
             in{" "}
@@ -317,21 +317,21 @@ function Hero({ onClaim }: { onClaim: (v: string) => void }) {
             .
           </h1>
 
-          <p style={{ animationDelay: "180ms" }} className="hero-rise mt-5 text-[15px] sm:text-[17px] text-neutral-500 max-w-sm mx-auto leading-relaxed text-balance">
-            A beautiful store for your Instagram and WhatsApp buyers — paid straight to your UPI.
+          <p style={{ animationDelay: "180ms" }} className="hero-rise mt-3 sm:mt-5 text-[14px] sm:text-[17px] text-neutral-500 max-w-sm mx-auto leading-relaxed text-balance">
+            For Instagram &amp; WhatsApp sellers — payments straight to your UPI.
           </p>
 
-          <div style={{ animationDelay: "270ms" }} className="hero-rise mt-8 w-full flex flex-col items-center gap-4">
+          <div style={{ animationDelay: "270ms" }} className="hero-rise mt-6 sm:mt-8 w-full flex flex-col items-center gap-3 sm:gap-4">
             <ClaimForm onClaim={onClaim} />
-            <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[13px] text-neutral-500">
+            <ul className="flex items-center justify-center gap-x-4 text-[12px] sm:text-[13px] text-neutral-500">
               {["Free plan", "0% commission", "Direct UPI"].map((t) => (
-                <li key={t} className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-neutral-900" strokeWidth={2.5} />
+                <li key={t} className="flex items-center gap-1">
+                  <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-neutral-900" strokeWidth={2.5} />
                   {t}
                 </li>
               ))}
             </ul>
-            <InstallAndroidApp className="mt-1" />
+            <InstallAndroidApp className="w-full max-w-[260px]" />
           </div>
           </div>
           </div>

@@ -24,18 +24,19 @@ export function InstallAndroidApp({ className = "" }: { className?: string }) {
     <a
       href={APK_URL}
       download={`shopersite-${APP_VERSION}.apk`}
-      className={`md:hidden inline-flex items-center gap-2.5 rounded-[12px] bg-black py-2 pl-2.5 pr-4 text-left text-white shadow-[0_10px_24px_-12px_rgba(0,0,0,0.6)] active:scale-[0.98] transition-transform ${className}`}
+      className={`md:hidden inline-flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-3.5 py-2.5 shadow-sm active:scale-[0.97] transition-transform hover:border-neutral-300 hover:shadow-md ${className}`}
     >
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-white/10">
-        <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="#3DDC84" aria-hidden>
+      {/* Android robot icon in brand green */}
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#edfbf3]">
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="#1a9e55" aria-hidden>
           <path d="M17.6 9.48l1.84-3.18a.38.38 0 00-.66-.38l-1.86 3.22a11.4 11.4 0 00-9.84 0L5.22 5.92a.38.38 0 10-.66.38L6.4 9.48A10.8 10.8 0 001 18h22a10.8 10.8 0 00-5.4-8.52zM7 15.25a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm10 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z" />
         </svg>
       </span>
-      <span className="leading-tight">
-        <span className="block text-[10px] font-medium uppercase tracking-[0.08em] text-white/60">Install the app</span>
-        <span className="block text-[14px] font-semibold">Get it for Android</span>
+      <span className="leading-tight text-left">
+        <span className="block text-[11px] text-neutral-400">Free download</span>
+        <span className="block text-[14px] font-semibold text-neutral-900">Get the Android app</span>
       </span>
-      <Download className="ml-1 h-4 w-4 text-white/70" />
+      <Download className="ml-auto h-4 w-4 text-neutral-400" />
     </a>
   );
 }
