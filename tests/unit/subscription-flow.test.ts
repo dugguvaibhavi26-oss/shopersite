@@ -9,7 +9,7 @@ describe("Subscription & UPI Payment Flow Unit Tests", () => {
   const testSubdomain = `subtest-${Date.now().toString(36)}`;
 
   beforeAll(() => {
-    storeService.registerStore({
+    storeService.registerStoreOffline({
       name: "Sub Test Boutique",
       subdomain: testSubdomain,
       category: "Fashion & Apparel",

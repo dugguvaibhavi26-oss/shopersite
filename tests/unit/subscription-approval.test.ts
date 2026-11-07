@@ -9,7 +9,7 @@ describe("Paid plans unlock only after admin approval", () => {
 
   beforeEach(() => {
     sub = `approve-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    storeService.registerStore({
+    storeService.registerStoreOffline({
       name: "Approval Test",
       subdomain: sub,
       category: "Fashion & Apparel",

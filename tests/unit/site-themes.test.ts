@@ -97,7 +97,7 @@ describe("Storefront themes", () => {
 
 describe("Coupons", () => {
   const sub = `coupons-${Date.now().toString(36)}`;
-  const store = storeService.registerStore({
+  const store = storeService.registerStoreOffline({
     name: "Coupon Shop",
     subdomain: sub,
     category: "Fashion",
@@ -140,7 +140,7 @@ describe("Theme preview samples", () => {
   it("give every theme its own products, categories, banners and reviews, keeping the shop's own details", async () => {
     const { demoStoreFor } = await import("@/lib/demo-store");
     const sub = `demo${Date.now().toString(36)}`;
-    storeService.registerStore({ name: "Acme", subdomain: sub, category: "Fashion", ownerName: "A", contactPhone: "9999999999", upiId: "acme@upi", tagline: "" });
+    storeService.registerStoreOffline({ name: "Acme", subdomain: sub, category: "Fashion", ownerName: "A", contactPhone: "9999999999", upiId: "acme@upi", tagline: "" });
     const real = storeService.getStore(sub)!;
     const titles = new Set<string>();
     for (const theme of ["classic-bloom", "mono-studio", "theme03", "theme04", "theme05", "theme06", "f01", "f02", "theme07", "theme08", "theme09", "theme10", "theme11", "theme12", "theme13", "theme14", "theme15", "theme16", "theme17", "theme18", "theme19", "theme20", "theme21", "theme22", "theme23", "theme24", "theme25", "theme26", "theme27", "theme28", "theme29", "theme30", "theme31", "theme32", "theme33", "theme34", "theme35"]) {

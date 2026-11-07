@@ -16,6 +16,7 @@ export const viewport: Viewport = {
 import { AuthProvider } from "@/lib/auth-context";
 import { NativeBridge } from "@/components/native/native-bridge";
 import { NavProgress } from "@/components/nav-progress";
+import { SaveFailedNotice } from "@/components/save-failed-notice";
 
 export default function RootLayout({
   children,
@@ -34,7 +35,10 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+          <SaveFailedNotice />
+        </AuthProvider>
         <NativeBridge />
         <NavProgress />
       </body>

@@ -93,7 +93,7 @@ describe("Buying a theme", () => {
   beforeEach(() => {
     applyThemePricing(null);
     sub = `theme-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    storeService.registerStore({
+    storeService.registerStoreOffline({
       name: "Theme Buyer",
       subdomain: sub,
       category: "Fashion & Apparel",

@@ -8,7 +8,7 @@ describe("Platform Multi-Tenant Store & Subscription Engine", () => {
   const testSubdomain = `testboutique-${Date.now().toString(36)}`;
 
   it("registers a new seller store with free starter plan & default theme", () => {
-    const store = storeService.registerStore({
+    const store = storeService.registerStoreOffline({
       name: "Test Silk Boutique",
       subdomain: testSubdomain,
       category: "Fashion & Apparel",

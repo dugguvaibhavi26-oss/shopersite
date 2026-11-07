@@ -17,7 +17,7 @@ const order = {
 describe("seller switches the shop off", () => {
   beforeEach(() => {
     if (!storeService.getStore(sub)) {
-      storeService.registerStore({
+      storeService.registerStoreOffline({
         name: "Closed Shop",
         subdomain: sub,
         category: "Fashion",

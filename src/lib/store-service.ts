@@ -10,6 +10,9 @@ import {
   collectionGroup,
   doc,
   setDoc,
+  updateDoc,
+  getDoc,
+  getDocFromServer,
   deleteDoc,
   getDocs,
   onSnapshot,
@@ -397,6 +400,22 @@ export const DEMO_STORE_IDS = new Set(["store-lume-001", "store-jaipur-crafts-00
 const isDemoStore = (s: Partial<StoreData> | null | undefined) =>
   !!s && (DEMO_STORE_IDS.has(String(s.id)) || s.subdomain === "lume" || s.subdomain === "jaipurcrafts");
 
+type NewStoreInput = {
+  name: string;
+  subdomain: string;
+  category: string;
+  ownerName: string;
+  contactPhone: string;
+  contactEmail?: string;
+  upiId: string;
+  tagline?: string;
+  ownerId?: string;
+  ownerEmail?: string;
+};
+
+/** Set by the test setup: no database connection at all. */
+const isOffline = () => (globalThis as { __SHOPERSITE_OFFLINE__?: boolean }).__SHOPERSITE_OFFLINE__ === true;
+
 // Global Store State Manager with Firebase Firestore Cloud Sync & LocalStorage fallback
 class StoreService {
   private stores: Record<string, StoreData> = {};
@@ -450,13 +469,22 @@ class StoreService {
       if (blocked.has(k)) continue;
       picked[k] = (store as unknown as Record<string, unknown>)[k];
     }
+    // only stores the database has: a deleted store must never be written back
+    if (!this.publicData[subdomain]) {
+      console.warn(`[Firebase Firestore] Not saving "${subdomain}": it isn't in the database.`);
+      return;
+    }
     const parts = splitStoreUpdate(JSON.parse(JSON.stringify(picked)));
     const now = new Date().toISOString();
     try {
-      if (Object.keys(parts.pub).length) await setDoc(doc(db, "stores", subdomain), { ...parts.pub, updatedAt: now }, { merge: true });
+      // updateDoc fails if the store was deleted meanwhile, instead of creating it again
+      if (Object.keys(parts.pub).length) await updateDoc(doc(db, "stores", subdomain), { ...parts.pub, updatedAt: now });
       if (Object.keys(parts.priv).length) await setDoc(doc(db, "stores", subdomain, "private", "data"), { ...parts.priv, updatedAt: now }, { merge: true });
     } catch (err) {
       console.warn(`[Firebase Firestore] Store "${subdomain}" save refused or failed:`, err);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("shopersite:save-failed", { detail: { subdomain, code: (err as { code?: string })?.code || "" } }));
+      }
     }
   }
 
@@ -533,32 +561,42 @@ class StoreService {
   }
 
   private connectFirebase() {
+    if (isOffline()) {
+      this.cloudSynced = true;
+      return;
+    }
     if (typeof window === "undefined" || this.firebaseConnected) return;
     this.firebaseConnected = true;
+    // a very slow or offline connection: stop waiting after a while so pages can show what they have
+    window.setTimeout(() => {
+      if (!this.cloudSynced) {
+        this.cloudSynced = true;
+        this.notify();
+      }
+    }, 10000);
 
     try {
       const storesCol = collection(db, "stores");
       onSnapshot(
         storesCol,
         (snapshot) => {
-          const firstSync = !this.cloudSynced;
-          this.cloudSynced = true;
-          if (!snapshot.empty) {
-            let hasChanges = false;
-            snapshot.docs.forEach((d) => {
-              const data = d.data() as StoreData;
-              if (data && data.subdomain && !isDemoStore(data)) {
-                this.publicData[data.subdomain] = data;
-                this.stores[data.subdomain] = mergeStoreParts(data, this.privateData[data.subdomain]);
-                hasChanges = true;
-              }
-            });
-            if (hasChanges) {
-              this.persist();
-              this.notify();
+          // the database is the only source of truth: stores it doesn't have are dropped here
+          const seen = new Set<string>();
+          const nextPublic: Record<string, Partial<StoreData>> = {};
+          const nextStores: Record<string, StoreData> = {};
+          snapshot.docs.forEach((d) => {
+            const data = d.data() as StoreData;
+            if (data && data.subdomain && !isDemoStore(data)) {
+              seen.add(data.subdomain);
+              nextPublic[data.subdomain] = data;
+              nextStores[data.subdomain] = mergeStoreParts(data, this.privateData[data.subdomain]);
             }
-          }
-          if (firstSync) this.notify();
+          });
+          for (const sub of Object.keys(this.privateData)) if (!seen.has(sub)) delete this.privateData[sub];
+          this.publicData = nextPublic;
+          this.stores = nextStores;
+          if (!snapshot.metadata.fromCache) this.cloudSynced = true;
+          this.notify();
         },
         (error) => {
           console.warn("[Firebase Firestore] Real-time listener warning:", error);
@@ -573,14 +611,12 @@ class StoreService {
 
   private initClient() {
     if (typeof window !== "undefined" && !this.initialized) {
+      // Stores come only from the database. Older versions kept a copy of every store in the
+      // browser, which kept deleted stores showing up; remove it.
       try {
-        const saved = localStorage.getItem("shopper_stores_state");
-        if (saved) {
-          const parsed = JSON.parse(saved) as Record<string, StoreData>;
-          this.stores = Object.fromEntries(Object.entries(parsed).filter(([, st]) => !isDemoStore(st)));
-        }
-      } catch (e) {
-        console.error("Failed to load stores from localStorage", e);
+        localStorage.removeItem("shopper_stores_state");
+      } catch {
+        // storage blocked: nothing to remove
       }
 
       // Ensure all stores have categories, subscribers, and pluginsConfig initialized cleanly (no demo mocks)
@@ -640,15 +676,8 @@ class StoreService {
   }
 
 
-  private persist() {
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem("shopper_stores_state", JSON.stringify(this.stores));
-      } catch (e) {
-        console.error("Failed to save stores to localStorage", e);
-      }
-    }
-  }
+  /** Stores are no longer copied into the browser (see initClient); kept as a no-op for callers. */
+  private persist() {}
 
   public getAllStores(): StoreData[] {
     this.initClient();
@@ -700,27 +729,47 @@ class StoreService {
     return { store, product };
   }
 
-  public registerStore(input: {
-    name: string;
-    subdomain: string;
-    category: string;
-    ownerName: string;
-    contactPhone: string;
-    contactEmail?: string;
-    upiId: string;
-    tagline?: string;
-    ownerId?: string;
-    ownerEmail?: string;
-  }): StoreData {
+  /** Asks the database itself whether a web address is in use. */
+  public async isSubdomainTaken(subdomain: string): Promise<boolean> {
+    const sub = subdomain.toLowerCase().trim();
+    try {
+      return (await getDocFromServer(doc(db, "stores", sub))).exists();
+    } catch {
+      // offline: fall back to the live list
+      return !!this.publicData[sub] || (await getDoc(doc(db, "stores", sub)).then((d) => d.exists()).catch(() => false));
+    }
+  }
+
+  public async registerStore(input: NewStoreInput): Promise<StoreData> {
     this.initClient();
+    const newStore = this.buildStore(input);
+    const cleanSubdomain = newStore.subdomain;
+    if (cleanSubdomain.length < 3) throw new Error("Use at least 3 letters or numbers for your web address.");
+    if (await this.isSubdomainTaken(cleanSubdomain)) {
+      throw new Error(`${getStoreDomain(cleanSubdomain)} is taken. Try another.`);
+    }
+    await this.createStoreDocs(newStore);
+    this.stores[cleanSubdomain] = newStore;
+    this.notify();
+    return newStore;
+  }
+
+  /** Tests only (no database): adds a new store in memory. */
+  public registerStoreOffline(input: NewStoreInput): StoreData {
+    if (!isOffline()) throw new Error("registerStoreOffline is for tests only.");
+    this.initClient();
+    const newStore = this.buildStore(input);
+    if (this.stores[newStore.subdomain]) throw new Error(`${getStoreDomain(newStore.subdomain)} is taken. Try another.`);
+    this.stores[newStore.subdomain] = newStore;
+    this.notify();
+    return newStore;
+  }
+
+  private buildStore(input: NewStoreInput): StoreData {
     const cleanSubdomain = input.subdomain
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9-]/g, "");
-
-    if (this.stores[cleanSubdomain]) {
-      throw new Error(`Domain "${getStoreDomain(cleanSubdomain)}" is already registered.`);
-    }
 
     const newStoreId = `store-${cleanSubdomain}-${Date.now().toString(36)}`;
     const now = new Date().toISOString();
@@ -775,10 +824,6 @@ class StoreService {
       updatedAt: now,
     };
 
-    this.stores[cleanSubdomain] = newStore;
-    this.persist();
-    this.createStoreDocs(newStore);
-    this.notify();
     return newStore;
   }
 
@@ -801,6 +846,12 @@ class StoreService {
       this.watchPrivate([...this.privateWatches.keys(), store.subdomain]);
     } catch (err) {
       console.warn(`[Firebase Firestore] Couldn't create store "${store.subdomain}":`, err);
+      const code = (err as { code?: string })?.code || "";
+      throw new Error(
+        code === "permission-denied"
+          ? `${getStoreDomain(store.subdomain)} is taken. Try another.`
+          : "Couldn't create your store. Check your internet connection and try again."
+      );
     }
   }
 

@@ -176,7 +176,7 @@ function RegisterStoreContent() {
       }
 
       const cleanSub = subdomain.toLowerCase().trim();
-      const newStore = storeService.registerStore({
+      const newStore = await storeService.registerStore({
         name: storeName,
         subdomain: cleanSub,
         category,
