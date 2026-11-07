@@ -79,6 +79,7 @@ import {
   Check,
   RefreshCw,
   FolderTree,
+  Layers,
   Lock,
   Upload,
   ArrowUpDown,
@@ -331,6 +332,7 @@ function DashboardPageContent() {
   const [cCtaText, setCCtaText] = useState("");
   const [cSelectedChildren, setCSelectedChildren] = useState<string[]>([]);
   const [catSearchQuery, setCatSearchQuery] = useState("");
+  const [cError, setCError] = useState("");
   const [categoryViewTab, setCategoryViewTab] = useState<"categories" | "collections">("categories");
   const [catMenuId, setCatMenuId] = useState<string | null>(null);
 
@@ -709,11 +711,15 @@ function DashboardPageContent() {
     setIsCategoryModalOpen(true);
   };
 
+  const closeCategoryEditor = () => {
+    setIsCategoryModalOpen(false);
+    resetCategoryForm();
+    setCError("");
+  };
+
   const openAddParentCollection = () => {
     resetCategoryForm();
     setCIsParent(true);
-    setCSubtitle("Modern fits for everyday style.");
-    setCCtaText("Shop Collection");
     setCategoryViewTab("collections");
     setIsCategoryModalOpen(true);
   };
@@ -742,7 +748,10 @@ function DashboardPageContent() {
 
   const handleSaveCategory = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!store || !cName.trim()) return;
+    if (!store) return;
+    if (!cName.trim()) return setCError(`Give your ${cIsParent ? "collection" : "category"} a name.`);
+    if (cIsParent && !cImageUrl.trim()) return setCError("Add a picture for the collection. It's shown on your home page.");
+    setCError("");
 
     const finalSlug = (cSlug.trim() || cName.trim())
       .toLowerCase()
@@ -1245,6 +1254,16 @@ function DashboardPageContent() {
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
+  // a form or detail page inside a section (it has its own back button)
+  const inEditor =
+    (activeTab === "products" && isProductModalOpen) ||
+    (activeTab === "categories" && isCategoryModalOpen) ||
+    (activeTab === "discounts" && isDiscountModalOpen) ||
+    (activeTab === "banners" && isBannerModalOpen) ||
+    (activeTab === "orders" && !!selectedOrder);
+  // phones: the top bar and bottom bar only show on the main pages; everything else is a sub page with a back button
+  const showPhoneChrome = !inEditor && (activeTab === "overview" || activeTab === "orders" || activeTab === "settings");
+
   const activeTheme = getTheme(store.activeThemeSlug);
   const productThumbs = store.products.map((p) => p.images?.[0]).filter(Boolean).slice(0, 4) as string[];
   const reviewAvg = store.reviews.length ? store.reviews.reduce((acc, r) => acc + r.rating, 0) / store.reviews.length : 0;
@@ -1253,7 +1272,7 @@ function DashboardPageContent() {
   return (
     <div className="dash home-sans min-h-screen w-full bg-[#FAFAFA] md:bg-[#0a0a0a] text-neutral-950">
       {/* Top bar on phones: profile · logo · notifications (desktop has them in the rail) */}
-      <header className="md:hidden fixed top-0 inset-x-0 z-40 h-16 bg-white/90 backdrop-blur-md border-b border-neutral-200">
+      <header className={`${showPhoneChrome ? "" : "hidden "}md:hidden fixed top-0 inset-x-0 z-40 h-16 bg-white/90 backdrop-blur-md border-b border-neutral-200`}>
         <div className="h-full px-3 sm:px-5 grid grid-cols-[1fr_auto_1fr] items-center">
           <div className="flex items-center">
             <button
@@ -1396,10 +1415,10 @@ function DashboardPageContent() {
       />
 
       {/* Main Content Area: under the top bar on phones; on desktop a rounded panel beside the black rail */}
-      <div className="pt-16 md:pt-3 md:pb-3 md:pl-[var(--dash-rail,var(--rail))] md:pr-3 md:transition-[padding-left] md:duration-500 md:ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col min-h-screen md:h-screen md:min-h-0 overflow-x-clip" style={{ "--rail": `${RAIL_WIDTH}px` } as React.CSSProperties}>
+      <div className={`${showPhoneChrome ? "pt-16" : "pt-[env(safe-area-inset-top)]"} md:pt-3 md:pb-3 md:pl-[var(--dash-rail,var(--rail))] md:pr-3 md:transition-[padding-left] md:duration-500 md:ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col min-h-screen md:h-screen md:min-h-0 overflow-x-clip`} style={{ "--rail": `${RAIL_WIDTH}px` } as React.CSSProperties}>
         <div id="dash-scroll" className="flex-1 flex flex-col md:min-h-0 md:overflow-y-auto md:overscroll-contain md:rounded-[28px] md:bg-[#FAFAFA] dash-panel-scroll">
         {/* Main Workspace Area (Scrolls smoothly under the fixed top header) */}
-        <main className="flex-1 min-w-0 p-4 sm:p-8 pb-28 md:pb-12 max-w-7xl w-full mx-auto">
+        <main className={`flex-1 min-w-0 p-4 sm:p-8 ${showPhoneChrome ? "pb-28" : "pb-10"} md:pb-12 max-w-7xl w-full mx-auto`}>
           {unseenPlanUpdate && (
             <div
               className={`mb-5 flex items-start gap-3 rounded-2xl p-4 ${
@@ -1441,7 +1460,7 @@ function DashboardPageContent() {
           {/* Each section slides in when you switch to it (key re-mounts the wrapper per section) */}
           <div key={activeTab} className="tab-enter">
           {/* Page title (overview greets you inside the hero card) */}
-          {activeTab !== "overview" && (
+          {activeTab !== "overview" && !inEditor && (
             <div className="mb-5 sm:mb-8 hero-rise flex items-center sm:items-start gap-3 sm:gap-4">
               <button
                 type="button"
@@ -1844,15 +1863,20 @@ function DashboardPageContent() {
                         {store.planId}
                       </span>
                     </div>
+                    {currentPlan.maxProducts >= 9999 ? (
+                      <p className="mt-3 text-xs text-neutral-500">
+                        <span className="text-neutral-950 font-semibold tabular-nums">{store.products.length}</span> product{store.products.length === 1 ? "" : "s"} · no product limit on your plan
+                      </p>
+                    ) : (
+                    <>
                     <p className="mt-3 text-xs text-neutral-500">
-                      <span className="text-neutral-950 font-semibold tabular-nums">{store.products.length}</span> of{" "}
-                      {currentPlan.maxProducts >= 9999 ? "unlimited" : currentPlan.maxProducts} products used
+                      <span className="text-neutral-950 font-semibold tabular-nums">{store.products.length}</span> of {currentPlan.maxProducts} products used
                     </p>
                     <div className="mt-2 w-full h-1.5 rounded-full bg-neutral-100 overflow-hidden">
                       <div
                         className="bar-grow h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
                         style={{
-                          width: `${Math.min(100, Math.max(4, (store.products.length / (currentPlan.maxProducts >= 9999 ? 100 : currentPlan.maxProducts)) * 100))}%`,
+                          width: `${Math.min(100, Math.max(4, (store.products.length / currentPlan.maxProducts) * 100))}%`,
                         }}
                       />
                     </div>
@@ -1860,9 +1884,11 @@ function DashboardPageContent() {
                       onClick={() => setActiveTab("billing")}
                       className="mt-4 w-full h-9 rounded-[10px] border border-neutral-300 text-xs font-semibold hover:border-black hover:bg-black hover:text-white inline-flex items-center justify-center gap-1.5 transition-colors"
                     >
-                      See plans from ₹499/mo
+                      {store.planId === "free" ? `See plans from ₹${(PLATFORM_PLANS.starter.priceMonthly / 100).toLocaleString("en-IN")}/mo` : "Compare plans"}
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
+                    </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1930,20 +1956,8 @@ function DashboardPageContent() {
                       </span>
                       <span className="min-w-0">
                         <span className="block text-sm font-semibold">Categories</span>
-                        <span className="hidden sm:block text-[11px] text-neutral-500">{store.categories.length} in your store</span>
+                        <span className="block text-[11px] text-neutral-500">{store.categories.length ? `${store.categories.length} in your store` : "Add your first category"}</span>
                       </span>
-                    </span>
-                    <span className="flex gap-1.5 overflow-hidden">
-                      {store.categories.slice(0, 4).map((c, i) => (
-                        <span
-                          key={c.id}
-                          className={`shrink-0 rounded-full border border-neutral-200 px-2.5 py-1 text-[11px] font-medium text-neutral-600 transition-colors duration-300 group-hover:border-sky-200 group-hover:bg-sky-50 group-hover:text-sky-700 ${i > 0 ? "hidden sm:inline" : ""}`}
-                          style={{ transitionDelay: `${i * 40}ms` }}
-                        >
-                          {c.name}
-                        </span>
-                      ))}
-                      {store.categories.length === 0 && <span className="text-[11px] text-neutral-400">Add your first category</span>}
                     </span>
                   </button>
 
@@ -2863,440 +2877,281 @@ function DashboardPageContent() {
         {/* TAB 2.5: CATEGORIES */}
         {activeTab === "categories" && (
           isCategoryModalOpen ? (
-            <div className="mt-6 space-y-6 animate-enter-scale">
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl bg-white border border-neutral-200 shadow-xs">
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsCategoryModalOpen(false);
-                      resetCategoryForm();
-                    }}
-                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-100 text-neutral-700 transition-colors cursor-pointer"
-                    title="Back to Categories"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-base font-bold text-neutral-900">
-                        {cIsParent
-                          ? editingCategoryId
-                            ? `Edit Collection: ${cName}`
-                            : "New Featured Collection"
-                          : editingCategoryId
-                          ? `Edit Category: ${cName}`
-                          : "New Category"}
-                      </h2>
-                      <Badge
-                        variant={cIsParent ? "warning" : "neutral"}
-                        className={cIsParent ? "bg-amber-600 text-white text-[10px]" : "text-[10px]"}
-                      >
-                        {cIsParent ? "Featured Collection" : "Category"}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-neutral-500 mt-0.5">
-                      {cIsParent
-                        ? "Homepage showcase card highlighting your key categories"
-                        : "Organizes products in your catalog"}
-                    </p>
-                  </div>
+            <form onSubmit={handleSaveCategory} noValidate className="mx-auto max-w-2xl pb-24 sm:pb-4 animate-enter-scale">
+              {/* header */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={closeCategoryEditor}
+                  aria-label="Back"
+                  className="w-10 h-10 shrink-0 rounded-[12px] border border-neutral-200 bg-white flex items-center justify-center text-neutral-700 hover:border-neutral-900 hover:text-black transition-colors"
+                >
+                  <ArrowLeft className="w-[18px] h-[18px]" />
+                </button>
+                <div className="min-w-0 flex-1">
+                  <h1 className="truncate text-[1.4rem] sm:text-[1.6rem] font-semibold tracking-tight leading-tight">
+                    {editingCategoryId ? (cIsParent ? "Edit collection" : "Edit category") : cIsParent ? "New collection" : "New category"}
+                  </h1>
+                  <p className="truncate text-xs sm:text-sm text-neutral-500">
+                    {cIsParent ? "Groups categories on your store's home page" : "Groups products, like T-shirts or Jeans"}
+                  </p>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-xs rounded-lg"
-                    onClick={() => {
-                      setIsCategoryModalOpen(false);
-                      resetCategoryForm();
-                    }}
-                  >
+                <div className="hidden sm:flex items-center gap-2">
+                  <button type="button" onClick={closeCategoryEditor} className="h-10 px-4 rounded-xl border border-neutral-200 bg-white text-sm font-medium hover:border-neutral-900">
                     Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="bg-[#111111] text-white hover:bg-black rounded-lg text-xs font-semibold px-4 cursor-pointer gap-1.5"
-                    onClick={handleSaveCategory}
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>{editingCategoryId ? "Update Category" : "Save Category"}</span>
-                  </Button>
+                  </button>
+                  <button type="submit" className="h-10 px-5 rounded-xl bg-neutral-950 text-white text-sm font-semibold hover:bg-black">
+                    {editingCategoryId ? "Save changes" : "Save"}
+                  </button>
                 </div>
               </div>
 
-              {/* Category Studio Form */}
-              <form onSubmit={handleSaveCategory} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-7 space-y-6">
-                  {/* Category Type Switcher */}
-                  <div className="p-4 rounded-xl bg-white border border-neutral-200 shadow-xs">
-                    <label className="text-xs font-bold text-neutral-900 block mb-2">Item Type</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setCIsParent(false)}
-                        className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
-                          !cIsParent
-                            ? "border-neutral-900 bg-neutral-900 text-white shadow-xs"
-                            : "border-neutral-200 bg-neutral-50 text-neutral-700 hover:bg-neutral-100"
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5 font-bold text-xs">
-                          <FolderTree className="w-3.5 h-3.5" />
-                          <span>Product Category</span>
-                        </div>
-                        <p className={`text-[11px] mt-0.5 ${!cIsParent ? "text-neutral-300" : "text-neutral-500"}`}>
-                          E.g. T-Shirts, Hoodies, Jeans
-                        </p>
-                      </button>
+              {/* type (only when creating) */}
+              {!editingCategoryId && (
+                <div role="radiogroup" aria-label="Type" className="mt-6 grid grid-cols-2 gap-1 rounded-xl bg-neutral-100 p-1">
+                  {([
+                    { parent: false, label: "Category" },
+                    { parent: true, label: "Collection" },
+                  ] as const).map((t) => (
+                    <button
+                      key={t.label}
+                      type="button"
+                      role="radio"
+                      aria-checked={cIsParent === t.parent}
+                      onClick={() => {
+                        setCIsParent(t.parent);
+                        setCError("");
+                      }}
+                      style={{ minHeight: 0 }}
+                      className={`h-10 rounded-lg text-sm font-medium transition-colors ${cIsParent === t.parent ? "bg-white text-neutral-950 shadow-sm" : "text-neutral-500 hover:text-neutral-900"}`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCIsParent(true);
-                          if (!cSubtitle) setCSubtitle("Modern fits for everyday style.");
-                          if (!cCtaText) setCCtaText("Shop Collection");
-                        }}
-                        className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
-                          cIsParent
-                            ? "border-neutral-900 bg-neutral-900 text-white shadow-xs"
-                            : "border-neutral-200 bg-neutral-50 text-neutral-700 hover:bg-neutral-100"
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5 font-bold text-xs">
-                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Featured Collection</span>
-                        </div>
-                        <p className={`text-[11px] mt-0.5 ${cIsParent ? "text-neutral-300" : "text-neutral-500"}`}>
-                          Homepage card (e.g. Men's or Women's Collection)
-                        </p>
-                      </button>
-                    </div>
-                  </div>
+              {/* details */}
+              <section className="mt-5 rounded-2xl border border-neutral-200 bg-white p-5 space-y-4">
+                <div>
+                  <label htmlFor="cat-name" className="block text-sm font-medium">Name</label>
+                  <input
+                    id="cat-name"
+                    value={cName}
+                    onChange={(e) => {
+                      setCName(e.target.value);
+                      setCError("");
+                      if (!editingCategoryId) {
+                        setCSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""));
+                      }
+                    }}
+                    placeholder={cIsParent ? "e.g. Men, Summer edit" : "e.g. T-shirts, Jeans"}
+                    className="mt-1.5 h-11 w-full rounded-xl border border-neutral-300 bg-white px-3.5 text-sm outline-none focus:border-neutral-900"
+                  />
+                </div>
 
-                  {/* Core Details */}
-                  <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-4 text-xs">
-                    <h3 className="font-bold text-sm text-neutral-900 border-b border-neutral-100 pb-3">
-                      {cIsParent ? "Collection Details" : "Category Details"}
-                    </h3>
-
+                {cIsParent ? (
+                  <>
                     <div>
-                      <label className="font-bold block mb-1">
-                        {cIsParent ? "Collection Title *" : "Category Name *"}
+                      <label htmlFor="cat-tagline" className="block text-sm font-medium">
+                        Short line <span className="font-normal text-neutral-400">(optional)</span>
                       </label>
-                      <Input
-                        placeholder={cIsParent ? "e.g. Men's Collection, Summer Drop" : "e.g. Vintage Denim, Hoodies"}
-                        value={cName}
-                        onChange={(e) => {
-                          setCName(e.target.value);
-                          if (!editingCategoryId) {
-                            setCSlug(
-                              e.target.value
-                                .toLowerCase()
-                                .replace(/[^a-z0-9]+/g, "-")
-                                .replace(/^-|-$/g, "")
-                            );
-                          }
-                        }}
-                        className="rounded-lg text-xs"
-                        required
-                      />
-                    </div>
-
-                    {!cIsParent && (
-                      <div className="p-3.5 rounded-lg bg-neutral-50 border border-neutral-200 space-y-1.5">
-                        <label className="font-bold block text-neutral-900 text-xs">
-                          Belongs to Collection (Optional)
-                        </label>
-                        <select
-                          value={cParentId}
-                          onChange={(e) => setCParentId(e.target.value)}
-                          className="w-full p-2.5 rounded-lg border border-neutral-300 text-xs text-neutral-900 bg-white focus:outline-none focus:ring-1 focus:ring-black"
-                        >
-                          <option value="">None (Independent Category)</option>
-                          {(store.categories || [])
-                            .filter((c) => c.isParent && c.id !== editingCategoryId)
-                            .map((parent) => (
-                              <option key={parent.id} value={parent.id}>
-                                {parent.name}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                    )}
-
-                    {cIsParent && (
-                      <div className="space-y-4 pt-1">
-                        <div>
-                          <label className="font-bold block mb-1 text-neutral-800">
-                            Tagline (Optional)
-                          </label>
-                          <Input
-                            placeholder="e.g. Modern fits for everyday style."
-                            value={cSubtitle}
-                            onChange={(e) => setCSubtitle(e.target.value)}
-                            className="rounded-lg text-xs"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="font-bold block mb-1 text-neutral-800">
-                            Button Text
-                          </label>
-                          <Input
-                            placeholder="e.g. Shop Collection, Explore Styles"
-                            value={cCtaText}
-                            onChange={(e) => setCCtaText(e.target.value)}
-                            className="rounded-lg text-xs"
-                          />
-                        </div>
-
-                        {/* Included Categories */}
-                        <div className="p-4 rounded-lg bg-neutral-50 border border-neutral-200 space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <label className="font-bold block text-neutral-900 text-xs">
-                              Included Categories
-                            </label>
-                            <span className="text-[11px] text-neutral-500">
-                              {cSelectedChildren.length} selected
-                            </span>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2 pt-1 max-h-48 overflow-y-auto pr-1">
-                            {(store.categories || [])
-                              .filter((c) => !c.isParent)
-                              .map((child) => {
-                                const isChecked = cSelectedChildren.includes(child.id);
-                                return (
-                                  <label
-                                    key={child.id}
-                                    className={`flex items-center gap-2 p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
-                                      isChecked
-                                        ? "bg-white border-neutral-900 shadow-2xs font-semibold text-neutral-900"
-                                        : "bg-white/60 border-neutral-200 text-neutral-600 hover:bg-white"
-                                    }`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={isChecked}
-                                      onChange={() => {
-                                        setCSelectedChildren((prev) =>
-                                          prev.includes(child.id)
-                                            ? prev.filter((id) => id !== child.id)
-                                            : [...prev, child.id]
-                                        );
-                                      }}
-                                      className="w-3.5 h-3.5 rounded text-black border-neutral-300 focus:ring-black"
-                                    />
-                                    <span className="truncate">{child.name}</span>
-                                  </label>
-                                );
-                              })}
-                          </div>
-                          {(store.categories || []).filter((c) => !c.isParent).length === 0 && (
-                            <p className="text-[11px] text-neutral-500 italic">
-                              No categories found. Create categories first to include them here.
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="font-bold block mb-1">Store URL</label>
-                      <div className="flex items-center">
-                        <span className="px-3 py-2 bg-neutral-100 border border-r-0 border-neutral-300 rounded-l-lg text-neutral-500 font-mono text-xs">
-                          /category/
-                        </span>
-                        <Input
-                          placeholder="collection-slug"
-                          value={cSlug}
-                          onChange={(e) => setCSlug(e.target.value)}
-                          className="rounded-l-none font-mono text-xs rounded-r-lg"
-                          required
-                        />
-                      </div>
-                      <p className="text-[11px] text-neutral-500 mt-1">
-                        Live collection URL: <code className="font-mono text-neutral-700">/s/{store.subdomain}/category/{cSlug || "..."}</code>
-                      </p>
-                    </div>
-
-                    {!cIsParent && (
-                      <div>
-                        <label className="font-bold block mb-1">Description</label>
-                        <textarea
-                          rows={2}
-                          placeholder="Short summary displayed at top of category collection page..."
-                          value={cDesc}
-                          onChange={(e) => setCDesc(e.target.value)}
-                          className="w-full p-2.5 rounded-lg border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:ring-1 focus:ring-black"
-                        />
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2 pt-2 border-t border-neutral-100">
                       <input
-                        type="checkbox"
-                        id="cat-active-checkbox-fullpage"
-                        checked={cIsActive}
-                        onChange={(e) => setCIsActive(e.target.checked)}
-                        className="w-4 h-4 rounded text-black border-neutral-300 focus:ring-black cursor-pointer"
+                        id="cat-tagline"
+                        value={cSubtitle}
+                        onChange={(e) => setCSubtitle(e.target.value)}
+                        placeholder="e.g. Everyday fits"
+                        className="mt-1.5 h-11 w-full rounded-xl border border-neutral-300 bg-white px-3.5 text-sm outline-none focus:border-neutral-900"
                       />
-                      <label htmlFor="cat-active-checkbox-fullpage" className="font-semibold text-neutral-800 text-xs cursor-pointer">
-                        Visible on storefront
+                    </div>
+                    <div>
+                      <label htmlFor="cat-cta" className="block text-sm font-medium">
+                        Button text <span className="font-normal text-neutral-400">(optional)</span>
                       </label>
+                      <input
+                        id="cat-cta"
+                        value={cCtaText}
+                        onChange={(e) => setCCtaText(e.target.value)}
+                        placeholder={`Shop ${cName.trim() || "now"}`}
+                        className="mt-1.5 h-11 w-full rounded-xl border border-neutral-300 bg-white px-3.5 text-sm outline-none focus:border-neutral-900"
+                      />
                     </div>
-                  </div>
-                </div>
-
-                {/* Right Column: Picture & Live Storefront Card Preview */}
-                <div className="lg:col-span-5 space-y-6">
-                  <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-4 text-xs">
-                    <h3 className="font-bold text-sm text-neutral-900 border-b border-neutral-100 pb-3">
-                      {cIsParent ? "Card Picture (Required)" : "Cover Photography"}
-                    </h3>
-                    <div className="space-y-2">
-                      <label className="font-bold block text-neutral-800">Picture Image URL *</label>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="https://images.unsplash.com/..."
-                          value={cImageUrl}
-                          onChange={(e) => setCImageUrl(e.target.value)}
-                          className="rounded-lg text-xs"
-                          required={cIsParent}
-                        />
-                        <label className="shrink-0">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onload = (event) => {
-                                  if (event.target?.result) setCImageUrl(event.target.result as string);
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                          />
-                          <Button type="button" variant="outline" size="md" className="cursor-pointer gap-1 text-xs rounded-lg">
-                            <UploadCloud className="w-3.5 h-3.5" />
-                            <span>Upload</span>
-                          </Button>
-                        </label>
+                    <div>
+                      <div className="flex items-baseline justify-between">
+                        <span className="block text-sm font-medium">Categories in this collection</span>
+                        <span className="text-xs text-neutral-500 tabular-nums">{cSelectedChildren.length} selected</span>
                       </div>
-
-                      {/* Presets */}
-                      <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                        <span className="text-[10px] text-neutral-400 font-medium">Presets:</span>
-                        <button
-                          type="button"
-                          onClick={() => setCImageUrl("https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=400&q=80")}
-                          className="text-[10px] px-2 py-0.5 rounded border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700 cursor-pointer"
-                        >
-                          Men's Suit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setCImageUrl("https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80")}
-                          className="text-[10px] px-2 py-0.5 rounded border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700 cursor-pointer"
-                        >
-                          Women's Portrait
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setCImageUrl("https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=400&q=80")}
-                          className="text-[10px] px-2 py-0.5 rounded border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700 cursor-pointer"
-                        >
-                          Editorial Fashion
-                        </button>
-                      </div>
+                      {(store.categories || []).filter((c) => !c.isParent).length === 0 ? (
+                        <p className="mt-1.5 text-sm text-neutral-500">Add categories first, then pick them here.</p>
+                      ) : (
+                        <div className="mt-2 max-h-60 overflow-y-auto rounded-xl border border-neutral-200 divide-y divide-neutral-100">
+                          {(store.categories || [])
+                            .filter((c) => !c.isParent)
+                            .map((child) => {
+                              const on = cSelectedChildren.includes(child.id);
+                              return (
+                                <label key={child.id} className="flex cursor-pointer items-center gap-3 px-3.5 py-3 text-sm hover:bg-neutral-50">
+                                  <input
+                                    type="checkbox"
+                                    checked={on}
+                                    onChange={() => setCSelectedChildren((prev) => (prev.includes(child.id) ? prev.filter((id) => id !== child.id) : [...prev, child.id]))}
+                                    style={{ minHeight: 0, minWidth: 0 }}
+                                    className="h-4 w-4 shrink-0 rounded accent-neutral-900"
+                                  />
+                                  <span className="truncate">{child.name}</span>
+                                </label>
+                              );
+                            })}
+                        </div>
+                      )}
                     </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label htmlFor="cat-parent" className="block text-sm font-medium">
+                        Collection <span className="font-normal text-neutral-400">(optional)</span>
+                      </label>
+                      <select
+                        id="cat-parent"
+                        value={cParentId}
+                        onChange={(e) => setCParentId(e.target.value)}
+                        className="mt-1.5 h-11 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm outline-none focus:border-neutral-900"
+                      >
+                        <option value="">None</option>
+                        {(store.categories || [])
+                          .filter((c) => c.isParent && c.id !== editingCategoryId)
+                          .map((parent) => (
+                            <option key={parent.id} value={parent.id}>
+                              {parent.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="cat-desc" className="block text-sm font-medium">
+                        Description <span className="font-normal text-neutral-400">(optional)</span>
+                      </label>
+                      <textarea
+                        id="cat-desc"
+                        rows={3}
+                        value={cDesc}
+                        onChange={(e) => setCDesc(e.target.value)}
+                        placeholder="Shown at the top of this category's page"
+                        className="mt-1.5 w-full rounded-xl border border-neutral-300 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-neutral-900"
+                      />
+                    </div>
+                  </>
+                )}
+              </section>
 
-                    {/* LIVE CARD PREVIEW FOR PARENT COLLECTION */}
-                    {cIsParent ? (
-                      <div className="mt-4 space-y-2">
-                        <div className="flex items-center justify-between text-[11px] text-neutral-500">
-                          <span className="font-semibold text-neutral-800">Storefront Homepage Card Preview:</span>
-                          <span className="text-[10px] text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded">
-                            Live Card Output
-                          </span>
-                        </div>
-
-                        <div className="rounded-2xl bg-[#EFECE6] p-5 border border-neutral-300/80 shadow-sm flex items-center justify-between group hover-3d-lift shimmer-card transition-all overflow-hidden relative">
-                          <div className="flex-1 min-w-0 pr-3">
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-500 block mb-0.5">
-                              Featured Collection
-                            </span>
-                            <h4 className="font-serif-title text-xl text-neutral-900 font-normal leading-tight">
-                              {cName || "Collection Name"}
-                            </h4>
-                            <p className="text-[11px] text-neutral-600 mt-1 line-clamp-2">
-                              {cSubtitle || "Modern fits for everyday style."}
-                            </p>
-
-                            {/* Assigned Children Pills */}
-                            {cSelectedChildren.length > 0 && (
-                              <div className="mt-2.5 flex flex-wrap gap-1">
-                                {cSelectedChildren.map((id) => {
-                                  const child = (store.categories || []).find((c) => c.id === id);
-                                  return (
-                                    <span
-                                      key={id}
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-white text-neutral-800 border border-neutral-300/60 shadow-2xs"
-                                    >
-                                      <span className="w-1 h-1 rounded-full bg-neutral-900"></span>
-                                      <span>{child?.name || "Child"}</span>
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            <div className="inline-flex items-center gap-1 text-[11px] font-bold text-neutral-900 mt-3">
-                              <span>{cCtaText || `Shop ${cName || "Collection"}`}</span>
-                              <ArrowRight className="w-3 h-3" />
-                            </div>
-                          </div>
-
-                          {/* Picture Preview */}
-                          <div className="w-24 aspect-3/4 rounded-lg overflow-hidden bg-neutral-300 shrink-0 ml-2 shadow-xs border border-neutral-300/50">
-                            {cImageUrl ? (
-                              <img
-                                src={cImageUrl}
-                                alt="Preview"
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center text-[10px] text-neutral-500">
-                                <span>No Photo</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+              {/* picture */}
+              <section className="mt-4 rounded-2xl border border-neutral-200 bg-white p-5">
+                <span className="block text-sm font-medium">
+                  Picture {cIsParent ? null : <span className="font-normal text-neutral-400">(optional)</span>}
+                </span>
+                <div className="mt-3 flex items-center gap-4">
+                  <span className="w-20 h-20 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 flex items-center justify-center">
+                    {cImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={cImageUrl} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      cImageUrl && (
-                        <div className="mt-3 rounded-xl overflow-hidden border border-neutral-200 bg-neutral-100">
-                          <div className="relative aspect-[16/9] w-full overflow-hidden">
-                            <img src={cImageUrl} alt="Category Cover Preview" className="w-full h-full object-cover" />
-                          </div>
-                          <div className="p-2 bg-neutral-50 border-t border-neutral-200 text-[11px] text-neutral-600 font-medium text-center">
-                            Category Cover Photo
-                          </div>
-                        </div>
-                      )
+                      <ImageIcon className="w-5 h-5 text-neutral-300" />
+                    )}
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <label className="h-10 px-4 rounded-xl border border-neutral-300 bg-white text-sm font-medium inline-flex items-center gap-2 cursor-pointer hover:border-neutral-900">
+                      <UploadCloud className="w-4 h-4" />
+                      {cImageUrl ? "Change" : "Upload"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            if (event.target?.result) {
+                              setCImageUrl(event.target.result as string);
+                              setCError("");
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+                    {cImageUrl && (
+                      <button type="button" onClick={() => setCImageUrl("")} className="h-10 px-3 rounded-xl text-sm text-neutral-500 hover:text-red-600">
+                        Remove
+                      </button>
                     )}
                   </div>
                 </div>
-              </form>
-            </div>
+                {!cImageUrl.startsWith("data:") && (
+                  <input
+                    value={cImageUrl}
+                    onChange={(e) => {
+                      setCImageUrl(e.target.value);
+                      setCError("");
+                    }}
+                    placeholder="Or paste an image link"
+                    aria-label="Image link"
+                    className="mt-3 h-10 w-full rounded-xl border border-neutral-200 bg-white px-3.5 text-sm outline-none focus:border-neutral-900"
+                  />
+                )}
+              </section>
+
+              {/* link + visibility */}
+              <section className="mt-4 rounded-2xl border border-neutral-200 bg-white divide-y divide-neutral-100">
+                <div className="p-5">
+                  <label htmlFor="cat-slug" className="block text-sm font-medium">Page link</label>
+                  <div className="mt-1.5 flex h-11 items-center rounded-xl border border-neutral-300 bg-white focus-within:border-neutral-900 overflow-hidden">
+                    <span className="shrink-0 pl-3.5 text-sm text-neutral-400">/category/</span>
+                    <input
+                      id="cat-slug"
+                      value={cSlug}
+                      onChange={(e) => setCSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                      placeholder="t-shirts"
+                      className="h-full min-w-0 flex-1 bg-transparent pr-3.5 text-sm outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-4 p-5">
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">Show on store</span>
+                    <span className="block text-xs text-neutral-500">Turn off to hide it without deleting.</span>
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={cIsActive}
+                    aria-label="Show on store"
+                    onClick={() => setCIsActive((v) => !v)}
+                    style={{ minHeight: 0, height: 24 }}
+                    className={`relative w-11 shrink-0 rounded-full transition-colors ${cIsActive ? "bg-emerald-500" : "bg-neutral-300"}`}
+                  >
+                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${cIsActive ? "left-[22px]" : "left-0.5"}`} />
+                  </button>
+                </div>
+              </section>
+
+              {cError && (
+                <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {cError}
+                </p>
+              )}
+
+              {/* phone: actions pinned at the bottom */}
+              <div className="sm:hidden fixed inset-x-0 bottom-0 z-40 grid grid-cols-2 gap-2 border-t border-neutral-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+                <button type="button" onClick={closeCategoryEditor} className="h-11 rounded-xl border border-neutral-300 bg-white text-sm font-medium">
+                  Cancel
+                </button>
+                <button type="submit" className="h-11 rounded-xl bg-neutral-950 text-white text-sm font-semibold">
+                  {editingCategoryId ? "Save changes" : "Save"}
+                </button>
+              </div>
+            </form>
           ) : (
             <div className="mt-6 space-y-6 animate-enter-blur">
               {/* Sub-navigation & add */}
@@ -3498,124 +3353,120 @@ function DashboardPageContent() {
               {categoryViewTab === "collections" && (
                 <div className="space-y-4">
 
-                  {/* Collections Grid */}
-                  {(store.categories || []).filter((c) => c.isParent).length === 0 ? (
-                    <div className="p-10 text-center border border-dashed border-neutral-200 rounded-xl bg-neutral-50/50 space-y-3">
-                      <Sparkles className="w-8 h-8 text-neutral-300 mx-auto" />
-                      <p className="text-xs font-semibold text-neutral-700">No featured collections created yet</p>
-                      <p className="text-[11px] text-neutral-500 max-w-sm mx-auto">
-                        Create collections (like Men's Collection or Summer Drop) to highlight key categories on your homepage.
-                      </p>
-                      <Button
-                        size="sm"
-                        className="bg-[#111111] text-white hover:bg-black rounded-lg text-xs mt-2 cursor-pointer"
-                        onClick={openAddParentCollection}
-                      >
-                        <Plus className="w-3.5 h-3.5 mr-1" />
-                        <span>Create Collection</span>
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {(store.categories || [])
-                        .filter((c) => c.isParent)
-                        .map((pCat, idx) => {
-                          const children = (store.categories || []).filter(
-                            (c) => !c.isParent && c.parentId === pCat.id
-                          );
-                          const bgColors = ["bg-[#EFECE6]", "bg-[#ECE7E1]", "bg-[#F3EFEA]", "bg-[#EAE6DF]"];
-                          const cardBg = bgColors[idx % bgColors.length];
-
+                  {(() => {
+                    const cols = (store.categories || []).filter((c) => c.isParent);
+                    if (cols.length === 0) {
+                      return (
+                        <div className="rounded-2xl border border-neutral-200 bg-white px-6 py-12 text-center">
+                          <span className="mx-auto w-14 h-14 rounded-2xl bg-neutral-100 flex items-center justify-center">
+                            <Layers className="w-6 h-6 text-neutral-500" />
+                          </span>
+                          <p className="mt-4 text-base font-semibold">No collections yet</p>
+                          <p className="mt-1 text-sm text-neutral-500 max-w-xs mx-auto">Group categories, like Men or Women, to show them together on your home page.</p>
+                          <button
+                            type="button"
+                            onClick={openAddParentCollection}
+                            className="mt-6 h-11 px-5 rounded-xl bg-neutral-950 text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-black"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Add collection
+                          </button>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="rounded-2xl border border-neutral-200 bg-white divide-y divide-neutral-100">
+                        {cols.map((pCat) => {
+                          const childCount = (store.categories || []).filter((c) => !c.isParent && c.parentId === pCat.id).length;
+                          const live = pCat.isActive ?? true;
+                          const menuOpen = catMenuId === pCat.id;
                           return (
-                            <div
-                              key={pCat.id}
-                              className={`rounded-2xl ${cardBg} p-5 border border-neutral-200/90 flex flex-col justify-between hover-3d-lift shimmer-card transition-all group overflow-hidden relative shadow-2xs`}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex-1 min-w-0 pr-2">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span
-                                      className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${
-                                        pCat.isActive ?? true
-                                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                          : "bg-neutral-100 text-neutral-500 border border-neutral-200"
-                                      }`}
-                                    >
-                                      {pCat.isActive ?? true ? "Live on Storefront" : "Hidden"}
-                                    </span>
-                                  </div>
-
-                                  <h4 className="font-serif-title text-xl sm:text-2xl text-neutral-900 font-normal">
-                                    {pCat.name}
-                                  </h4>
-                                  <p className="text-xs text-neutral-600 mt-1 line-clamp-2">
-                                    {pCat.subtitle || pCat.description || "Curated collection"}
-                                  </p>
-
-                                  {/* Included Category Pills */}
-                                  <div className="mt-3 flex flex-wrap gap-1.5 items-center">
-                                    {children.length > 0 ? (
-                                      children.map((child) => (
-                                        <span
-                                          key={child.id}
-                                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/90 text-neutral-800 border border-neutral-300/60 shadow-2xs"
-                                        >
-                                          <span className="w-1 h-1 rounded-full bg-neutral-900"></span>
-                                          <span>{child.name}</span>
-                                        </span>
-                                      ))
-                                    ) : (
-                                      <span className="text-[10px] text-neutral-400 italic">No categories assigned</span>
-                                    )}
-                                  </div>
-
-                                  <div className="text-[11px] font-bold text-neutral-900 mt-3 inline-flex items-center gap-1">
-                                    <span>{pCat.ctaText || `Shop ${pCat.name}`}</span>
-                                    <ArrowRight className="w-3 h-3" />
-                                  </div>
-                                </div>
-
-                                {/* Picture on right */}
-                                {pCat.imageUrl && (
-                                  <div className="w-24 sm:w-28 aspect-3/4 rounded-xl overflow-hidden bg-neutral-200 shrink-0 ml-2 shadow-sm border border-neutral-300/40">
-                                    <img
-                                      src={pCat.imageUrl}
-                                      alt={pCat.name}
-                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                    />
-                                  </div>
+                            <div key={pCat.id} className="flex items-center gap-3 p-3">
+                              <button type="button" onClick={() => openEditCategory(pCat)} style={{ minHeight: 0 }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                                <span className={`w-12 h-12 rounded-xl overflow-hidden bg-neutral-100 shrink-0 flex items-center justify-center ${live ? "" : "opacity-50"}`}>
+                                  {pCat.imageUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={pCat.imageUrl} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <Layers className="w-5 h-5 text-neutral-400" />
+                                  )}
+                                </span>
+                                <span className="min-w-0">
+                                  <span className={`block truncate text-sm font-semibold ${live ? "" : "text-neutral-500"}`}>{pCat.name}</span>
+                                  <span className="block truncate text-xs text-neutral-500">
+                                    {childCount} {childCount === 1 ? "category" : "categories"}
+                                    {live ? "" : " · Hidden"}
+                                  </span>
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={live}
+                                aria-label={live ? `Hide ${pCat.name} from store` : `Show ${pCat.name} on store`}
+                                onClick={() => handleToggleCategoryActive(pCat)}
+                                style={{ minHeight: 0, height: 24 }}
+                                className={`relative w-11 shrink-0 rounded-full transition-colors ${live ? "bg-emerald-500" : "bg-neutral-300"}`}
+                              >
+                                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${live ? "left-[22px]" : "left-0.5"}`} />
+                              </button>
+                              <div className="relative shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setCatMenuId(menuOpen ? null : pCat.id)}
+                                  aria-label={`More options for ${pCat.name}`}
+                                  aria-expanded={menuOpen}
+                                  style={{ minHeight: 0 }}
+                                  className={`w-9 h-9 rounded-xl flex items-center justify-center text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 ${menuOpen ? "bg-neutral-100 text-neutral-900" : ""}`}
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </button>
+                                {menuOpen && (
+                                  <>
+                                    <button type="button" aria-label="Close menu" onClick={() => setCatMenuId(null)} className="fixed inset-0 z-30 cursor-default" />
+                                    <div className="absolute right-0 top-10 z-40 w-48 rounded-2xl border border-neutral-200 bg-white p-1.5 shadow-xl shadow-neutral-950/10 animate-enter-scale">
+                                      <button
+                                        type="button"
+                                        style={{ minHeight: 0 }}
+                                        onClick={() => {
+                                          setCatMenuId(null);
+                                          openEditCategory(pCat);
+                                        }}
+                                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
+                                      >
+                                        <Edit className="w-4 h-4" /> Edit
+                                      </button>
+                                      <Link
+                                        href={getStoreUrl(store.subdomain, `/category/${pCat.slug}`)}
+                                        target="_blank"
+                                        onClick={() => setCatMenuId(null)}
+                                        style={{ minHeight: 0 }}
+                                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
+                                      >
+                                        <ExternalLink className="w-4 h-4" /> View in store
+                                      </Link>
+                                      <div className="my-1 h-px bg-neutral-100" />
+                                      <button
+                                        type="button"
+                                        style={{ minHeight: 0 }}
+                                        onClick={() => {
+                                          setCatMenuId(null);
+                                          handleDeleteCategory(pCat.id, pCat.name);
+                                        }}
+                                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="w-4 h-4" /> Delete
+                                      </button>
+                                    </div>
+                                  </>
                                 )}
-                              </div>
-
-                              {/* Card Footer Actions */}
-                              <div className="mt-4 pt-3 border-t border-neutral-300/40 flex items-center justify-between">
-                                <code className="text-[10px] font-mono text-neutral-600">
-                                  /category/{pCat.slug}
-                                </code>
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-xs bg-white/80 hover:bg-white rounded-md gap-1 cursor-pointer"
-                                    onClick={() => openEditCategory(pCat)}
-                                  >
-                                    <Edit className="w-3 h-3" />
-                                    <span>Edit</span>
-                                  </Button>
-                                  <button
-                                    onClick={() => handleDeleteCategory(pCat.id, pCat.name)}
-                                    className="p-1.5 text-neutral-500 hover:text-red-600 rounded-md hover:bg-white/80 transition-colors cursor-pointer"
-                                    title="Delete Collection"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
                               </div>
                             </div>
                           );
                         })}
-                    </div>
-                  )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -5842,6 +5693,7 @@ function DashboardPageContent() {
 
       {/* Phone bottom bar: red dots on sections with something unseen, and a chip that springs up for new events */}
       <MobileDock
+        hidden={!showPhoneChrome && !isMobileMenuOpen}
         storeKey={store.subdomain}
         active={activeTab}
         onSelect={(tab) => {

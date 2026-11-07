@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowRight, CreditCard, LayoutDashboard, Menu, Package, ShoppingBag, Tag, X } from "lucide-react";
+import { ArrowRight, CreditCard, LayoutDashboard, Menu, Package, Settings, ShoppingBag, X } from "lucide-react";
 
 /** A notice from the dashboard's bell: an order, a stock alert or a plan payment update. */
 export type DockNotice = {
@@ -15,7 +15,7 @@ export type DockNotice = {
   unread: boolean;
 };
 
-type DockTab = "overview" | "orders" | "discounts" | "products" | "billing";
+type DockTab = "overview" | "orders" | "settings" | "products" | "billing";
 
 // where tapping a chip takes you, and which icon it wears
 const NOTICE_TAB: Record<string, DockTab> = { order: "orders", stock: "products", plan: "billing" };
@@ -29,11 +29,12 @@ const CHIP_MS = 5000;
 const dot = "absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-[#ef4444] ring-2 ring-black";
 
 /**
- * The phone dashboard's bottom bar: Home, Orders, Discounts and Menu, with a small red dot on any section that has
+ * The phone dashboard's bottom bar: Home, Orders, Settings and Menu, with a small red dot on any section that has
  * something unseen (Menu stands in for the pages inside it). When something new happens, say an order comes in, a
  * chip springs up above the bar for a few seconds; tapping it opens that page.
  */
 export function MobileDock({
+  hidden = false,
   storeKey,
   active,
   onSelect,
@@ -42,6 +43,8 @@ export function MobileDock({
   notices,
   onSeen,
 }: {
+  /** sub pages (forms, details, pages opened from Menu) hide the bar */
+  hidden?: boolean;
   storeKey: string;
   active: string;
   onSelect: (tab: DockTab) => void;
@@ -93,7 +96,7 @@ export function MobileDock({
   const ChipIcon = (chip && NOTICE_ICON[chip.type]) || ShoppingBag;
 
   return (
-    <div className="md:hidden fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] inset-x-0 mx-auto w-[92%] max-w-sm z-[60]">
+    <div className={`${hidden ? "hidden" : ""} md:hidden fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] inset-x-0 mx-auto w-[92%] max-w-sm z-[60]`}>
       {/* the chip that springs up when something happens */}
       <div className="pointer-events-none absolute inset-x-0 bottom-full mb-3 flex justify-center">
         <button
@@ -133,9 +136,9 @@ export function MobileDock({
           <span className="text-[10px]">Orders</span>
         </button>
 
-        <button onClick={() => onSelect("discounts")} className={tab(active === "discounts")}>
-          <Tag className="w-4 h-4" />
-          <span className="text-[10px]">Discounts</span>
+        <button onClick={() => onSelect("settings")} className={tab(active === "settings")}>
+          <Settings className="w-4 h-4" />
+          <span className="text-[10px]">Settings</span>
         </button>
 
         <button
