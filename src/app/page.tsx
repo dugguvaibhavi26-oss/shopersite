@@ -85,7 +85,7 @@ const FAQS = [
   },
   {
     q: "How much does it cost?",
-    a: `You can start free with up to ${PLATFORM_PLANS.free.maxProducts} products. Paid plans unlock more products, designer themes, custom domains and marketing tools. We never take a commission on your sales.`,
+    a: `You can start free with up to ${PLATFORM_PLANS.free.maxProducts} products. Every theme is free. Paid plans unlock more products, the website editor, custom domains and marketing tools. We never take a commission on your sales.`,
   },
   {
     q: "Do you hold or process my customers' money?",

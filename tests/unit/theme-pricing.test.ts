@@ -1,11 +1,15 @@
 // @vitest-environment node
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
 import { storeService } from "@/lib/store-service";
 import { seedPlanRequest, seedThemePurchase } from "../helpers/seed-requests";
-import { applyThemePricing, canEditTheme, canUseTheme, getThemePlan, getThemePrice, planActive } from "@/lib/theme-pricing";
+import { applyThemePricing, canEditTheme, canUseTheme, getThemePlan, getThemePrice, planActive, setAllThemesFree } from "@/lib/theme-pricing";
 
 const DAY = 24 * 60 * 60 * 1000;
 const later = (days: number) => new Date(Date.now() + days * DAY).toISOString();
+
+// these check the paid-theme rules, which are switched off while every theme is free
+beforeAll(() => setAllThemesFree(false));
+afterAll(() => setAllThemesFree(true));
 
 describe("Theme prices and plans", () => {
   beforeEach(() => applyThemePricing(null));
@@ -134,5 +138,18 @@ describe("Buying a theme", () => {
     expect(days).toBeLessThan(32);
     expect(storeService.setStoreTheme(sub, "theme06").success).toBe(true);
     expect(storeService.getStore(sub)!.planThemes).toContain("theme06");
+  });
+});
+
+describe("every theme free", () => {
+  it("any shop can use any theme at no cost while ALL_THEMES_FREE is on", async () => {
+    setAllThemesFree(true);
+    const { getThemePrice, canUseTheme, getThemePlan } = await import("@/lib/theme-pricing");
+    for (const slug of ["mono-studio", "theme12", "theme35", "custom-abc"]) {
+      expect(getThemePrice(slug)).toBe(0);
+      expect(getThemePlan(slug)).toBeNull();
+      expect(canUseTheme({ planId: "free" }, slug)).toBe(true);
+    }
+    setAllThemesFree(false);
   });
 });

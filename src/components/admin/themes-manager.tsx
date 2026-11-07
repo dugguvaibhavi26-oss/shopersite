@@ -5,7 +5,7 @@ import { Download, Eye, EyeOff, FileArchive, Loader2, Search, Trash2, Upload } f
 import { storeService, type StoreData } from "@/lib/store-service";
 import { getTheme, PLATFORM_THEMES, type ThemeDefinition } from "@/lib/themes";
 import { buildThemeZip, readThemePackage, themeZipName } from "@/lib/theme-package";
-import { defaultThemePlan, defaultThemePrice, formatThemePrice, getThemePlan, getThemePrice, type ThemePlan } from "@/lib/theme-pricing";
+import { ALL_THEMES_FREE, defaultThemePlan, defaultThemePrice, formatThemePrice, getThemePlan, getThemePrice, type ThemePlan } from "@/lib/theme-pricing";
 import type { CustomThemeDef } from "@/lib/site-content";
 
 /** Admin: every theme sellers can use, a download of each as a zip, and uploading new or edited theme zips. */
@@ -278,6 +278,11 @@ function ThemeCard({
  * good, editing included; a plan theme lasts only while that plan is paid for.
  */
 function PriceField({ slug }: { slug: string }) {
+  if (ALL_THEMES_FREE) return <p className="text-[11px] font-medium text-neutral-500">Free on every plan</p>;
+  return <PriceFieldEditor slug={slug} />;
+}
+
+function PriceFieldEditor({ slug }: { slug: string }) {
   const current = getThemePrice(slug);
   const plan = getThemePlan(slug);
   const [draft, setDraft] = useState(String(current / 100));

@@ -35,7 +35,7 @@ export const PLATFORM_PLANS: Record<string, PlanFeature> = {
     description: "Everything you need to start selling online today.",
     features: [
       "Up to 75 products",
-      "37 themes",
+      "Every theme, free",
       "Cash on Delivery (COD)",
       "Direct UPI payments",
       "Free subdomain (yourshop.shopersite.in)",

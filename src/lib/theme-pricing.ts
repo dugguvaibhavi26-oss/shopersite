@@ -15,6 +15,17 @@ import { canUseThemeEditor, isPaidPlan, isThemeAllowed } from "./plans";
 
 export type ThemePlan = "starter" | "pro" | null;
 
+/**
+ * Every theme is free on every plan (Growth and Pro add the website editor, not themes).
+ * Set to false to bring back the prices and plan themes below, including the admin's saved prices.
+ */
+export let ALL_THEMES_FREE = true;
+
+/** For tests of the paid-theme rules. */
+export function setAllThemesFree(on: boolean) {
+  ALL_THEMES_FREE = on;
+}
+
 /** Built-in themes that start out free. */
 const FREE_THEMES = ["classic-bloom", "mono-studio", "theme03", "theme04", "theme05"];
 /** Built-in themes that start out included with Growth (and so Pro). */
@@ -67,6 +78,7 @@ export function defaultThemePlan(slug: string): ThemePlan {
 
 /** What a theme costs once, in paise; 0 means free. */
 export function getThemePrice(slug: string): number {
+  if (ALL_THEMES_FREE) return 0;
   return slug in priceOverrides ? priceOverrides[slug] : defaultThemePrice(slug);
 }
 
@@ -113,6 +125,7 @@ export function planIncludesTheme(store: ThemeUser, slug: string, now = Date.now
 /** Whether the shop may switch to (or keep showing) this theme. */
 export function canUseTheme(store: ThemeUser, slug: string, now = Date.now()): boolean {
   if (ownsTheme(store, slug)) return true;
+  if (ALL_THEMES_FREE) return true;
   if (getThemePrice(slug) === 0) return isThemeAllowed(slug, store.planId) || isThemeAllowed(slug, "free");
   if (planIncludesTheme(store, slug, now)) return true;
   // a shop that was already on this theme before it had a price keeps it; one that got it through a plan doesn't
