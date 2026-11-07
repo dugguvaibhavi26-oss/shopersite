@@ -1,10 +1,10 @@
 import "server-only";
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { firebaseConfig } from "../firebase-config";
 import type { StoreData } from "../store-service";
 import { ApiError } from "./api-error";
+import { verifyFirebaseIdToken } from "./id-token";
 
 /**
  * Firebase with full server access, for the payment routes only. It needs a service account:
@@ -49,9 +49,9 @@ export async function requireUser(req: Request): Promise<{ uid: string; email?: 
   const header = req.headers.get("authorization") || "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
   if (!token) throw new ApiError(401, "Please sign in again.");
-  const adminAuth = getAuth(adminApp()); // a setup problem should say so, not "sign in again"
+  const { projectId } = readServiceAccount(); // a setup problem should say so, not "sign in again"
   try {
-    const decoded = await adminAuth.verifyIdToken(token);
+    const decoded = await verifyFirebaseIdToken(token, projectId);
     return { uid: decoded.uid, email: decoded.email, emailVerified: !!decoded.email_verified };
   } catch {
     throw new ApiError(401, "Your session has expired. Please sign in again.");
