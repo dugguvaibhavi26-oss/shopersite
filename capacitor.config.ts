@@ -41,8 +41,9 @@ const config: CapacitorConfig = {
     url: serverUrl,
     cleartext: isDev, // plain http only for the local dev server
     errorPath: "offline.html",
-    // The app opens at "/". The site sends the app on to its own launch screen (/app), so a
-    // build made before the website is deployed still opens the live site instead of a 404.
+    // The app opens straight on its own launch screen (/app → welcome slides, app login or the
+    // dashboard), never the website's marketing home page.
+    appStartPath: "/app",
   },
 
   android: {

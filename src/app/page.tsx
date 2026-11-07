@@ -8,6 +8,7 @@ import { siteConfig } from "@/lib/config/site";
 import { usePlatformSettings } from "@/lib/use-platform-settings";
 import { PLATFORM_PLANS, planDiscountPercent, calculatePlanPrice, BILLING_CYCLES, type BillingCycle } from "@/lib/plans";
 import { PLATFORM_THEMES, themeThumb } from "@/lib/themes";
+import { InstallAndroidApp } from "@/components/home/install-app";
 import { cn } from "@/lib/utils";
 import {
   StoreMockup,
@@ -330,6 +331,7 @@ function Hero({ onClaim }: { onClaim: (v: string) => void }) {
                 </li>
               ))}
             </ul>
+            <InstallAndroidApp className="mt-1" />
           </div>
           </div>
           </div>
