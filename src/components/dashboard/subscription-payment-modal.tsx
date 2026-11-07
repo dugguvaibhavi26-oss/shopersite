@@ -7,6 +7,7 @@ import { siteConfig } from "@/lib/config/site";
 import { storeService, StoreData, SubscriptionRequest } from "@/lib/store-service";
 import { UpiPayPanel } from "@/components/payments/upi-pay-panel";
 import { auth } from "@/lib/firebase";
+import { rankOf } from "@/lib/subscription";
 
 interface SubscriptionPaymentModalProps {
   isOpen: boolean;
@@ -56,7 +57,10 @@ export function SubscriptionPaymentModal({
   onNavigateTab,
   onOpenSetupWizard,
 }: SubscriptionPaymentModalProps) {
-  const [selectedPlanId, setSelectedPlanId] = useState<"starter" | "pro">(initialPlanId);
+  // a running paid plan can only be renewed or upgraded, never swapped for a lower one
+  const isLower = (planId: string) => rankOf(planId) < rankOf(store.planId);
+  const startPlan = isLower(initialPlanId) ? "pro" : initialPlanId;
+  const [selectedPlanId, setSelectedPlanId] = useState<"starter" | "pro">(startPlan);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>(initialBillingCycle);
   const [step, setStep] = useState<ModalStep>(() => (readParam("step") === "payment" ? "payment" : "review"));
   const [submittedRequest, setSubmittedRequest] = useState<SubscriptionRequest | null>(store?.pendingSubscription || null);
@@ -70,11 +74,11 @@ export function SubscriptionPaymentModal({
       setStep("verifying");
     } else {
       setSubmittedRequest(null);
-      setSelectedPlanId(initialPlanId);
+      setSelectedPlanId(rankOf(initialPlanId) < rankOf(store.planId) ? "pro" : initialPlanId);
       setBillingCycle(initialBillingCycle);
       setStep((s) => (s === "verifying" ? "review" : s));
     }
-  }, [isOpen, store?.pendingSubscription, initialPlanId, initialBillingCycle]);
+  }, [isOpen, store?.pendingSubscription, store?.planId, initialPlanId, initialBillingCycle]);
 
   // Mirror the checkout into the URL so a refresh comes back to the same place
   useEffect(() => {
@@ -237,6 +241,7 @@ export function SubscriptionPaymentModal({
                 {(["starter", "pro"] as const).map((planKey) => {
                   const p = PLATFORM_PLANS[planKey];
                   const on = selectedPlanId === planKey;
+                  const lower = isLower(planKey);
                   const cardPricing = calculatePlanPrice(planKey, billingCycle);
                   return (
                     <button
@@ -244,16 +249,23 @@ export function SubscriptionPaymentModal({
                       type="button"
                       role="radio"
                       aria-checked={on}
+                      disabled={lower}
                       onClick={() => setSelectedPlanId(planKey)}
                       style={{ minHeight: 0 }}
-                      className={`flex flex-col rounded-xl border bg-white p-5 text-left transition-shadow ${
+                      className={`flex flex-col rounded-xl border bg-white p-5 text-left transition-shadow disabled:cursor-not-allowed disabled:opacity-50 ${
                         on ? "border-neutral-900 shadow-[0_0_0_1px_#171717]" : "border-neutral-200 hover:border-neutral-400"
                       }`}
                     >
                       <div className="flex w-full items-center justify-between gap-2">
                         <span className="flex items-center gap-2">
                           <span className="text-[15px] font-semibold">{p.name}</span>
-                          {p.highlight && <span className="rounded border border-neutral-200 px-1.5 py-px text-[11px] text-neutral-600">Popular</span>}
+                          {lower ? (
+                            <span className="rounded border border-neutral-200 px-1.5 py-px text-[11px] text-neutral-500">Included in your plan</span>
+                          ) : rankOf(planKey) === rankOf(store.planId) ? (
+                            <span className="rounded border border-neutral-200 px-1.5 py-px text-[11px] text-neutral-600">Renew</span>
+                          ) : (
+                            p.highlight && <span className="rounded border border-neutral-200 px-1.5 py-px text-[11px] text-neutral-600">Popular</span>
+                          )}
                         </span>
                         <span
                           aria-hidden

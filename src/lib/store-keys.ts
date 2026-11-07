@@ -7,6 +7,7 @@
  * - stores/{subdomain}/private/data      private: buyers' details and payment records (owner + admin)
  */
 import type { StoreData } from "./store-service";
+import { effectivePlan } from "./subscription";
 
 /** Kept in stores/{subdomain}/private/data, never in the public store document. */
 export const PRIVATE_STORE_KEYS = [
@@ -65,5 +66,6 @@ export function mergeStoreParts(pub: Partial<StoreData>, priv?: Partial<StoreDat
     const fromPriv = priv && k in priv ? (priv as Record<string, unknown>)[k] : undefined;
     merged[k] = fromPriv !== undefined ? fromPriv : (pub as Record<string, unknown>)[k] ?? defaults[k];
   }
-  return merged as unknown as StoreData;
+  // a paid plan past its end date counts as Free everywhere (dashboard, shop and server)
+  return effectivePlan(merged as unknown as StoreData);
 }

@@ -10,6 +10,7 @@ import { ApiError } from "./api-error";
 import { adminDb } from "./firebase-admin";
 import { readStoreTx, writeStoreTx } from "./store-data";
 import { UTR_PATTERN } from "./order-service";
+import { rankOf } from "../subscription";
 
 /**
  * Sellers paying Shopersite (plans and themes) by UPI. The server sets the amount, the payee and
@@ -69,6 +70,12 @@ export async function requestPlan(subdomain: string, input: { planId: string; bi
     const claim = await tx.get(claimRef);
     if (claim.exists) throw new ApiError(409, "This UPI reference number was already used. Check the number in your payment app.");
     if (store.pendingSubscription) throw new ApiError(409, "You already have a plan payment being checked. Cancel it first to send a new one.");
+    // no moving down while a higher paid plan is running (an ended plan already reads as Free)
+    if (rankOf(q.planId) < rankOf(store.planId)) {
+      const current = PLATFORM_PLANS[store.planId]?.name || "your current plan";
+      const until = store.planPaidUntil ? ` until ${new Date(store.planPaidUntil).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : "";
+      throw new ApiError(409, `You're on ${current}${until}. You can choose a lower plan after it ends.`);
+    }
 
     const req: SubscriptionRequest = {
       id: `sub_${randomBytes(8).toString("hex")}`,

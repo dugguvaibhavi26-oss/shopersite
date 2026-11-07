@@ -214,6 +214,10 @@ export interface StoreData {
   subscriptionHistory?: SubscriptionRequest[];
   /** when the paid plan runs out (set when a plan payment is approved); none means paid with no end on record */
   planPaidUntil?: string;
+  /** "off" when the seller cancelled their subscription: it ends on planPaidUntil and isn't renewed */
+  planRenewal?: "on" | "off";
+  /** set in memory (never saved) when the paid plan has ended: the plan it was on; planId is then "free" */
+  expiredPlanId?: string;
   /** themes this shop bought; they're theirs on any plan */
   ownedThemes?: string[];
   /** themes the shop switched to through its plan; they lock again if the plan isn't renewed */
@@ -958,6 +962,7 @@ class StoreService {
     const updated = this.updateStore(store.subdomain, {
       planId: pending.planId,
       planPaidUntil: from.toISOString(),
+      planRenewal: "on",
       pendingSubscription: null,
       subscriptionHistory: updatedHistory,
     });

@@ -136,6 +136,7 @@ describe("buyer orders", () => {
 
 describe("seller payments to Shopersite", () => {
   it("plan: amount, payee and reference come from the server; stays pending for the admin", async () => {
+    seed({ planId: "free" });
     const req = await billing.requestPlan(SUB, { planId: "starter", billingCycle: "quarterly", utr: "512345678901" });
     expect(req).toMatchObject({
       planId: "starter",
@@ -147,7 +148,7 @@ describe("seller payments to Shopersite", () => {
     expect(req.referenceId).toMatch(/^SHS-SUB-[0-9A-F]{8}$/);
     const priv = docs.get(`stores/${SUB}/private/data`) as any;
     expect(priv.pendingSubscription.id).toBe(req.id);
-    expect((docs.get(`stores/${SUB}`) as any).planId).toBe("pro"); // nothing unlocks until approved
+    expect((docs.get(`stores/${SUB}`) as any).planId).toBe("free"); // nothing unlocks until approved
   });
 
   it("plan: rejects bad plans, free plans, bad UTRs, a second request and a reused UTR", async () => {
@@ -160,6 +161,14 @@ describe("seller payments to Shopersite", () => {
     // another shop can't reuse the same UPI reference
     docs.set("stores/other", { ...(docs.get(`stores/${SUB}`) as object), subdomain: "other", id: "store-other" });
     await expect(billing.requestPlan("other", { planId: "pro", billingCycle: "monthly", utr: "512345678901" })).rejects.toThrow(/already used/);
+  });
+
+  it("plan: no moving down while a higher plan is running; allowed once it has ended", async () => {
+    seed({ planId: "pro", planPaidUntil: new Date(Date.now() + 10 * 86400000).toISOString() });
+    await expect(billing.requestPlan(SUB, { planId: "starter", billingCycle: "monthly", utr: "512345678901" })).rejects.toThrow(/lower plan after it ends/);
+    await expect(billing.requestPlan(SUB, { planId: "pro", billingCycle: "monthly", utr: "512345678901" })).resolves.toMatchObject({ planId: "pro" });
+    seed({ planId: "pro", planPaidUntil: new Date(Date.now() - 86400000).toISOString() });
+    await expect(billing.requestPlan(SUB, { planId: "starter", billingCycle: "monthly", utr: "512345678903" })).resolves.toMatchObject({ planId: "starter" });
   });
 
   it("plan: cancelling frees the UTR so a mistyped number can be corrected", async () => {
