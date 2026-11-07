@@ -3,14 +3,17 @@
 import { useState } from "react";
 import { ArrowLeft, Check, ImageIcon, PartyPopper, UploadCloud, X } from "lucide-react";
 import { storeService, type StoreData } from "@/lib/store-service";
+import { missingPolicies } from "@/lib/policies";
+import { checkPrices, checkUpiId } from "@/lib/validation";
+import { cropImage } from "@/components/ui/image-cropper";
 
-type StepId = "logo" | "products" | "upi" | "banner" | "discount" | "instagram";
+type StepId = "logo" | "products" | "upi" | "policies" | "discount" | "instagram";
 
 export const SETUP_STEPS: { id: StepId; title: string; hint: string }[] = [
   { id: "logo", title: "Add your store logo", hint: "Shown at the top of your store and on order messages." },
   { id: "products", title: "Add 5 products", hint: "A photo, a name and a price is all you need to start." },
   { id: "upi", title: "Set up UPI payments", hint: "Buyers pay straight to this UPI ID. We never hold the money." },
-  { id: "banner", title: "Upload a storefront banner", hint: "The big image buyers see first on your store." },
+  { id: "policies", title: "Add your policy pages", hint: "Terms, returns, shipping and privacy. Required for online shops, and they protect you in disputes." },
   { id: "discount", title: "Create a discount code", hint: "Give first-time buyers a reason to order today." },
   { id: "instagram", title: "Link your Instagram", hint: "Buyers can find and follow you from your store." },
 ];
@@ -23,8 +26,8 @@ export function isSetupStepDone(store: StoreData, id: StepId): boolean {
       return store.products.length >= 5;
     case "upi":
       return Boolean(store.upiId?.trim());
-    case "banner":
-      return store.banners.length > 0;
+    case "policies":
+      return missingPolicies(store).length === 0;
     case "discount":
       return (store.discounts?.length || 0) > 0;
     case "instagram":
@@ -32,16 +35,31 @@ export function isSetupStepDone(store: StoreData, id: StepId): boolean {
   }
 }
 
-const readImage = (file: File, done: (url: string) => void) => {
-  const reader = new FileReader();
-  reader.onload = (e) => e.target?.result && done(e.target.result as string);
-  reader.readAsDataURL(file);
+/** Crop, then upload to storage (photos are never kept inside the store record). */
+const uploadImage = async (sub: string, file: File, aspect: number | undefined, done: (url: string) => void, fail: (msg: string) => void) => {
+  if (file.size > 12 * 1024 * 1024) return fail("Choose a photo under 12 MB.");
+  const cropped = await cropImage(file, { aspect });
+  if (!cropped) return;
+  try {
+    done(await storeService.uploadStoreImage(sub, cropped));
+  } catch {
+    fail("Couldn't upload this photo. Check your internet and try again.");
+  }
 };
 
-function ImagePicker({ value, onChange, label, wide = false }: { value: string; onChange: (v: string) => void; label: string; wide?: boolean }) {
+function ImagePicker({ value, onPick, label, wide = false }: { value: string; onPick: (f: File) => void; label: string; wide?: boolean }) {
   return (
     <label className="block cursor-pointer">
-      <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && readImage(e.target.files[0], onChange)} />
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f) onPick(f);
+        }}
+      />
       <span
         className={`relative flex flex-col items-center justify-center gap-1.5 overflow-hidden rounded-2xl border-2 border-dashed transition-colors ${
           value ? "border-transparent" : "border-neutral-300 bg-neutral-50 hover:border-neutral-900"
@@ -83,11 +101,13 @@ export function SetupWizard({
   startAt,
   onClose,
   onChanged,
+  onOpenPolicies,
 }: {
   store: StoreData;
   startAt: number;
   onClose: () => void;
   onChanged: () => void;
+  onOpenPolicies: () => void;
 }) {
   const [index, setIndex] = useState(startAt);
   const [finished, setFinished] = useState(false);
@@ -101,8 +121,14 @@ export function SetupWizard({
   const [pImage, setPImage] = useState("");
   const [pName, setPName] = useState("");
   const [pPrice, setPPrice] = useState("");
-  const [bImage, setBImage] = useState("");
-  const [bCategory, setBCategory] = useState(store.categories.find((c) => !c.isParent)?.name || store.categories[0]?.name || "");
+  const [pCat, setPCat] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const pick = (aspect: number | undefined, set: (v: string) => void) => (f: File) => {
+    setUploading(true);
+    setError("");
+    uploadImage(store.subdomain, f, aspect, set, setError).finally(() => setUploading(false));
+  };
+  const firstCategory = store.categories.find((c) => !c.isParent)?.name || "";
   const [dCode, setDCode] = useState("WELCOME10");
   const [dPercent, setDPercent] = useState("10");
 
@@ -132,7 +158,7 @@ export function SetupWizard({
         break;
       case "upi": {
         const v = upi.trim();
-        if (!/^[\w.\-]{2,}@[a-zA-Z]{2,}$/.test(v)) return setError("Enter a UPI ID like yourname@okaxis."), false;
+        if (checkUpiId(v)) return setError(checkUpiId(v)), false;
         storeService.updateStore(sub, { upiId: v });
         break;
       }
@@ -145,14 +171,24 @@ export function SetupWizard({
       case "products": {
         const price = parseFloat(pPrice);
         if (!pName.trim()) return setError("Give the product a name."), false;
-        if (!(price > 0)) return setError("Enter a price in rupees."), false;
+        const priceErr = checkPrices(pPrice).price;
+        if (priceErr) return setError(priceErr), false;
+        // products always sit in a real category: make the first one here if there's none
+        let category = firstCategory;
+        if (!category) {
+          const name = pCat.trim().replace(/\s+/g, " ");
+          if (name.length < 2) return setError("Name a category for this product (e.g. Sarees)."), false;
+          const made = storeService.addCategory(sub, { name });
+          if (!made.success || !made.category) return setError(made.error || "Couldn't create the category."), false;
+          category = made.category.name;
+        }
         const res = storeService.addProduct(sub, {
           title: pName.trim(),
           slug: `${pName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now().toString(36).slice(-4)}`,
           description: "",
           price: Math.round(price * 100),
           stock: 10,
-          category: store.categories.find((c) => !c.isParent)?.name || "General",
+          category,
           images: pImage ? [pImage] : [],
           status: "published",
         });
@@ -169,24 +205,10 @@ export function SetupWizard({
         }
         break;
       }
-      case "banner": {
-        if (!bImage) return setError("Upload a banner image first."), false;
-        storeService.saveBanners(sub, [
-          ...store.banners,
-          {
-            id: `banner-${Date.now().toString(36)}`,
-            storeId: store.id,
-            title: bCategory ? `${bCategory} Collection` : "Hero Banner",
-            imageUrl: bImage,
-            ctaLink: bCategory ? `/s/${sub}?category=${encodeURIComponent(bCategory)}` : `/s/${sub}`,
-            targetType: bCategory ? "category" : "custom",
-            targetValue: bCategory || undefined,
-            position: store.banners.length,
-            isActive: true,
-          },
-        ]);
-        break;
-      }
+      case "policies":
+        onClose();
+        onOpenPolicies();
+        return false;
       case "discount": {
         const code = dCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "");
         const pct = parseFloat(dPercent);
@@ -269,7 +291,7 @@ export function SetupWizard({
                   Already done. You can change it in Settings.
                 </div>
               ) : step.id === "logo" ? (
-                <ImagePicker value={logo} onChange={(v) => (setLogo(v), setError(""))} label="Upload logo" />
+                <ImagePicker value={logo} onPick={pick(undefined, setLogo)} label={uploading ? "Uploading…" : "Upload logo"} />
               ) : step.id === "upi" ? (
                 <Field label="UPI ID" value={upi} onChange={(e) => (setUpi(e.target.value), setError(""))} placeholder="yourname@okaxis" autoFocus />
               ) : step.id === "instagram" ? (
@@ -282,7 +304,16 @@ export function SetupWizard({
                   </div>
                   <div className="grid grid-cols-[96px_1fr] gap-3">
                     <label className="cursor-pointer">
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && readImage(e.target.files[0], setPImage)} />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          e.target.value = "";
+                          if (f) pick(4 / 5, setPImage)(f);
+                        }}
+                      />
                       <span className="relative flex h-[96px] items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-neutral-300 bg-neutral-50 hover:border-neutral-900 transition-colors">
                         {pImage ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -294,30 +325,15 @@ export function SetupWizard({
                     </label>
                     <div className="space-y-2.5">
                       <Field label="Product name" value={pName} onChange={(e) => (setPName(e.target.value), setError(""))} placeholder="Oversized cotton tee" />
-                      <Field label="Price" prefix="₹" inputMode="decimal" value={pPrice} onChange={(e) => (setPPrice(e.target.value), setError(""))} placeholder="799" />
+                      <Field label="Price" prefix="₹" inputMode="decimal" value={pPrice} onChange={(e) => (setPPrice(e.target.value.replace(/[^0-9.]/g, "")), setError(""))} placeholder="799" />
+                      {!firstCategory && <Field label="Category" value={pCat} onChange={(e) => (setPCat(e.target.value.slice(0, 40)), setError(""))} placeholder="e.g. Sarees" />}
                     </div>
                   </div>
                 </>
-              ) : step.id === "banner" ? (
-                <>
-                  <ImagePicker value={bImage} onChange={(v) => (setBImage(v), setError(""))} label="Upload banner image" wide />
-                  {store.categories.length > 0 && (
-                    <label className="block">
-                      <span className="mb-1.5 block text-xs font-semibold text-neutral-600">Opens this collection</span>
-                      <select
-                        value={bCategory}
-                        onChange={(e) => setBCategory(e.target.value)}
-                        className="h-11 w-full rounded-[10px] border border-neutral-300 bg-white px-3 text-sm outline-none focus:border-neutral-900"
-                      >
-                        {store.categories.map((c) => (
-                          <option key={c.id} value={c.name}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                </>
+              ) : step.id === "policies" ? (
+                <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  {missingPolicies(store).length} of 4 still to add. Ready-made templates are filled in with your shop&apos;s details, so this takes a few minutes.
+                </p>
               ) : (
                 <div className="grid grid-cols-[1fr_110px] gap-3">
                   <Field label="Code" value={dCode} onChange={(e) => (setDCode(e.target.value.toUpperCase()), setError(""))} placeholder="WELCOME10" />
@@ -353,7 +369,7 @@ export function SetupWizard({
                   onClick={() => save() && next()}
                   className="ml-auto h-11 px-5 rounded-[12px] bg-neutral-950 text-white text-sm font-semibold hover:bg-black transition-colors"
                 >
-                  {step.id === "products" ? "Add product" : "Save & continue"}
+                  {step.id === "products" ? "Add product" : step.id === "policies" ? "Write my policies" : "Save & continue"}
                 </button>
               )}
             </div>

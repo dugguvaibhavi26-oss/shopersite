@@ -187,6 +187,7 @@ export function SidebarRail<T extends string>({
                 <button
                   key={id}
                   type="button"
+                  data-tour={`nav-${id}`}
                   onClick={() => onSelect(id)}
                   aria-label={name}
                   aria-current={on ? "page" : undefined}

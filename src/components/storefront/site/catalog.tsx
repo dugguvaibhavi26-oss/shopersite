@@ -67,10 +67,10 @@ export function SiteCatalog({ slug, query }: { slug?: string; query?: string }) 
 
   return (
     <div className="pb-20">
-      {category?.imageUrl && !query && layout !== "banner" && (
+      {(category?.bannerUrl || category?.imageUrl) && !query && layout !== "banner" && (
         <div className="m-panel relative h-[34vh] min-h-[220px] overflow-hidden sm:h-[46vh]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={category.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <img src={category.bannerUrl || category.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0 bg-black/20" />
         </div>
       )}

@@ -2,10 +2,14 @@
 
 import * as React from "react";
 import { Check, Loader2, Mail, MessageCircle, Package, Truck, X, ExternalLink } from "lucide-react";
-import { findOrderToken, openCashfreeCheckout, trackOrders, verifyOnlinePayment, type VerifyResponse } from "@/lib/payments/client";
+import { orderPolicyOf } from "@/lib/policies";
+import { checkEmail, checkPersonName, checkPhone, checkPincode, cleanPhone } from "@/lib/validation";
+import { BuyerAuth, useAccountOrders } from "./buyer-auth";
+import { findOrderToken, openCashfreeCheckout, requestOrderChange, trackOrders, verifyOnlinePayment, type VerifyResponse } from "@/lib/payments/client";
 import type { OrderData } from "@/lib/store-service";
 import { SITE_PAGE_IDS, type SitePageId } from "@/lib/site-content";
 import { cn } from "@/lib/utils";
+import { POLICY_IDS, POLICY_INFO, type PolicyId } from "@/lib/policies";
 import { EMPTY_DETAILS, rupees, useSite, visibleProducts, whatsappLink, type SavedDetails } from "./context";
 import { Container, InstagramIcon, EmptyState, MLink, ProductGrid } from "./ui";
 
@@ -85,7 +89,9 @@ export function SiteOrder({ token }: { token: string }) {
   const saved = tracked?.find((o) => o.token === token);
   // until the server answers, don't start the online-payment check
   const pay = useOnlinePayment(token, tracked === null || !!saved);
-  const order = saved || (pay.result?.status === "paid" ? pay.result.order : undefined);
+  // after the buyer cancels or asks for a return, the answer from the server is shown at once
+  const [changed, setChanged] = React.useState<OrderData | null>(null);
+  const order = (changed && changed.token === token ? changed : null) || saved || (pay.result?.status === "paid" ? pay.result.order : undefined);
   const [placed, setPlaced] = React.useState(false);
   const [retrying, setRetrying] = React.useState(false);
   React.useEffect(() => {
@@ -206,9 +212,12 @@ export function SiteOrder({ token }: { token: string }) {
 
       <div className="m-soft mt-6 rounded-3xl p-5 sm:p-7">
         {cancelled ? (
-          <p className="flex items-center gap-2 font-semibold">
-            <X className="h-4 w-4" /> This order was cancelled
-          </p>
+          <div>
+            <p className="flex items-center gap-2 font-semibold">
+              <X className="h-4 w-4" /> {order.cancelledBy === "buyer" ? "You cancelled this order" : order.cancelledBy === "seller" ? `${store.name} cancelled this order` : "This order was cancelled"}
+            </p>
+            {order.cancelReason && <p className="m-muted mt-2 text-[length:calc(14px*var(--m-scale))]">Reason: {order.cancelReason}</p>}
+          </div>
         ) : (
           <ol className="grid grid-cols-5 gap-1">
             {STEPS.map((s, i) => (
@@ -220,6 +229,27 @@ export function SiteOrder({ token }: { token: string }) {
           </ol>
         )}
         <p className="m-muted mt-5 text-[length:calc(14px*var(--m-scale))]">{PAYMENT_TEXT[order.paymentStatus]}</p>
+        {order.returnRequest && (
+          <div className="m-line mt-5 border-t pt-5 text-[length:calc(14px*var(--m-scale))]">
+            <p className="font-semibold">
+              {order.returnRequest.status === "requested"
+                ? "Return requested: the shop will reply soon"
+                : order.returnRequest.status === "approved"
+                  ? "Return accepted"
+                  : order.returnRequest.status === "received"
+                    ? "Return received by the shop"
+                    : "Return not accepted"}
+            </p>
+            {order.returnRequest.note && <p className="m-muted mt-1">{order.returnRequest.note}</p>}
+          </div>
+        )}
+        {order.refund && (
+          <p className="m-line mt-5 border-t pt-5 text-[length:calc(14px*var(--m-scale))] font-semibold">
+            {order.refund.status === "refunded"
+              ? `Refund of ${rupees(order.refund.amount)} sent${order.refund.reference ? ` · ref ${order.refund.reference}` : ""}`
+              : `Refund of ${rupees(order.refund.amount)} due from the shop`}
+          </p>
+        )}
         {order.trackingNumber && (
           <div className="m-line mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-5 text-[length:calc(14px*var(--m-scale))]">
             <span className="flex items-center gap-2">
@@ -235,6 +265,8 @@ export function SiteOrder({ token }: { token: string }) {
           </div>
         )}
       </div>
+
+      <OrderChange order={order} onChanged={setChanged} />
 
       <div className="mt-8 grid gap-8 md:grid-cols-[1fr_300px]">
         <ul className="m-line border-t">
@@ -303,6 +335,75 @@ export function SiteOrder({ token }: { token: string }) {
   );
 }
 
+/** Cancel (before shipping) or ask for a return (after delivery), when the shop allows it. */
+function OrderChange({ order, onChanged }: { order: OrderData; onChanged: (o: OrderData) => void }) {
+  const { store } = useSite();
+  const policy = orderPolicyOf(store);
+  const [open, setOpen] = React.useState<"cancel" | "return" | null>(null);
+  const [reason, setReason] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const canCancel = policy.cancelEnabled && ["placed", "confirmed", "packed"].includes(order.fulfilmentStatus);
+  const deliveredAt = new Date(order.deliveredAt || order.updatedAt).getTime();
+  const daysLeft = Math.ceil((deliveredAt + policy.returnDays * 86400000 - Date.now()) / 86400000);
+  const canReturn = policy.returnEnabled && order.fulfilmentStatus === "delivered" && daysLeft > 0 && (!order.returnRequest || order.returnRequest.status === "declined");
+  if (!canCancel && !canReturn) return null;
+
+  const send = async () => {
+    if (!open) return;
+    if (reason.trim().length < 5) return setError("Tell the shop why, in a few words.");
+    setBusy(true);
+    setError("");
+    try {
+      onChanged(await requestOrderChange(store.subdomain, order.token, open, reason.trim()));
+      setOpen(null);
+      setReason("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't send. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="m-line mt-4 rounded-3xl border p-5 sm:p-6 text-[length:calc(14px*var(--m-scale))]">
+      {!open ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="m-muted">
+            {canCancel ? "Changed your mind? You can cancel until the order ships." : `You can ask for a return for ${daysLeft} more day${daysLeft === 1 ? "" : "s"}.`}
+          </p>
+          <button type="button" onClick={() => setOpen(canCancel ? "cancel" : "return")} className="m-btn m-btn-outline h-11 px-6">
+            {canCancel ? "Cancel order" : "Request a return"}
+          </button>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          <p className="m-h text-[length:calc(17px*var(--m-scale))]">{open === "cancel" ? "Cancel this order?" : "Request a return"}</p>
+          <label className="block">
+            <span className="mb-1.5 block font-medium">{open === "cancel" ? "Why are you cancelling?" : "What's wrong with the order?"}</span>
+            <textarea value={reason} onChange={(e) => (setReason(e.target.value.slice(0, 500)), setError(""))} rows={3} className="m-field !h-auto py-3" placeholder={open === "cancel" ? "e.g. Ordered the wrong size" : "e.g. The colour is different from the photo"} />
+          </label>
+          {open === "cancel" && (order.paymentStatus === "paid" || order.paymentStatus === "verified" || order.paymentUtr) && (
+            <p className="m-muted text-[length:calc(13px*var(--m-scale))]">The shop will refund {rupees(order.total)} to you as per its refund policy.</p>
+          )}
+          {error && <p className="text-[length:calc(13px*var(--m-scale))] text-red-600">{error}</p>}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={busy} onClick={send} className="m-btn h-11 px-6">
+              {busy ? "Sending…" : open === "cancel" ? "Yes, cancel order" : "Send request"}
+            </button>
+            <button type="button" onClick={() => (setOpen(null), setError(""))} className="m-btn m-btn-outline h-11 px-6">
+              {open === "cancel" ? "Keep my order" : "Back"}
+            </button>
+          </div>
+          <MLink to="/pages/returns" className="m-muted text-[length:calc(13px*var(--m-scale))] underline underline-offset-4">
+            Read the returns &amp; refunds policy
+          </MLink>
+        </div>
+      )}
+    </div>
+  );
+}
+
 type Tab = "orders" | "wishlist" | "details";
 
 export function SiteAccount() {
@@ -313,7 +414,12 @@ export function SiteAccount() {
     if (t === "wishlist" || t === "details" || t === "orders") setTab(t);
   }, []);
   const tracked = useTrackedOrders(orderTokens);
-  const orders = orderTokens.map((t) => (tracked || []).find((o) => o.token === t)).filter(Boolean) as OrderData[];
+  const deviceOrders = orderTokens.map((t) => (tracked || []).find((o) => o.token === t)).filter(Boolean) as OrderData[];
+  // orders from the buyer's account (any device), plus the ones saved on this device
+  const accountOrders = useAccountOrders();
+  const orders = [...deviceOrders, ...(accountOrders || []).filter((o) => !deviceOrders.some((d) => d.token === o.token))].sort((a, b) =>
+    (b.createdAt || "").localeCompare(a.createdAt || "")
+  );
   const wished = visibleProducts(store).filter((p) => wishlist.includes(p.id));
 
   const [phone, setPhone] = React.useState("");
@@ -347,7 +453,10 @@ export function SiteAccount() {
   return (
     <Container className="pb-20 pt-8 sm:pt-12">
       <h1 className="m-h t-title">Account</h1>
-      <p className="m-muted mt-3 text-[length:calc(15px*var(--m-scale))]">Your orders, wishlist and delivery details are saved on this device.</p>
+      <p className="m-muted mt-3 text-[length:calc(15px*var(--m-scale))]">Your orders, wishlist and delivery details. Sign in to see your orders on any device.</p>
+      <div className="mt-6 max-w-xl">
+        <BuyerAuth />
+      </div>
       <div className="m-line m-cap mt-8 flex gap-6 border-b text-[length:calc(12px*var(--m-scale))] font-semibold tracking-[0.12em]">
         {tabs.map((t) => (
           <button key={t.id} type="button" onClick={() => setTab(t.id)} aria-pressed={tab === t.id} className={cn("-mb-px border-b-2 pb-3", tab === t.id ? "border-[var(--m-text)]" : "m-faint border-transparent")}>
@@ -417,7 +526,14 @@ export function SiteAccount() {
           className="mt-8 grid max-w-2xl gap-4"
           onSubmit={(e) => {
             e.preventDefault();
-            saveDetails(form);
+            const wrong =
+              (form.name && checkPersonName(form.name, "full name")) ||
+              (form.phone && checkPhone(form.phone)) ||
+              (form.email && checkEmail(form.email)) ||
+              (form.pincode && checkPincode(form.pincode)) ||
+              "";
+            if (wrong) return showToast(wrong);
+            saveDetails({ ...form, phone: form.phone ? cleanPhone(form.phone) : "" });
             showToast("Details saved");
           }}
         >
@@ -498,7 +614,7 @@ function ContactLinks() {
  * on it, the photo beside the text, or a big centred title over a soft card.
  */
 export function SiteInfoPage({ id }: { id: string }) {
-  const { content, look } = useSite();
+  const { content, look, store } = useSite();
   if (!SITE_PAGE_IDS.includes(id as SitePageId)) {
     return (
       <Container>
@@ -506,7 +622,11 @@ export function SiteInfoPage({ id }: { id: string }) {
       </Container>
     );
   }
-  const page = content.pages[id as SitePageId];
+  // the seller's own policy (Dashboard → Policies) takes the place of the theme's sample text
+  const own = (POLICY_IDS as readonly string[]).includes(id) ? store.policies?.[id as PolicyId] : undefined;
+  const page = own?.body?.trim()
+    ? { ...content.pages[id as SitePageId], title: POLICY_INFO[id as PolicyId].title, body: own.body }
+    : content.pages[id as SitePageId];
   const paragraphs = page.body.split(/\n{2,}/).filter((p) => p.trim());
   const photo = id === "about" || id === "contact" ? page.image || "" : "";
   const style = photo ? look.pageStyle || "plain" : look.pageStyle === "card" ? "card" : "plain";

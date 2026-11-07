@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm, appPrompt } from "@/components/ui/app-dialog";
 
 import * as React from "react";
 import {
@@ -184,7 +185,7 @@ export default function ComponentGalleryPage() {
               <PinCodeInput
                 label="Postal PIN Code"
                 helperText="Auto-fills city and state"
-                onLookupComplete={(loc) => alert(`PIN code resolved: ${loc.city}, ${loc.state}`)}
+                onLookupComplete={(loc) => appAlert(`PIN code resolved: ${loc.city}, ${loc.state}`)}
               />
               <SearchInput placeholder="Search catalog..." />
               <Input
@@ -381,7 +382,7 @@ export default function ComponentGalleryPage() {
                   description="Share your store link on your Instagram bio and WhatsApp stories to receive your first order."
                   action={{
                     label: "Share Store Link",
-                    onClick: () => alert("Open Share Link"),
+                    onClick: () => appAlert("Open Share Link"),
                   }}
                 />
               </div>
@@ -470,7 +471,7 @@ export default function ComponentGalleryPage() {
                 label: "Copy Link",
                 onClick: () => {
                   navigator.clipboard?.writeText(`https://auraboutique.${siteConfig.domain}`);
-                  alert("Copied!");
+                  appAlert("Copied!");
                 },
               }}
             />

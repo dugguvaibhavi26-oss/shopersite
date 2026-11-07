@@ -273,9 +273,13 @@ function bannerLink(b: BannerData): string {
   return "/catalog";
 }
 
-function Banners() {
+function Banners({ s }: { s: Record<string, string> }) {
   const { store, editing } = useSite();
-  const banners = (store.banners || []).filter((b) => b.isActive && b.imageUrl).sort((a, b) => a.position - b.position);
+  // slides set in the theme editor; shops set up before that still show their saved banners
+  const slides: BannerData[] = [1, 2, 3, 4]
+    .filter((n) => s[`slide${n}Image`])
+    .map((n) => ({ id: `slide-${n}`, storeId: store.id, imageUrl: s[`slide${n}Image`], ctaLink: s[`slide${n}Link`] || "/catalog", position: n, isActive: true }));
+  const banners = slides.length ? slides : (store.banners || []).filter((b) => b.isActive && b.imageUrl).sort((a, b) => a.position - b.position);
   const [i, setI] = React.useState(0);
   const count = banners.length;
   React.useEffect(() => {
@@ -287,7 +291,7 @@ function Banners() {
     return editing ? (
       <Container className="py-10">
         <div className="m-soft m-muted flex aspect-[3/1] items-center justify-center rounded-2xl text-center text-[length:calc(14px*var(--m-scale))]">
-          Add banners in Dashboard → Banners and they slide here.
+          Add banner photos on the left (Slide 1–4) and they slide here.
         </div>
       </Container>
     ) : null;
@@ -5912,7 +5916,7 @@ function PastelTiles({ s }: { s: Record<string, string> }) {
   );
 }
 
-function SectionBody({ section }: { section: SiteSection }) {
+export function SectionBody({ section }: { section: SiteSection }) {
   const s = section.settings;
   switch (section.type) {
     case "hero":
@@ -5922,7 +5926,7 @@ function SectionBody({ section }: { section: SiteSection }) {
     case "product-row":
       return <ProductRow s={s} />;
     case "banners":
-      return <Banners />;
+      return <Banners s={s} />;
     case "categories":
       return <Categories s={s} />;
     case "category-circles":
@@ -6112,6 +6116,94 @@ function SectionBody({ section }: { section: SiteSection }) {
   }
 }
 
+/**
+ * In the theme editor, records which settings this theme's version of the section actually reads
+ * while it draws, and tells the editor, so the editor only offers the fields this theme shows.
+ */
+function TrackedSection({ section, editing }: { section: SiteSection; editing: boolean }) {
+  const used = React.useRef<Set<string>>(new Set());
+  // only what this draw reads counts (an earlier draw may have taken another layout's path)
+  used.current = new Set();
+  const tracked = React.useMemo(() => {
+    if (!editing) return section;
+    const settings = new Proxy(section.settings, {
+      get(target, key) {
+        if (typeof key === "string") used.current.add(key);
+        return (target as Record<string | symbol, unknown>)[key];
+      },
+    });
+    return { ...section, settings };
+  }, [section, editing]);
+  React.useEffect(() => {
+    if (!editing) return;
+    const send = () =>
+      window.parent.postMessage({ source: "shopersite-preview", type: "fields", id: section.id, keys: [...used.current] }, window.location.origin);
+    send();
+    // parts drawn a moment later (sliders, lazy images) add their fields too
+    const t = window.setTimeout(send, 900);
+    return () => window.clearTimeout(t);
+  });
+  return <SectionBody section={tracked} />;
+}
+
+/**
+ * Double-click a piece of text in the editor's preview to type over it. The text is matched to the
+ * section setting it came from; the change goes to the editor, which saves it like any other edit.
+ */
+function editTextInPlace(e: React.MouseEvent, section: SiteSection) {
+  const el = (e.target as HTMLElement).closest<HTMLElement>("h1,h2,h3,h4,h5,h6,p,span,a,button,li,strong,em,small,label,div");
+  if (!el || el.isContentEditable) return;
+  const original = el.textContent || "";
+  const norm = (v: string) => v.replace(/\s+/g, " ").trim();
+  const key = Object.entries(section.settings).find(([, v]) => typeof v === "string" && v.trim() && norm(v) === norm(original))?.[0];
+  if (!key) {
+    window.parent.postMessage({ source: "shopersite-preview", type: "text-miss", id: section.id }, window.location.origin);
+    return;
+  }
+  e.preventDefault();
+  e.stopPropagation();
+  const textNode = Array.from(el.childNodes).find((n) => n.nodeType === Node.TEXT_NODE) as Text | undefined;
+  el.contentEditable = "plaintext-only";
+  if (el.contentEditable !== "plaintext-only") el.contentEditable = "true";
+  el.setAttribute("data-inline-editing", "");
+  el.focus();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+  let cancelled = false;
+  const finish = () => {
+    el.removeEventListener("blur", finish);
+    el.removeEventListener("keydown", onKey);
+    el.removeEventListener("paste", onPaste);
+    el.removeAttribute("contenteditable");
+    el.removeAttribute("data-inline-editing");
+    const next = (el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 4000);
+    if (cancelled || next === norm(original)) {
+      if (textNode) textNode.nodeValue = original;
+      return;
+    }
+    window.parent.postMessage({ source: "shopersite-preview", type: "text", id: section.id, key, value: next }, window.location.origin);
+  };
+  const onKey = (k: KeyboardEvent) => {
+    if (k.key === "Enter" && !k.shiftKey) {
+      k.preventDefault();
+      el.blur();
+    } else if (k.key === "Escape") {
+      cancelled = true;
+      el.blur();
+    }
+  };
+  const onPaste = (p: ClipboardEvent) => {
+    p.preventDefault();
+    document.execCommand("insertText", false, (p.clipboardData?.getData("text/plain") || "").replace(/\s+/g, " "));
+  };
+  el.addEventListener("blur", finish);
+  el.addEventListener("keydown", onKey);
+  el.addEventListener("paste", onPaste);
+}
+
 export function SiteHome({ selectedId }: { selectedId?: string }) {
   const { content, editing, store } = useSite();
   const sections = content.sections.filter((s) => !s.hidden);
@@ -6135,9 +6227,10 @@ export function SiteHome({ selectedId }: { selectedId?: string }) {
                 }
               : undefined
           }
+          onDoubleClickCapture={editing ? (e) => editTextInPlace(e, section) : undefined}
           aria-label={editing ? SITE_SECTION_TYPES[section.type].label : undefined}
         >
-          <SectionBody section={section} />
+          <TrackedSection section={section} editing={editing} />
         </div>
       ))}
       {!hasProducts && !editing && (

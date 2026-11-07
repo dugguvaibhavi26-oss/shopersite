@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { storeService } from "@/lib/store-service";
 import { siteConfig, getStoreUrl, getPublicStoreUrl, getPublicStoreAddress } from "@/lib/config/site";
 import { cn } from "@/lib/utils";
+import { isReservedSubdomain } from "@/lib/reserved-names";
 import { PLATFORM_PLANS, type BillingCycle } from "@/lib/plans";
 import { usePlatformSettings } from "@/lib/use-platform-settings";
 import { getTheme } from "@/lib/themes";
@@ -45,7 +46,9 @@ import {
   Sofa,
   Cookie,
   Loader2,
+  Plus,
 } from "lucide-react";
+import { checkEmail, checkPassword, checkPersonName, checkPhone, checkUpiId, cleanPhone, phoneInput } from "@/lib/validation";
 
 const CATEGORIES = [
   { value: "Fashion & Apparel", label: "Fashion & Apparel", icon: Shirt },
@@ -54,6 +57,7 @@ const CATEGORIES = [
   { value: "Beauty & Skincare", label: "Beauty & Skincare", icon: Sparkles },
   { value: "Home & Living", label: "Home Decor & Living", icon: Sofa },
   { value: "Gourmet & Organic Foods", label: "Food & Organic", icon: Cookie },
+  { value: "Others", label: "Others", icon: Plus },
 ];
 
 type QuestionId = "name" | "address" | "category" | "tagline" | "owner" | "phone" | "email" | "password" | "upi";
@@ -99,6 +103,9 @@ function RegisterStoreContent() {
   );
   const [category, setCategory] = useState("Fashion & Apparel");
   const [tagline, setTagline] = useState("");
+  // "Others": the seller says what they sell in their own words
+  const [otherCategory, setOtherCategory] = useState("");
+  const [agreed, setAgreed] = useState(false);
 
   const [ownerName, setOwnerName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
@@ -179,9 +186,9 @@ function RegisterStoreContent() {
       const newStore = await storeService.registerStore({
         name: storeName,
         subdomain: cleanSub,
-        category,
-        ownerName,
-        contactPhone,
+        category: category === "Others" ? otherCategory.trim().replace(/\s+/g, " ") : category,
+        ownerName: ownerName.trim(),
+        contactPhone: cleanPhone(contactPhone),
         contactEmail: contactEmail || activeUser.email || undefined,
         upiId: upiId.trim(),
         tagline: tagline || `Welcome to ${storeName}`,
@@ -231,19 +238,26 @@ function RegisterStoreContent() {
         return storeName.trim() ? "" : "Give your shop a name.";
       case "address": {
         if (subdomain.length < 3) return "Use at least 3 letters or numbers.";
+        if (isReservedSubdomain(subdomain)) return `${subdomain}.${siteConfig.domain} can't be used. Try another.`;
         const taken = storeService.getStore(subdomain);
         return taken ? `${subdomain}.${siteConfig.domain} is taken. Try another.` : "";
       }
+      case "category":
+        if (category !== "Others") return "";
+        if (otherCategory.trim().length < 3) return "Tell us what you sell (e.g. Stationery, Toys, Plants).";
+        if (!/^[\p{L}\p{N} &,'.-]{3,40}$/u.test(otherCategory.trim())) return "Use letters only, up to 40 characters.";
+        return "";
       case "owner":
-        return ownerName.trim() ? "" : "Tell us your name.";
+        return checkPersonName(ownerName);
       case "phone":
-        return contactPhone.replace(/\D/g, "").length >= 10 ? "" : "Enter a 10-digit WhatsApp number.";
+        return checkPhone(contactPhone, "WhatsApp number");
       case "email":
-        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim()) ? "" : "Enter a valid email address.";
+        return checkEmail(contactEmail);
       case "password":
-        return accountPassword.length >= 6 ? "" : "Use at least 6 characters.";
+        return checkPassword(accountPassword);
       case "upi":
-        return /^[\w.\-]{2,}@[a-zA-Z]{2,}$/.test(upiId.trim()) ? "" : "Enter a UPI ID like yourname@okaxis.";
+        if (checkUpiId(upiId)) return checkUpiId(upiId);
+        return agreed ? "" : "Please agree to the Terms and Privacy Policy to launch your store.";
       default:
         return "";
     }
@@ -330,6 +344,18 @@ function RegisterStoreContent() {
                     </button>
                   );
                 })}
+                {category === "Others" && (
+                  <div className="col-span-2 mt-1">
+                    <AuthInput
+                      label="What do you sell?"
+                      placeholder="e.g. Stationery, Toys, Plants"
+                      value={otherCategory}
+                      maxLength={40}
+                      onChange={(e) => (setOtherCategory(e.target.value), setQError(""))}
+                      autoFocus
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -361,9 +387,10 @@ function RegisterStoreContent() {
                 icon={Phone}
                 type="tel"
                 autoComplete="tel"
-                placeholder="+91 98765 43210"
+                inputMode="tel"
+                placeholder="10-digit number, e.g. 9876543210"
                 value={contactPhone}
-                onChange={(e) => (setContactPhone(e.target.value), setQError(""))}
+                onChange={(e) => (setContactPhone(phoneInput(e.target.value)), setQError(""))}
               />
             )}
 
@@ -393,7 +420,7 @@ function RegisterStoreContent() {
                 icon={Lock}
                 type={showPassword ? "text" : "password"}
                 autoComplete="new-password"
-                placeholder="At least 6 characters"
+                placeholder="At least 8 characters, with a number"
                 value={accountPassword}
                 onChange={(e) => (setAccountPassword(e.target.value), setQError(""))}
                 trailing={<PasswordToggle shown={showPassword} onToggle={() => setShowPassword(!showPassword)} />}
@@ -467,6 +494,24 @@ function RegisterStoreContent() {
               </>
             )}
 
+            {isLast && (
+              <label className="mt-5 flex items-start gap-3 text-sm text-neutral-700">
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={(e) => (setAgreed(e.target.checked), setQError(""))}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-black"
+                  style={{ minHeight: 0, minWidth: 0 }}
+                />
+                <span>
+                  I agree to the{" "}
+                  <Link href="/legal/terms" target="_blank" className="font-semibold underline underline-offset-2">Seller Terms</Link>,{" "}
+                  <Link href="/legal/privacy" target="_blank" className="font-semibold underline underline-offset-2">Privacy Policy</Link> and{" "}
+                  <Link href="/legal/acceptable-use" target="_blank" className="font-semibold underline underline-offset-2">what can&apos;t be sold</Link>.
+                  I&apos;ll add my shop&apos;s own return and privacy policies.
+                </span>
+              </label>
+            )}
             {qError && <p className="mt-3 text-sm font-medium text-red-600">{qError}</p>}
           </div>
 

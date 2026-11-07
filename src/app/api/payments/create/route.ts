@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { isEmail, isIndianMobile } from "@/lib/payments/cashfree-core";
+import { INDIA_STATES } from "@/lib/india-states";
+import { checkEmail, checkPersonName, checkPhone, checkPincode, checkPlace, checkStreet, cleanPhone } from "@/lib/validation";
 import { ApiError, handle } from "@/lib/server/api-error";
 import { createPayment } from "@/lib/server/payment-service";
 
@@ -27,9 +29,17 @@ export async function POST(req: Request) {
     const parsed = Body.safeParse(await req.json().catch(() => null));
     if (!parsed.success) throw new ApiError(400, "Please check your delivery details and try again.");
     const b = parsed.data;
-    const phone = b.customer.phone.replace(/[^0-9]/g, "").slice(-10);
-    if (!isIndianMobile(phone)) throw new ApiError(400, "Enter a 10-digit mobile number.");
-    const email = b.customer.email || undefined;
+    const phone = cleanPhone(b.customer.phone);
+    const wrong =
+      checkPersonName(b.customer.name, "full name") ||
+      checkPhone(phone) ||
+      checkEmail(b.customer.email || "", { required: false }) ||
+      checkStreet(b.address.street) ||
+      checkPlace(b.address.city, "city") ||
+      checkPincode(b.address.pincode) ||
+      (INDIA_STATES.includes(b.address.state) ? "" : "Choose your state.");
+    if (wrong || !isIndianMobile(phone)) throw new ApiError(400, wrong || "Enter a 10-digit mobile number.");
+    const email = b.customer.email?.trim().toLowerCase() || undefined;
     if (email && !isEmail(email)) throw new ApiError(400, "Check your email address.");
     const result = await createPayment(
       {

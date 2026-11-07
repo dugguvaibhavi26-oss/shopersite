@@ -55,7 +55,7 @@ interface SiteContextValue {
   showToast: (text: string, bag?: boolean) => void;
 }
 
-const SiteContext = React.createContext<SiteContextValue | null>(null);
+export const SiteContext = React.createContext<SiteContextValue | null>(null);
 
 export function useSite(): SiteContextValue {
   const ctx = React.useContext(SiteContext);

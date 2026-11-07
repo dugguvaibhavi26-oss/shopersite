@@ -104,6 +104,8 @@ await check("can't create a shop owned by someone else", "DENY", () => setDoc(do
 await check("can't create a shop with paid themes", "DENY", () => setDoc(doc(owner(), "stores/newshop"), { ...fresh, ownedThemes: ["luxe"] }));
 await check("can't take over an existing shop by 'creating' it", "DENY", () => setDoc(doc(stranger(), "stores/lume"), { ...store, ownerId: "attacker" }));
 await check("visitor can't create a shop", "DENY", () => setDoc(doc(visitor(), "stores/newshop"), fresh));
+await check("can't take a reserved web address", "DENY", () => setDoc(doc(owner(), "stores/admin"), { ...fresh, subdomain: "admin" }));
+await check("can't take a 2-letter web address", "DENY", () => setDoc(doc(owner(), "stores/ab"), { ...fresh, subdomain: "ab" }));
 
 // private data
 await check("owner can update an order's status", "ALLOW", () =>
@@ -164,7 +166,10 @@ async function checkSt(name, expect, fn) {
   }
 }
 await checkSt("visitor can't upload", "DENY", () => uploadBytes(ref(st(env.unauthenticatedContext()), "store_assets/lume/b.png"), png, { contentType: "image/png" }));
-await checkSt("seller uploads a theme image", "ALLOW", () => uploadBytes(ref(st(ownerCtx()), `store_assets/lume/new-${Date.now()}.png`), png, { contentType: "image/png" }));
+await checkSt("seller uploads a theme image (own folder)", "ALLOW", () => uploadBytes(ref(st(ownerCtx()), `store_assets/lume/u_owner1/theme-${Date.now()}.png`), png, { contentType: "image/png" }));
+await checkSt("can't upload outside their own folder", "DENY", () => uploadBytes(ref(st(ownerCtx()), `store_assets/lume/new-${Date.now()}.png`), png, { contentType: "image/png" }));
+await checkSt("can't upload into someone else's folder", "DENY", () => uploadBytes(ref(st(strangerCtx()), `store_assets/lume/u_owner1/x-${Date.now()}.png`), png, { contentType: "image/png" }));
+await checkSt("can't upload an SVG (scripts)", "DENY", () => uploadBytes(ref(st(ownerCtx()), `store_assets/lume/u_owner1/x-${Date.now()}.svg`), png, { contentType: "image/svg+xml" }));
 await checkSt("can't upload a web page / script", "DENY", () => uploadBytes(ref(st(ownerCtx()), "store_assets/lume/x.html"), png, { contentType: "text/html" }));
 await checkSt("can't upload a huge file", "DENY", () =>
   uploadBytes(ref(st(ownerCtx()), "store_assets/lume/big.png"), new Uint8Array(9 * 1024 * 1024), { contentType: "image/png" })

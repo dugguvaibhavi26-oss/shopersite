@@ -2,6 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { applyNewOrder, quoteOrder, QuoteError, type BagItemInput } from "../payments/cashfree-core";
 import { canUseReviews } from "../plans";
+import { orderPolicyOf } from "../policies";
 import { isValidUpiId, type OrderData, type ReviewData, type StoreData } from "../store-service";
 import { ApiError } from "./api-error";
 import { adminDb } from "./firebase-admin";
@@ -34,6 +35,8 @@ export interface PlaceOrderInput {
   address: { street: string; city: string; state: string; pincode: string };
   notes?: string;
   utr?: string;
+  /** the signed-in buyer's account id (from a verified token) */
+  customerUid?: string;
 }
 
 /** Places a UPI (buyer says they paid, shop checks) or cash-on-delivery order. */
@@ -84,6 +87,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<OrderData> {
       storeId: store.id,
       token: `tok_sh_${randomBytes(12).toString("hex")}`,
       customer: { name: input.customer.name, phone: input.customer.phone, ...(input.customer.email ? { email: input.customer.email } : {}) },
+      ...(input.customerUid ? { customerUid: input.customerUid } : {}),
       address: input.address,
       items: quote.items,
       subtotal: quote.subtotal,
@@ -109,6 +113,75 @@ export async function placeOrder(input: PlaceOrderInput): Promise<OrderData> {
     if (claimRef) tx.set(claimRef, { kind: "order", store: store.subdomain, orderId: id, createdAt: now });
     return applied.order;
   });
+}
+
+const PAID = new Set(["paid", "verified"]);
+
+/** Puts an order's items back in stock (after a cancellation). */
+export function restock(products: StoreData["products"], order: OrderData): StoreData["products"] {
+  return (products || []).map((p) => {
+    const qty = order.items.filter((i) => i.productId === p.id).reduce((n, i) => n + i.quantity, 0);
+    return qty ? { ...p, stock: (p.stock ?? 0) + qty } : p;
+  });
+}
+
+/**
+ * A buyer cancels (before shipping) or asks for a return (within the shop's window after delivery),
+ * using the order's token. Only allowed when the shop has switched it on in Dashboard → Policies.
+ */
+export async function requestOrderChange(input: { subdomain: string; token: string; kind: "cancel" | "return"; reason: string }): Promise<OrderData> {
+  const db = adminDb();
+  return db.runTransaction(async (tx) => {
+    const store = await readStoreTx(tx, input.subdomain);
+    if (!store) throw new ApiError(404, "Store not found.");
+    const orders = [...(store.orders || [])];
+    const i = orders.findIndex((o) => o.token === input.token);
+    if (i < 0) throw new ApiError(404, "Order not found.");
+    const order = orders[i];
+    const policy = orderPolicyOf(store);
+    const now = new Date().toISOString();
+    let next: OrderData;
+    let products = store.products;
+
+    if (input.kind === "cancel") {
+      if (!policy.cancelEnabled) throw new ApiError(409, "This shop doesn't take cancellations online. Message the shop to cancel.");
+      if (order.fulfilmentStatus === "cancelled") throw new ApiError(409, "This order is already cancelled.");
+      if (!["placed", "confirmed", "packed"].includes(order.fulfilmentStatus)) throw new ApiError(409, "This order has been shipped, so it can't be cancelled. You can ask for a return after it arrives.");
+      const owed = PAID.has(order.paymentStatus) || (order.paymentStatus === "awaiting_verification" && !!order.paymentUtr);
+      next = {
+        ...order,
+        fulfilmentStatus: "cancelled",
+        cancelledAt: now,
+        cancelledBy: "buyer",
+        cancelReason: input.reason,
+        ...(owed ? { refund: { status: "due" as const, amount: order.total } } : {}),
+        updatedAt: now,
+      };
+      products = restock(store.products, order);
+    } else {
+      if (!policy.returnEnabled) throw new ApiError(409, "This shop doesn't take returns online. Message the shop about a return.");
+      if (order.fulfilmentStatus !== "delivered") throw new ApiError(409, "You can ask for a return once the order is delivered.");
+      if (order.returnRequest && order.returnRequest.status !== "declined") throw new ApiError(409, "You've already asked for a return on this order.");
+      const delivered = new Date(order.deliveredAt || order.updatedAt).getTime();
+      if (Date.now() - delivered > policy.returnDays * 86400000) throw new ApiError(409, `Returns are open for ${policy.returnDays} days after delivery, and that time has passed.`);
+      next = { ...order, returnRequest: { status: "requested", reason: input.reason, requestedAt: now }, updatedAt: now };
+    }
+    orders[i] = next;
+    writeStoreTx(tx, store.subdomain, input.kind === "cancel" ? { orders, products } : { orders });
+    tx.set(db.collection("orders").doc(order.id), clean({ ...next, storeSubdomain: store.subdomain }), { merge: true });
+    return next;
+  });
+}
+
+/** A signed-in buyer's orders at one shop: placed while signed in, or with their verified email. */
+export async function ordersForBuyer(subdomain: string, user: { uid: string; email?: string; emailVerified: boolean }): Promise<OrderData[]> {
+  const store = await readStore(subdomain);
+  if (!store) return [];
+  const email = user.emailVerified ? (user.email || "").toLowerCase().trim() : "";
+  return (store.orders || [])
+    .filter((o) => o.customerUid === user.uid || (!!email && (o.customer?.email || "").toLowerCase().trim() === email))
+    .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+    .slice(0, 100);
 }
 
 /** Orders for the buyer's own order tokens (the unguessable keys only the buyer has). */

@@ -55,7 +55,12 @@ service cloud.firestore {
 
       // a new store: owned by the creator, on the Free plan, nothing paid or private in it
       allow create: if signedIn()
-        && sub.matches('^[a-z0-9-]{1,63}$')
+        && sub.matches('^[a-z0-9][a-z0-9-]{2,62}$')
+        && !(sub in ['www', 'app', 'api', 'admin', 'administrator', 'dashboard', 'login', 'signup', 'register', 'account',
+                     'accounts', 'auth', 'billing', 'pay', 'payment', 'payments', 'checkout', 'support', 'help', 'mail', 'email',
+                     'smtp', 'ftp', 'static', 'cdn', 'assets', 'images', 'img', 'blog', 'docs', 'status', 'legal', 'terms',
+                     'privacy', 'security', 'shopersite', 'official', 'team', 'staff', 'root', 'system', 'test', 'demo', 'dev',
+                     'staging', 'null', 'undefined'])
         && request.resource.data.subdomain == sub
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.planId == 'free'

@@ -13,6 +13,7 @@ import { SiteProduct } from "./product";
 import { SiteCart, SiteCheckout } from "./checkout";
 import { SiteAccount, SiteInfoPage, SiteOrder } from "./account";
 import { Container, EmptyState } from "./ui";
+import { FieldProbe } from "./field-probe";
 
 export type SiteView =
   | { name: "home" }
@@ -147,6 +148,7 @@ function Frame({ view, selectedId, previewBar }: { view: SiteView; selectedId?: 
       </main>
       <SiteFooter />
       <SiteToast />
+      {editing && <FieldProbe overHero={overHero} />}
     </div>
   );
 }

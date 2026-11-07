@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm, appPrompt } from "@/components/ui/app-dialog";
 
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Link2, Loader2, Trash2, Upload, X } from "lucide-react";
@@ -198,7 +199,7 @@ function BannerRow({ banner }: { banner: PlatformBanner }) {
           type="button"
           aria-label="Delete banner"
           onClick={() => {
-            if (confirm("Delete this banner from every seller dashboard?")) storeService.deletePlatformBanner(banner.id);
+            appConfirm("It disappears from every seller dashboard.", { title: "Delete this banner?", danger: true }).then((ok) => ok && storeService.deletePlatformBanner(banner.id));
           }}
           className="h-9 w-9 rounded-lg border border-neutral-200 text-neutral-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center"
         >

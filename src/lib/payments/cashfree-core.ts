@@ -109,6 +109,8 @@ export function quoteOrder(
     if (!Number.isInteger(qty) || qty < 1 || qty > 99) throw new QuoteError("Check the quantities in your bag.");
     const p = (store.products || []).find((x) => x.id === line.productId && x.status === "published");
     if (!p) throw new QuoteError("Some items in your bag are no longer available. Go back to your bag to update it.");
+    // a product saved with a broken price (0, negative, not whole paise) is never sold
+    if (!Number.isInteger(p.price) || p.price <= 0) throw new QuoteError("Some items in your bag are no longer available. Go back to your bag to update it.");
     wanted.set(p.id, (wanted.get(p.id) || 0) + qty);
     const variantName = typeof line.variantName === "string" ? line.variantName.slice(0, 120) : "";
     return {

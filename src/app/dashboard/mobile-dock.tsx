@@ -128,7 +128,7 @@ export function MobileDock({
           <span className="text-[10px]">Home</span>
         </button>
 
-        <button onClick={() => onSelect("orders")} className={tab(active === "orders")} aria-label={ordersDot ? "Orders, new" : undefined}>
+        <button data-tour="dock-orders" onClick={() => onSelect("orders")} className={tab(active === "orders")} aria-label={ordersDot ? "Orders, new" : undefined}>
           <span className="relative">
             <ShoppingBag className="w-4 h-4" />
             {ordersDot && <span className={dot} />}
@@ -142,6 +142,7 @@ export function MobileDock({
         </button>
 
         <button
+          data-tour="dock-menu"
           onClick={onToggleMenu}
           aria-expanded={menuOpen}
           className={`relative flex flex-col items-center gap-1 py-1 px-3 rounded-full transition-all ${

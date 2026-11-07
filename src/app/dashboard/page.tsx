@@ -1,8 +1,18 @@
 "use client";
+import { appAlert, appConfirm, appPrompt } from "@/components/ui/app-dialog";
 
 import { RAIL_WIDTH, SidebarRail } from "./sidebar-rail";
 import { MobileDock } from "./mobile-dock";
 import { EmailPanel, sendNewProductAlert } from "@/components/dashboard/email-panel";
+import { SITE_THEME_STYLE, toSiteTheme } from "@/lib/site-content";
+import { cropImage } from "@/components/ui/image-cropper";
+import { Tour, type TourStep } from "@/components/ui/tour";
+import { OrderActions } from "@/components/dashboard/order-actions";
+import { PoliciesPanel } from "@/components/dashboard/policies-panel";
+import { missingPolicies } from "@/lib/policies";
+import { BulkUploadPanel } from "@/components/dashboard/bulk-upload";
+import { ProductCategoryField, moneyInput, uniqueSlug } from "@/components/dashboard/product-fields";
+import { checkPrices, checkStock } from "@/lib/validation";
 import { planMove, rankOf, REMIND_DAYS, subscriptionState } from "@/lib/subscription";
 import React, { useState, useEffect, useMemo, Suspense } from "react";
 import Link from "next/link";
@@ -61,6 +71,9 @@ import {
   ArrowRight,
   ShieldCheck,
   AlertTriangle,
+  X,
+  Scale,
+  HelpCircle,
   AlertCircle,
   Copy,
   ChevronRight,
@@ -136,14 +149,16 @@ function DashboardPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlStoreParam = searchParams.get("store");
-  const urlTabParam = searchParams.get("tab");
+  const rawTabParam = searchParams.get("tab");
+  // the Banners page moved into the theme editor (Banner slider section)
+  const urlTabParam = rawTabParam === "banners" ? "overview" : rawTabParam;
   const { user, loading: authLoading, signOut } = useAuth();
 
   const [activeSubdomain, setActiveSubdomain] = useState<string>(urlStoreParam || "");
   const [store, setStore] = useState<StoreData | null>(null);
   const [userStores, setUserStores] = useState<StoreData[]>([]);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "products" | "categories" | "orders" | "discounts" | "customers" | "reviews" | "banners" | "themes" | "billing" | "settings" | "plugins" | "notifications" | "profile"
+    "overview" | "products" | "categories" | "orders" | "discounts" | "customers" | "reviews" | "banners" | "policies" | "themes" | "billing" | "settings" | "plugins" | "notifications" | "profile"
   >((urlTabParam as any) || "overview");
 
   // Remember the pages visited so each page's back button can return to the previous one
@@ -316,6 +331,13 @@ function DashboardPageContent() {
   const [pCategory, setPCategory] = useState("");
   const [pPrice, setPPrice] = useState("");
   const [pComparePrice, setPComparePrice] = useState("");
+  const [pErrors, setPErrors] = useState<{ title?: string; category?: string; price?: string; mrp?: string; stock?: string; form?: string }>({});
+  // "+ New category" inside the product form: created when the product is saved
+  const [pNewCategory, setPNewCategory] = useState("");
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const dashTour = React.useRef<(() => void) | null>(null);
+  const [bulkNote, setBulkNote] = useState("");
+  const [pAddingCategory, setPAddingCategory] = useState(false);
   const [pStock, setPStock] = useState("10");
   const [pDesc, setPDesc] = useState("");
   const [pImageUrl, setPImageUrl] = useState("");
@@ -327,6 +349,7 @@ function DashboardPageContent() {
   const [cSlug, setCSlug] = useState("");
   const [cDesc, setCDesc] = useState("");
   const [cImageUrl, setCImageUrl] = useState("");
+  const [cBannerUrl, setCBannerUrl] = useState("");
   const [cIsActive, setCIsActive] = useState(true);
   const [cIsParent, setCIsParent] = useState(false);
   const [cParentId, setCParentId] = useState("");
@@ -575,7 +598,7 @@ function DashboardPageContent() {
     e.preventDefault();
     if (!store) return;
     if (!dCode.trim() || !dValue) {
-      alert("Please provide both a coupon code and discount value.");
+      appAlert("Please provide both a coupon code and discount value.");
       return;
     }
 
@@ -594,7 +617,7 @@ function DashboardPageContent() {
     });
 
     if (!res) {
-      alert("Failed to create discount code.");
+      appAlert("Failed to create discount code.");
       return;
     }
 
@@ -612,18 +635,68 @@ function DashboardPageContent() {
     refreshStore();
   };
 
-  const handleDeleteDiscount = (discountId: string, code: string) => {
+  const handleDeleteDiscount = async (discountId: string, code: string) => {
     if (!store) return;
-    if (confirm(`Are you sure you want to delete promo code "${code}"?`)) {
+    if (await appConfirm(`Promo code "${code}" will stop working for buyers.`, { title: "Delete this promo code?", danger: true })) {
       storeService.deleteDiscount(store.subdomain, discountId);
       refreshStore();
     }
   };
 
   // Handle Product Save
+  /** Crop, then upload to storage (never kept inside the store record), then use its link. */
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const uploadPhoto = async (file: File, aspect: number | undefined, use: (url: string) => void) => {
+    if (!store) return;
+    if (file.size > 12 * 1024 * 1024) return appAlert("Choose a photo under 12 MB.", { danger: true });
+    const cropped = await cropImage(file, { aspect });
+    if (!cropped) return;
+    setPhotoUploading(true);
+    try {
+      use(await storeService.uploadStoreImage(store.subdomain, cropped));
+    } catch {
+      appAlert("Couldn't upload this photo. Check your internet and try again.", { danger: true });
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   const handleSaveProduct = (e: React.FormEvent) => {
     e.preventDefault();
     if (!store) return;
+
+    // check every field first: nothing is saved until all of it is right
+    const errs: typeof pErrors = {};
+    const title = pTitle.trim().replace(/\s+/g, " ");
+    if (title.length < 2) errs.title = "Give your product a name.";
+    else if (title.length > 120) errs.title = "Keep the name under 120 characters.";
+    else if (store.products.some((p) => p.id !== editingProductId && p.title.trim().toLowerCase() === title.toLowerCase()))
+      errs.title = "You already have a product with this name.";
+    const priceCheck = checkPrices(pPrice, pComparePrice);
+    if (priceCheck.price) errs.price = priceCheck.price;
+    if (priceCheck.mrp) errs.mrp = priceCheck.mrp;
+    const stockErr = checkStock(pStock);
+    if (stockErr) errs.stock = stockErr;
+    const typedCategory = pAddingCategory ? pNewCategory.trim().replace(/\s+/g, " ") : pCategory;
+    if (!typedCategory) errs.category = pAddingCategory ? "Name the new category." : "Choose a category.";
+    else if (typedCategory.length > 40) errs.category = "Keep the category name under 40 characters.";
+    setPErrors(errs);
+    if (Object.keys(errs).length) {
+      scrollDashTop({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    // a category typed in here is created first, so the product always sits in a real category
+    let categoryName = typedCategory;
+    if (pAddingCategory) {
+      const existing = (store.categories || []).find((c) => !c.isParent && c.name.toLowerCase() === typedCategory.toLowerCase());
+      if (existing) categoryName = existing.name;
+      else {
+        const made = storeService.addCategory(store.subdomain, { name: typedCategory });
+        if (!made.success || !made.category) return setPErrors({ category: made.error || "Couldn't create the category." });
+        categoryName = made.category.name;
+      }
+    }
 
     const pricePaise = Math.round(parseFloat(pPrice || "0") * 100);
     const comparePricePaise = pComparePrice ? Math.round(parseFloat(pComparePrice) * 100) : undefined;
@@ -631,8 +704,8 @@ function DashboardPageContent() {
 
     if (editingProductId) {
       storeService.updateProduct(store.subdomain, editingProductId, {
-        title: pTitle,
-        category: pCategory,
+        title,
+        category: categoryName,
         price: pricePaise,
         compareAtPrice: comparePricePaise,
         stock: stockNum,
@@ -641,13 +714,13 @@ function DashboardPageContent() {
       });
     } else {
       const res = storeService.addProduct(store.subdomain, {
-        title: pTitle,
-        slug: pTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        title,
+        slug: uniqueSlug(title, store.products.map((p) => p.slug)),
         description: pDesc,
         price: pricePaise,
         compareAtPrice: comparePricePaise,
         stock: stockNum,
-        category: pCategory || "General",
+        category: categoryName,
         images: [
           pImageUrl ||
             "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
@@ -658,8 +731,7 @@ function DashboardPageContent() {
       });
 
       if (!res.success) {
-        alert(res.error);
-        setActiveTab("billing");
+        setPErrors({ form: res.error });
         return;
       }
       // new product alert to subscribers (if switched on); wait a moment so the product is saved first
@@ -676,6 +748,9 @@ function DashboardPageContent() {
   };
 
   const resetProductForm = () => {
+    setPErrors({});
+    setPNewCategory("");
+    setPAddingCategory(false);
     setEditingProductId(null);
     setPTitle("");
     setPCategory("");
@@ -704,6 +779,7 @@ function DashboardPageContent() {
     setCSlug("");
     setCDesc("");
     setCImageUrl("");
+    setCBannerUrl("");
     setCIsActive(true);
     setCIsParent(false);
     setCParentId("");
@@ -738,6 +814,7 @@ function DashboardPageContent() {
     setCSlug(cat.slug);
     setCDesc(cat.description || "");
     setCImageUrl(cat.imageUrl || "");
+    setCBannerUrl(cat.bannerUrl || "");
     setCIsActive(cat.isActive ?? true);
     setCIsParent(cat.isParent ?? false);
     setCParentId(cat.parentId || "");
@@ -774,6 +851,7 @@ function DashboardPageContent() {
         slug: finalSlug,
         description: cDesc.trim(),
         imageUrl: cImageUrl.trim(),
+        bannerUrl: cBannerUrl.trim() || undefined,
         isActive: cIsActive,
         isParent: cIsParent,
         parentId: cIsParent ? undefined : (cParentId || undefined),
@@ -786,6 +864,7 @@ function DashboardPageContent() {
         slug: finalSlug,
         description: cDesc.trim(),
         imageUrl: cImageUrl.trim(),
+        bannerUrl: cBannerUrl.trim() || undefined,
         isActive: cIsActive,
         isParent: cIsParent,
         parentId: cIsParent ? undefined : (cParentId || undefined),
@@ -813,9 +892,9 @@ function DashboardPageContent() {
     resetCategoryForm();
   };
 
-  const handleDeleteCategory = (catId: string, catName: string) => {
+  const handleDeleteCategory = async (catId: string, catName: string) => {
     if (!store) return;
-    if (confirm(`Are you sure you want to delete category "${catName}"?`)) {
+    if (await appConfirm(`"${catName}" will be removed from your store. Its products stay, without this category.`, { title: "Delete this category?", danger: true })) {
       storeService.deleteCategory(store.subdomain, catId);
       refreshStore();
     }
@@ -862,7 +941,7 @@ function DashboardPageContent() {
     if (!store) return;
     const res = storeService.setStoreTheme(store.subdomain, themeSlug);
     if (!res.success) {
-      alert(res.error);
+      appAlert(res.error);
       setActiveTab("billing");
       return;
     }
@@ -877,8 +956,11 @@ function DashboardPageContent() {
     status: OrderData["fulfilmentStatus"]
   ) => {
     if (!store) return;
+    const current = store.orders.find((x) => x.id === orderId);
     storeService.updateOrderStatus(store.subdomain, orderId, {
       fulfilmentStatus: status,
+      // the return window starts when the order is delivered
+      ...(status === "delivered" && !current?.deliveredAt ? { deliveredAt: new Date().toISOString() } : {}),
       courierName: courierNameInput || undefined,
       trackingNumber: trackingNumberInput || undefined,
       trackingUrl: courierNameInput ? "https://www.delhivery.com/track" : undefined,
@@ -912,7 +994,7 @@ function DashboardPageContent() {
       codEnabled: codEnabledInput,
       codFee: Math.round(parseFloat(codFeeInput || "0") * 100),
     });
-    alert("Settings saved successfully.");
+    appAlert("Your settings are saved.", { title: "Saved", tone: "success" });
     refreshStore();
   };
 
@@ -942,7 +1024,7 @@ function DashboardPageContent() {
     e.preventDefault();
     if (!store) return;
     if (!dropSubject.trim() || !dropMessage.trim()) {
-      alert("Please enter both an email subject and a drop announcement message.");
+      appAlert("Please enter both an email subject and a drop announcement message.");
       return;
     }
 
@@ -999,22 +1081,22 @@ function DashboardPageContent() {
   const handleSaveBanner = (e: React.FormEvent) => {
     e.preventDefault();
     if (!store || !bImageUrl.trim()) {
-      alert("Please upload or provide a banner image URL.");
+      appAlert("Please upload or provide a banner image URL.");
       return;
     }
 
     if (!bTargetType) {
-      alert("Please select whether this banner redirects to a Category or a Product.");
+      appAlert("Please select whether this banner redirects to a Category or a Product.");
       return;
     }
 
     if (bTargetType === "category" && !bSelectedCategory) {
-      alert("Please select which category this banner redirects to.");
+      appAlert("Please select which category this banner redirects to.");
       return;
     }
 
     if (bTargetType === "product" && !bSelectedProduct) {
-      alert("Please select which product this banner redirects to.");
+      appAlert("Please select which product this banner redirects to.");
       return;
     }
 
@@ -1037,7 +1119,7 @@ function DashboardPageContent() {
 
     const bannerQuota = canAddBanner(store.banners.length, store.planId);
     if (!bannerQuota.allowed) {
-      alert(`Your plan allows ${bannerQuota.limit} banner${bannerQuota.limit === 1 ? "" : "s"}. Upgrade to add more.`);
+      appAlert(`Your plan allows ${bannerQuota.limit} banner${bannerQuota.limit === 1 ? "" : "s"}. Upgrade to add more.`);
       return;
     }
 
@@ -1104,6 +1186,7 @@ function DashboardPageContent() {
   const subNow = subscriptionState(store);
   // the Subscription page gets a red dot while the plan is ending or has ended
   const planNeedsAttention = (subNow.kind === "active" && subNow.endingSoon) || (subNow.kind === "free" && !!subNow.endedPlanId);
+  const policiesMissing = missingPolicies(store);
   type DashTab = typeof activeTab;
   const navGroups: {
     label: string;
@@ -1124,7 +1207,6 @@ function DashboardPageContent() {
       label: "Marketing",
       items: [
         { id: "discounts", label: "Discounts", icon: Tag, badge: canUseCoupons(store.planId) ? store.discounts?.length || 0 : "lock" },
-        { id: "banners", label: "Banners", icon: ImageIcon },
       ],
     },
     {
@@ -1132,6 +1214,7 @@ function DashboardPageContent() {
       items: [
         { id: "themes", label: "Themes", icon: Palette },
         { id: "billing", label: "Subscription", icon: CreditCard, badge: planNeedsAttention ? "dot" : undefined },
+        { id: "policies", label: "Policies", icon: Scale, badge: policiesMissing.length ? "dot" : undefined },
         { id: "settings", label: "Settings", icon: Settings },
         { id: "plugins", label: "Plugins", icon: Plug, badge: canUseEmail(store.planId) ? "active" : "lock" },
       ],
@@ -1147,6 +1230,7 @@ function DashboardPageContent() {
     customers: { title: "Customers", text: "View your customers and order history." },
     reviews: { title: "Reviews", text: "Manage customer ratings and reviews." },
     banners: { title: "Banners", text: "Upload storefront hero promotional banners." },
+    policies: { title: "Policies", text: "Your terms, refund, shipping and privacy pages, and what buyers can cancel or return." },
     themes: { title: "Themes", text: "Customize your storefront theme and style." },
     billing: { title: "Subscription", text: "Manage your subscription plan and limits." },
     settings: { title: "Settings", text: "Configure payments, payouts, and store details." },
@@ -1526,7 +1610,16 @@ function DashboardPageContent() {
                     {greetingTime}, {ownerName.split(" ")[0]}
                   </h1>
                 </div>
+                <span className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => dashTour.current?.()}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:border-neutral-400 transition-colors"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" /> Show me around
+                </button>
                 <a
+                  data-tour="store-link"
                   href={liveStoreUrl}
                   target="_blank"
                   rel="noreferrer"
@@ -1535,9 +1628,12 @@ function DashboardPageContent() {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   {storeWebDomain}
                 </a>
+                </span>
               </div>
+              <Tour id="dashboard-overview" startRef={dashTour} steps={DASHBOARD_TOUR} />
 
               <section
+                data-tour="stats"
                 style={{ animationDelay: "100ms" }}
                 className="hero-rise grid grid-cols-3 lg:grid-cols-[1.5fr_1fr_1fr_1fr] gap-3"
               >
@@ -2061,18 +2157,35 @@ function DashboardPageContent() {
                     </span>
                   </button>
 
-                  {/* Banners — small */}
-                  <button type="button" onClick={() => setActiveTab("banners")} className={`group relative overflow-hidden text-left rounded-2xl bg-white border border-neutral-200 transition-all duration-300 hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-[0_20px_44px_-24px_rgba(0,0,0,0.3)] col-start-1 row-start-4 p-3 sm:p-4 flex flex-col justify-between`}>
-                    <span className="w-9 h-9 rounded-[10px] bg-pink-50 text-pink-600 flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
-                      <ImageIcon className="w-4 h-4" />
+                  {/* Policies — small */}
+                  <button type="button" data-tour="policies" onClick={() => setActiveTab("policies")} className={`group relative overflow-hidden text-left rounded-2xl bg-white border border-neutral-200 transition-all duration-300 hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-[0_20px_44px_-24px_rgba(0,0,0,0.3)] col-start-1 row-start-4 p-3 sm:p-4 flex flex-col justify-between`}>
+                    <span className={`w-9 h-9 rounded-[10px] flex items-center justify-center transition-transform duration-300 group-hover:scale-110 ${policiesMissing.length ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"}`}>
+                      <Scale className="w-4 h-4" />
                     </span>
                     <span>
-                      <span className="block text-sm font-semibold">Banners</span>
-                      <span className="hidden sm:block text-[11px] text-neutral-500 truncate">{liveBanners} live</span>
+                      <span className="block text-sm font-semibold">Policies</span>
+                      <span className="hidden sm:block text-[11px] text-neutral-500 truncate">{policiesMissing.length ? `${policiesMissing.length} to add` : "All live"}</span>
                     </span>
                   </button>
                 </div>
               </section>
+
+              {policiesMissing.length > 0 && (
+                <section className="hero-rise flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:p-5">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                    <AlertTriangle className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-neutral-900">Add your policy pages to protect your store</span>
+                    <span className="mt-0.5 block text-xs leading-relaxed text-neutral-600">
+                      Online shops in India must show their terms, refund, shipping and privacy policies. {policiesMissing.length} of 4 still to add; templates are ready to edit.
+                    </span>
+                  </span>
+                  <button type="button" onClick={() => setActiveTab("policies")} className="h-10 shrink-0 rounded-xl bg-neutral-950 px-4 text-sm font-semibold text-white hover:bg-black">
+                    Add policies
+                  </button>
+                </section>
+              )}
 
               {/* Setup checklist */}
               {(() => {
@@ -2454,6 +2567,19 @@ function DashboardPageContent() {
                 </div>
               </div>
 
+              {(pErrors.form || Object.keys(pErrors).length > 0) && (
+                <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    {pErrors.form || "Some details need fixing before this product can be saved."}
+                    {pErrors.form && /limit/i.test(pErrors.form) && (
+                      <button type="button" onClick={() => setActiveTab("billing")} className="ml-2 font-semibold underline underline-offset-2">
+                        See plans
+                      </button>
+                    )}
+                  </span>
+                </div>
+              )}
               {/* Full Page Product Form Grid */}
               <form onSubmit={handleSaveProduct} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Left 7 Columns: Product Information & Pricing */}
@@ -2469,49 +2595,24 @@ function DashboardPageContent() {
                       <Input
                         placeholder="e.g. Vintage Washed Oversized Heavyweight Tee"
                         value={pTitle}
-                        onChange={(e) => setPTitle(e.target.value)}
-                        className="text-xs rounded-lg"
+                        maxLength={120}
+                        onChange={(e) => (setPTitle(e.target.value), setPErrors((x) => ({ ...x, title: undefined })))}
+                        className={`text-xs rounded-lg ${pErrors.title ? "!border-red-500" : ""}`}
                         required
                       />
+                      {pErrors.title && <p className="mt-1 text-[11px] font-medium text-red-600">{pErrors.title}</p>}
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="font-bold block text-xs text-neutral-800">Category *</label>
-                      <Input
-                        placeholder="e.g. T-Shirts, Hoodies, Accessories"
-                        value={pCategory}
-                        onChange={(e) => setPCategory(e.target.value)}
-                        list="dashboard-categories-datalist-fullpage"
-                        className="text-xs rounded-lg"
-                        required
-                      />
-                      <datalist id="dashboard-categories-datalist-fullpage">
-                        {(store.categories || []).map((cat) => (
-                          <option key={cat.id} value={cat.name} />
-                        ))}
-                      </datalist>
-
-                      {/* Quick Select Category Chips */}
-                      {(store.categories || []).length > 0 && (
-                        <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                          <span className="text-[10px] text-neutral-400 font-medium">Quick select:</span>
-                          {(store.categories || []).map((cat) => (
-                            <button
-                              key={cat.id}
-                              type="button"
-                              onClick={() => setPCategory(cat.name)}
-                              className={`text-[10px] px-2 py-0.5 rounded border transition-colors cursor-pointer ${
-                                pCategory.toLowerCase() === cat.name.toLowerCase()
-                                  ? "bg-black text-white border-black font-bold"
-                                  : "border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700"
-                              }`}
-                            >
-                              {cat.name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <ProductCategoryField
+                      categories={(store.categories || []).filter((c) => !c.isParent)}
+                      value={pCategory}
+                      onChange={(v) => (setPCategory(v), setPErrors((x) => ({ ...x, category: undefined })))}
+                      adding={pAddingCategory || !(store.categories || []).some((c) => !c.isParent)}
+                      onAdding={(on) => (setPAddingCategory(on), setPErrors((x) => ({ ...x, category: undefined })))}
+                      newName={pNewCategory}
+                      onNewName={(v) => (setPNewCategory(v), setPErrors((x) => ({ ...x, category: undefined })))}
+                      error={pErrors.category}
+                    />
 
                     <div>
                       <label className="font-bold block mb-1 text-xs text-neutral-800">Description</label>
@@ -2535,14 +2636,19 @@ function DashboardPageContent() {
                       <div>
                         <label className="font-bold block mb-1 text-xs text-neutral-800">Selling Price (₹) *</label>
                         <Input
-                          type="number"
+                          type="text"
+                          inputMode="decimal"
                           placeholder="699"
                           value={pPrice}
-                          onChange={(e) => setPPrice(e.target.value)}
-                          className="text-xs rounded-lg"
+                          onChange={(e) => (setPPrice(moneyInput(e.target.value)), setPErrors((x) => ({ ...x, price: undefined, mrp: undefined })))}
+                          className={`text-xs rounded-lg ${pErrors.price ? "!border-red-500" : ""}`}
                           required
                         />
-                        <p className="text-[10px] text-neutral-400 mt-1">Price charged to customer</p>
+                        {pErrors.price ? (
+                          <p className="mt-1 text-[11px] font-medium text-red-600">{pErrors.price}</p>
+                        ) : (
+                          <p className="text-[10px] text-neutral-400 mt-1">Price charged to customer</p>
+                        )}
                       </div>
 
                       <div>
@@ -2555,13 +2661,18 @@ function DashboardPageContent() {
                           )}
                         </div>
                         <Input
-                          type="number"
+                          type="text"
+                          inputMode="decimal"
                           placeholder="999"
                           value={pComparePrice}
-                          onChange={(e) => setPComparePrice(e.target.value)}
-                          className="text-xs rounded-lg"
+                          onChange={(e) => (setPComparePrice(moneyInput(e.target.value)), setPErrors((x) => ({ ...x, mrp: undefined })))}
+                          className={`text-xs rounded-lg ${pErrors.mrp ? "!border-red-500" : ""}`}
                         />
-                        <p className="text-[10px] text-neutral-400 mt-1">Crossed-out MRP (optional)</p>
+                        {pErrors.mrp ? (
+                          <p className="mt-1 text-[11px] font-medium text-red-600">{pErrors.mrp}</p>
+                        ) : (
+                          <p className="text-[10px] text-neutral-400 mt-1">Crossed-out MRP, higher than the price (optional)</p>
+                        )}
                       </div>
                     </div>
 
@@ -2569,13 +2680,15 @@ function DashboardPageContent() {
                       <div>
                         <label className="font-bold block mb-1 text-xs text-neutral-800">Stock Quantity *</label>
                         <Input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           placeholder="25"
                           value={pStock}
-                          onChange={(e) => setPStock(e.target.value)}
-                          className="text-xs rounded-lg"
+                          onChange={(e) => (setPStock(e.target.value.replace(/\D/g, "").slice(0, 6)), setPErrors((x) => ({ ...x, stock: undefined })))}
+                          className={`text-xs rounded-lg ${pErrors.stock ? "!border-red-500" : ""}`}
                           required
                         />
+                        {pErrors.stock && <p className="mt-1 text-[11px] font-medium text-red-600">{pErrors.stock}</p>}
                       </div>
                       <div className="flex flex-col justify-end">
                         <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-200 flex items-center justify-between">
@@ -2615,15 +2728,8 @@ function DashboardPageContent() {
                             className="hidden"
                             onChange={(e) => {
                               const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onload = (event) => {
-                                  if (event.target?.result) {
-                                    setPImageUrl(event.target.result as string);
-                                  }
-                                };
-                                reader.readAsDataURL(file);
-                              }
+                              e.target.value = "";
+                              if (file) uploadPhoto(file, 4 / 5, setPImageUrl);
                             }}
                           />
                           <Button type="button" variant="outline" size="md" className="cursor-pointer gap-1.5 text-xs rounded-lg">
@@ -2799,7 +2905,32 @@ function DashboardPageContent() {
                         <Plus className="w-4 h-4" />
                         Add product
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => (productQuota.allowed ? setBulkOpen(true) : setActiveTab("billing"))}
+                        className="h-11 px-5 rounded-xl border border-neutral-300 bg-white text-sm font-semibold inline-flex items-center justify-center gap-2 hover:border-neutral-900 transition-colors"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Bulk upload
+                      </button>
                     </div>
+                    {bulkOpen && (
+                      <BulkUploadPanel
+                        store={store}
+                        onClose={() => setBulkOpen(false)}
+                        onDone={(n) => {
+                          setBulkOpen(false);
+                          refreshStore();
+                          setBulkNote(`${n} product${n === 1 ? "" : "s"} added.`);
+                        }}
+                      />
+                    )}
+                    {bulkNote && (
+                      <p className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800">
+                        <CheckCircle2 className="w-4 h-4" /> {bulkNote}
+                        <button type="button" onClick={() => setBulkNote("")} className="ml-auto text-emerald-700" aria-label="Dismiss"><X className="w-4 h-4" /></button>
+                      </p>
+                    )}
                     <p className="-mt-2 text-xs text-neutral-500">
                       {currentPlan.maxProducts >= 9999
                         ? `${totalProducts} products · unlimited on your plan`
@@ -2886,8 +3017,8 @@ function DashboardPageContent() {
                                   <button
                                     type="button"
                                     aria-label={`Delete ${prod.title}`}
-                                    onClick={() => {
-                                      if (confirm(`Delete "${prod.title}"?`)) {
+                                    onClick={async () => {
+                                      if (await appConfirm(`"${prod.title}" will be removed from your store. This can't be undone.`, { title: "Delete this product?", danger: true })) {
                                         storeService.deleteProduct(store.subdomain, prod.id);
                                         refreshStore();
                                       }
@@ -3105,15 +3236,8 @@ function DashboardPageContent() {
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
-                          if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            if (event.target?.result) {
-                              setCImageUrl(event.target.result as string);
-                              setCError("");
-                            }
-                          };
-                          reader.readAsDataURL(file);
+                          e.target.value = "";
+                          if (file) uploadPhoto(file, 4 / 5, (url) => (setCImageUrl(url), setCError("")));
                         }}
                       />
                     </label>
@@ -3137,6 +3261,47 @@ function DashboardPageContent() {
                   />
                 )}
               </section>
+
+              {/* wide banner: only for themes that put a photo across the top of the category page */}
+              {!cIsParent && (SITE_THEME_STYLE[toSiteTheme(store.activeThemeSlug)]?.catalogLayout || "chips") !== "banner" && (
+                <section className="mt-4 rounded-2xl border border-neutral-200 bg-white p-5">
+                  <span className="block text-sm font-medium">
+                    Banner for the category page <span className="font-normal text-neutral-400">(optional)</span>
+                  </span>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    Your theme shows a wide photo across the top of this category&apos;s page. Without one, the picture above is used and cropped to fit.
+                  </p>
+                  <div className="mt-3 aspect-[3/1] w-full overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 flex items-center justify-center">
+                    {cBannerUrl || cImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={cBannerUrl || cImageUrl} alt="" className={`w-full h-full object-cover ${cBannerUrl ? "" : "opacity-50"}`} />
+                    ) : (
+                      <ImageIcon className="w-5 h-5 text-neutral-300" />
+                    )}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <label className="h-10 px-4 rounded-xl border border-neutral-300 bg-white text-sm font-medium inline-flex items-center gap-2 cursor-pointer hover:border-neutral-900">
+                      <UploadCloud className="w-4 h-4" />
+                      {cBannerUrl ? "Change banner" : "Upload banner"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (file) uploadPhoto(file, 3, setCBannerUrl);
+                        }}
+                      />
+                    </label>
+                    {cBannerUrl && (
+                      <button type="button" onClick={() => setCBannerUrl("")} className="h-10 px-3 rounded-xl text-sm text-neutral-500 hover:text-red-600">
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </section>
+              )}
 
               {/* link + visibility */}
               <section className="mt-4 rounded-2xl border border-neutral-200 bg-white divide-y divide-neutral-100">
@@ -3592,7 +3757,7 @@ function DashboardPageContent() {
                             <button
                               key={s.id}
                               type="button"
-                              onClick={() => handleUpdateOrderStatus(o.id, s.id)}
+                              onClick={() => o.fulfilmentStatus !== "cancelled" && handleUpdateOrderStatus(o.id, s.id)}
                               aria-pressed={o.fulfilmentStatus === s.id}
                               className="group relative flex min-w-0 flex-col items-center gap-1.5 !min-h-0"
                             >
@@ -3657,6 +3822,7 @@ function DashboardPageContent() {
                   </div>
 
                   <div className="min-w-0 space-y-4 lg:col-span-5">
+                    <OrderActions store={store} order={o} onChange={(next) => (setSelectedOrder(next), refreshStore())} />
                     {/* Customer */}
                     <div className={card}>
                       <h3 className="text-sm font-semibold">Customer</h3>
@@ -4445,365 +4611,11 @@ function DashboardPageContent() {
         )}
 
         {/* TAB 6: BANNERS */}
-        {activeTab === "banners" && (
-          isBannerModalOpen ? (
-            <div className="mt-6 space-y-6 animate-enter-scale">
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl bg-white border border-neutral-200 shadow-xs">
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsBannerModalOpen(false)}
-                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-100 text-neutral-700 transition-colors cursor-pointer"
-                    title="Back to Banners"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <div>
-                    <h2 className="text-base font-bold text-neutral-900">
-                      Add Banner
-                    </h2>
-                    <p className="text-xs text-neutral-500 mt-0.5">
-                      Promotional banner displayed at the top of your storefront homepage.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-xs rounded-lg cursor-pointer"
-                    onClick={() => setIsBannerModalOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="bg-[#111111] text-white hover:bg-black rounded-lg text-xs font-semibold px-4 cursor-pointer"
-                    onClick={handleSaveBanner}
-                  >
-                    Save Banner
-                  </Button>
-                </div>
-              </div>
-
-              {/* Form Grid */}
-              <form onSubmit={handleSaveBanner} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-7 space-y-6">
-                  {/* Image input card */}
-                  <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-4 text-xs">
-                    <h3 className="font-bold text-sm text-neutral-900 border-b border-neutral-100 pb-3">
-                      Banner Image *
-                    </h3>
-                    <p className="text-[11px] text-neutral-500">
-                      Recommended size: 1800×600 px (wide landscape).
-                    </p>
-
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Paste banner image URL (or upload from device)..."
-                        value={bImageUrl}
-                        onChange={(e) => setBImageUrl(e.target.value)}
-                        required
-                        className="text-xs rounded-lg"
-                      />
-                      <label className="shrink-0">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = (event) => {
-                                if (event.target?.result) setBImageUrl(event.target.result as string);
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                        />
-                        <Button type="button" variant="outline" size="md" className="cursor-pointer gap-1.5 text-xs rounded-lg">
-                          <UploadCloud className="w-3.5 h-3.5" />
-                          <span>Upload</span>
-                        </Button>
-                      </label>
-                    </div>
-
-                    {/* Quick Presets */}
-                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                      <span className="text-[10px] text-neutral-400 font-medium">Quick presets:</span>
-                      <button
-                        type="button"
-                        onClick={() => setBImageUrl("https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1800&q=80")}
-                        className="text-[10px] px-2 py-0.5 rounded border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700 cursor-pointer"
-                      >
-                        Editorial Lifestyle
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setBImageUrl("https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1800&q=80")}
-                        className="text-[10px] px-2 py-0.5 rounded border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700 cursor-pointer"
-                      >
-                        Streetwear & Hoodies
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setBImageUrl("https://images.unsplash.com/photo-1469334031218-e382a71b716b?auto=format&fit=crop&w=1800&q=80")}
-                        className="text-[10px] px-2 py-0.5 rounded border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700 cursor-pointer"
-                      >
-                        Denim & Trousers
-                      </button>
-                    </div>
-
-                    {/* Live Banner Panoramic Preview */}
-                    {bImageUrl && (
-                      <div className="mt-4 rounded-xl overflow-hidden border border-neutral-200 bg-neutral-100">
-                        <div className="relative aspect-[2.8/1] w-full overflow-hidden">
-                          <img src={bImageUrl} alt="Banner Preview" className="w-full h-full object-cover" />
-                        </div>
-                        <div className="p-3 bg-neutral-50 border-t border-neutral-200 flex items-center justify-between text-xs text-neutral-600">
-                          <span className="font-semibold">Storefront Hero Banner Preview</span>
-                          <span className="text-emerald-700 font-bold">Edge-to-Edge Display</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="lg:col-span-5 space-y-6">
-                  {/* Destination Card */}
-                  <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-4 text-xs">
-                    <h3 className="font-bold text-sm text-neutral-900 border-b border-neutral-100 pb-3">
-                      Destination Link *
-                    </h3>
-                    <p className="text-[11px] text-neutral-500">
-                      Where shoppers go when clicking this banner.
-                    </p>
-
-                    <select
-                      value={bTargetType}
-                      onChange={(e) => {
-                        setBTargetType(e.target.value as any);
-                        setBSearchQuery("");
-                      }}
-                      className="w-full p-2.5 rounded-lg border border-neutral-300 text-xs text-neutral-900 bg-white font-medium focus:outline-none focus:ring-2 focus:ring-black"
-                      required
-                    >
-                      <option value="">-- Choose Destination --</option>
-                      <option value="category">Category Page</option>
-                      <option value="product">Product Page</option>
-                    </select>
-
-                    {bTargetType === "category" && (
-                      <div className="p-3.5 rounded-lg border border-neutral-200 bg-neutral-50/70 space-y-2.5">
-                        <span className="font-bold text-neutral-800 text-xs block">
-                          Select Category: {bSelectedCategory && <Badge variant="success" className="ml-1">{bSelectedCategory}</Badge>}
-                        </span>
-                        <div className="max-h-40 overflow-y-auto space-y-1 border border-neutral-200 rounded-lg bg-white p-1">
-                          {filteredCategories.map((cat) => (
-                            <div
-                              key={cat}
-                              onClick={() => setBSelectedCategory(cat)}
-                              className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer text-xs ${
-                                bSelectedCategory.toLowerCase() === cat.toLowerCase()
-                                  ? "bg-black text-white font-bold"
-                                  : "hover:bg-neutral-100 text-neutral-800"
-                              }`}
-                            >
-                              <span>{cat}</span>
-                              <span className="text-[10px] text-neutral-400">
-                                {store.products.filter((p) => p.category.toLowerCase() === cat.toLowerCase()).length} items
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {bTargetType === "product" && (
-                      <div className="p-3.5 rounded-lg border border-neutral-200 bg-neutral-50/70 space-y-2.5">
-                        <span className="font-bold text-neutral-800 text-xs block">
-                          Select Product: {bSelectedProduct && <Badge variant="success" className="ml-1">{bSelectedProduct.title}</Badge>}
-                        </span>
-                        <div className="max-h-48 overflow-y-auto space-y-1 border border-neutral-200 rounded-lg bg-white p-1">
-                          {filteredProducts.map((p) => {
-                            const isSelected = bSelectedProduct?.id === p.id;
-                            return (
-                              <div
-                                key={p.id}
-                                onClick={() => setBSelectedProduct(p)}
-                                className={`flex items-center justify-between p-2 rounded-md cursor-pointer text-xs ${
-                                  isSelected ? "bg-black text-white" : "hover:bg-neutral-100 text-neutral-800"
-                                }`}
-                              >
-                                <div className="flex items-center gap-2 truncate">
-                                  <img src={p.images[0]} alt={p.title} className="w-7 h-7 rounded object-cover shrink-0" />
-                                  <span className="truncate">{p.title}</span>
-                                </div>
-                                {isSelected && <Check className="w-3.5 h-3.5 text-white shrink-0 ml-1" />}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="pt-2">
-                      <Button
-                        type="submit"
-                        className="w-full bg-[#111111] text-white hover:bg-black rounded-lg text-xs font-bold py-3 cursor-pointer"
-                      >
-                        Save Carousel Banner
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </form>
-            </div>
-          ) : (
-            <div className="mt-6 space-y-4 animate-enter-blur">
-              {(() => {
-                const banners = store.banners;
-                const live = banners.filter((b) => b.isActive).length;
-                const openNewBanner = () => {
-                  setBImageUrl("");
-                  setBTargetType("");
-                  setBSelectedCategory("");
-                  setBSelectedProduct(null);
-                  setBSearchQuery("");
-                  setIsBannerModalOpen(true);
-                };
-                return banners.length === 0 ? (
-                  <button
-                    type="button"
-                    onClick={openNewBanner}
-                    className="group w-full aspect-[2/1] sm:aspect-[3.2/1] rounded-2xl border-2 border-dashed border-neutral-300 bg-white flex flex-col items-center justify-center gap-2 px-6 text-center hover:border-neutral-400 hover:bg-neutral-50 transition-colors"
-                  >
-                    <span className="w-12 h-12 rounded-2xl bg-neutral-100 flex items-center justify-center transition-transform group-hover:scale-105">
-                      <ImageIcon className="w-5 h-5 text-neutral-500" />
-                    </span>
-                    <span className="text-sm font-semibold">Add your first banner</span>
-                    <span className="text-xs text-neutral-500">It slides at the top of your store&apos;s homepage</span>
-                  </button>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm text-neutral-500">
-                        <span className="font-semibold text-neutral-900">{live} live</span> · {banners.length} total
-                      </p>
-                      <button
-                        type="button"
-                        onClick={openNewBanner}
-                        className="h-11 px-5 rounded-xl bg-neutral-950 text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-black"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Add banner
-                      </button>
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      {banners.map((b, idx) => {
-                        const dest =
-                          b.targetType === "category" ? `Category · ${b.targetValue}`
-                          : b.targetType === "product" ? `Product · ${b.targetValue}`
-                          : b.ctaLink || "No link";
-                        return (
-                          <div
-                            key={b.id}
-                            className={`overflow-hidden rounded-2xl border border-neutral-200 bg-white transition-opacity ${b.isActive ? "" : "opacity-75"}`}
-                          >
-                            <div className="relative aspect-[2.4/1] bg-neutral-100">
-                              <img
-                                src={b.imageUrl}
-                                alt={b.title || "Banner"}
-                                className={`w-full h-full object-cover transition-[filter] ${b.isActive ? "" : "grayscale"}`}
-                              />
-                              <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-white/90 backdrop-blur px-2.5 py-1 text-[11px] font-semibold">
-                                <span className={`w-1.5 h-1.5 rounded-full ${b.isActive ? "bg-emerald-500" : "bg-neutral-400"}`} />
-                                {b.isActive ? "Live" : "Paused"}
-                              </span>
-                              <span className="absolute right-3 top-3 rounded-full bg-neutral-950/70 text-white px-2 py-1 text-[11px] font-semibold tabular-nums">
-                                {idx + 1}/{banners.length}
-                              </span>
-                            </div>
-                            <div className="p-4">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="text-sm font-semibold truncate">{b.title || "Storefront banner"}</p>
-                                  <p className="mt-1 flex items-center gap-1.5 text-xs text-neutral-500">
-                                    <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
-                                    <span className="truncate">{dest}</span>
-                                  </p>
-                                </div>
-                                <button
-                    type="button"
-                    role="switch"
-                    aria-checked={b.isActive}
-                    aria-label="Show banner on store"
-                    onClick={() => handleToggleBannerActive(b.id)}
-                    style={{ minHeight: 0, height: 24 }}
-                    className={`relative w-11 shrink-0 rounded-full transition-colors ${b.isActive ? "bg-emerald-500" : "bg-neutral-300"}`}
-                  >
-                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${b.isActive ? "left-[22px]" : "left-0.5"}`} />
-                  </button>
-                              </div>
-                              <div className="mt-4 flex items-center gap-1 border-t border-neutral-100 pt-3">
-                                <button
-                                  type="button"
-                                  disabled={idx === 0}
-                                  onClick={() => handleMoveBanner(idx, "up")}
-                                  style={{ minHeight: 0 }}
-                                  className="w-9 h-9 rounded-lg flex items-center justify-center text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-30 disabled:hover:bg-transparent"
-                                  aria-label="Move banner earlier"
-                                >
-                                  <ChevronUp className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={idx === banners.length - 1}
-                                  onClick={() => handleMoveBanner(idx, "down")}
-                                  style={{ minHeight: 0 }}
-                                  className="w-9 h-9 rounded-lg flex items-center justify-center text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-30 disabled:hover:bg-transparent"
-                                  aria-label="Move banner later"
-                                >
-                                  <ChevronDown className="w-4 h-4" />
-                                </button>
-                                <span className="flex-1" />
-                                {b.ctaLink && (
-                                  <Link
-                                    href={b.ctaLink}
-                                    target="_blank"
-                                    style={{ minHeight: 0 }}
-                                    className="h-9 px-3 rounded-lg inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100"
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                    Test link
-                                  </Link>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteBanner(b.id)}
-                                  style={{ minHeight: 0 }}
-                                  className="w-9 h-9 rounded-lg flex items-center justify-center text-neutral-400 hover:bg-red-50 hover:text-red-600"
-                                  aria-label="Delete banner"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                );
-              })()}
+        {activeTab === "policies" && (
+          <div className="mt-6 animate-enter-blur">
+            <PoliciesPanel store={store} onSaved={refreshStore} />
           </div>
-        )
-      )}
+        )}
 
         {/* TAB 7: THEMES & STOREFRONT DESIGN */}
         {activeTab === "themes" && (() => {
@@ -4977,8 +4789,8 @@ function DashboardPageContent() {
           const lastPaid = history.find((h) => h.status === "verified" && h.planId === (sub.kind === "active" ? sub.planId : sub.endedPlanId));
           const daysText = (n: number) => (n <= 0 ? "today" : n === 1 ? "in 1 day" : `in ${n} days`);
           const renew = (planId: string) => openSubscriptionModal(planId as "starter" | "pro", (lastPaid?.billingCycle as BillingCycle) || "monthly");
-          const setRenewal = (value: "on" | "off") => {
-            if (value === "off" && !confirm(`Cancel your subscription? ${activePlan?.name || "Your plan"} stays active until ${fmtDate(sub.kind === "active" ? sub.endsAt : undefined)}, then your store moves to Free. Nothing is charged automatically.`)) return;
+          const setRenewal = async (value: "on" | "off") => {
+            if (value === "off" && !(await appConfirm(`${activePlan?.name || "Your plan"} stays active until ${fmtDate(sub.kind === "active" ? sub.endsAt : undefined)}, then your store moves to Free. Nothing is charged automatically.`, { title: "Cancel your subscription?", okLabel: "Cancel subscription", cancelLabel: "Keep it", danger: true }))) return;
             storeService.updateStore(store.subdomain, { planRenewal: value });
             refreshStore();
           };
@@ -5315,15 +5127,8 @@ function DashboardPageContent() {
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        if (event.target?.result) {
-                          setLogoUrlInput(event.target.result as string);
-                        }
-                      };
-                      reader.readAsDataURL(file);
-                    }
+                    e.target.value = "";
+                    if (file) uploadPhoto(file, undefined, setLogoUrlInput);
                   }}
                 />
                 <span className="w-10 h-10 rounded-xl bg-neutral-100 flex items-center justify-center shrink-0">
@@ -5589,7 +5394,7 @@ function DashboardPageContent() {
 
       {/* Setup checklist: one step at a time, in a card in the middle of the screen */}
       {setupStart !== null && (
-        <SetupWizard store={store} startAt={setupStart} onClose={() => setSetupStart(null)} onChanged={refreshStore} />
+        <SetupWizard store={store} startAt={setupStart} onClose={() => setSetupStart(null)} onChanged={refreshStore} onOpenPolicies={() => setActiveTab("policies")} />
       )}
 
       {/* Mobile menu: floating card that pops up above the bottom bar */}
@@ -5621,7 +5426,7 @@ function DashboardPageContent() {
                   { id: "discounts", label: "Discounts", icon: Tag, locked: !canUseCoupons(store.planId) },
                   { id: "customers", label: "Customers", icon: Users },
                   { id: "reviews", label: "Reviews", icon: Star, locked: !canUseReviews(store.planId) },
-                  { id: "banners", label: "Banners", icon: ImageIcon },
+                  { id: "policies", label: "Policies", icon: Scale, dot: policiesMissing.length > 0 },
                   { id: "themes", label: "Themes", icon: Palette },
                   { id: "billing", label: "Plan", icon: CreditCard, dot: planNeedsAttention || notifications.some((n) => n.unread && n.type === "plan") },
                   { id: "settings", label: "Settings", icon: Settings },
@@ -5741,6 +5546,19 @@ function DashboardPageContent() {
 }
 
 /** Full-screen holding state for the dashboard (loading, or about to redirect), in the app's style. */
+const DASHBOARD_TOUR: TourStep[] = [
+  { title: "Welcome to your shop's dashboard", text: "A quick look around. You can replay this any time from Show me around." },
+  { target: '[data-tour="stats"]', title: "Your numbers", text: "Sales, orders and visitors at a glance. They update as orders come in." },
+  { target: '[data-tour="store-link"]', title: "Your live shop", text: "Open your shop the way buyers see it. Share this link on Instagram and WhatsApp." },
+  { target: '[data-tour="nav-categories"]', title: "1. Add categories", text: "Start here: make categories like T-Shirts or Earrings. Every product goes into one." },
+  { target: '[data-tour="nav-products"]', title: "2. Add products", text: "Add products one by one, or upload a spreadsheet of many at once with Bulk upload." },
+  { target: '[data-tour="nav-themes"]', title: "3. Make it yours", text: "Pick a theme and edit its words, photos and colours. Double-click text in the preview to type over it." },
+  { target: '[data-tour="nav-policies"]', title: "4. Add your policies", text: "Terms, returns, shipping and privacy pages protect you and are required for online shops. Templates are ready to edit." },
+  { target: '[data-tour="nav-orders"]', title: "Orders", text: "New orders show up here. Confirm payment, add tracking, cancel or handle returns, and message the buyer." },
+  { target: '[data-tour="dock-orders"]', title: "Orders", text: "New orders show up here. Confirm payment, add tracking, and message the buyer." },
+  { target: '[data-tour="dock-menu"]', title: "Everything else", text: "Products, categories, themes, policies and more are in this menu." },
+];
+
 function DashboardHold({ text }: { text: string }) {
   return (
     <div className="home-sans fixed inset-0 flex flex-col items-center justify-center gap-5 bg-white px-6 font-[Inter,sans-serif]">

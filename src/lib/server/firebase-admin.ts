@@ -59,6 +59,16 @@ export async function requireUser(req: Request): Promise<{ uid: string; email?: 
   }
 }
 
+/** The signed-in user if the request carries a valid token, otherwise null (for public routes). */
+export async function optionalUser(req: Request): Promise<{ uid: string; email?: string; emailVerified: boolean } | null> {
+  if (!(req.headers.get("authorization") || "").startsWith("Bearer ")) return null;
+  try {
+    return await requireUser(req);
+  } catch {
+    return null;
+  }
+}
+
 /** Loads a store and checks the signed-in user owns it (same rule as the dashboard's store list). */
 export async function requireStoreOwner(req: Request, subdomain: string): Promise<{ store: StoreData; uid: string }> {
   const user = await requireUser(req);

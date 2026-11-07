@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm, appPrompt } from "@/components/ui/app-dialog";
 
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, Check, Clock, Loader2 } from "lucide-react";
@@ -116,7 +117,7 @@ export function SubscriptionPaymentModal({
   };
 
   const handleCancelPending = async () => {
-    if (!confirm("Cancel this payment request? Only do this if you haven't paid, or entered the wrong reference number.")) return;
+    if (!(await appConfirm("Only do this if you haven't paid, or entered the wrong reference number.", { title: "Cancel this payment request?", okLabel: "Cancel request", cancelLabel: "Keep it", danger: true }))) return;
     setCancelling(true);
     try {
       await storeService.cancelSubscriptionRequest(store.subdomain);
@@ -124,7 +125,7 @@ export function SubscriptionPaymentModal({
       setStep("review");
       if (onSuccess) onSuccess();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Couldn't cancel. Please try again.");
+      appAlert(err instanceof Error ? err.message : "Couldn't cancel. Please try again.");
     } finally {
       setCancelling(false);
     }

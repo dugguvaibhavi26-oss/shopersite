@@ -240,7 +240,10 @@ const FOOTER_COLUMNS = [
     links: [
       { label: "FAQ", href: "/#faq" },
       { label: "How it works", href: "/#how-it-works" },
-      { label: "Platform Admin", href: "/admin" },
+      { label: "Seller terms", href: "/legal/terms" },
+      { label: "Privacy policy", href: "/legal/privacy" },
+      { label: "Refund policy", href: "/legal/refunds" },
+      { label: "Acceptable use", href: "/legal/acceptable-use" },
     ],
   },
 ];

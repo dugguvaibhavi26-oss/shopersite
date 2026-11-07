@@ -1,3 +1,5 @@
+import { AppDialogHost } from "@/components/ui/app-dialog";
+import { ImageCropperHost } from "@/components/ui/image-cropper";
 import type { Metadata, Viewport } from "next";
 import { siteConfig } from "@/lib/config/site";
 import "./globals.css";
@@ -38,6 +40,8 @@ export default function RootLayout({
         <AuthProvider>
           {children}
           <SaveFailedNotice />
+          <AppDialogHost />
+          <ImageCropperHost />
         </AuthProvider>
         <NativeBridge />
         <NavProgress />

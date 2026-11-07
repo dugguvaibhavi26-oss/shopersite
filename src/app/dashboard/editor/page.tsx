@@ -1,4 +1,9 @@
 "use client";
+import { cropImage } from "@/components/ui/image-cropper";
+import { Tour, type TourStep } from "@/components/ui/tour";
+import type { ProbeReport } from "@/components/storefront/site/field-probe";
+import { POLICY_IDS, POLICY_INFO, type PolicyId } from "@/lib/policies";
+import { appAlert, appConfirm, appPrompt } from "@/components/ui/app-dialog";
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -28,6 +33,8 @@ import {
   Upload,
   X,
   ExternalLink,
+  HelpCircle,
+  ChevronDown,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { storeService, type StoreData } from "@/lib/store-service";
@@ -44,6 +51,7 @@ import {
   SITE_THEME_SLUGS,
   themeKeyOf,
   toSiteTheme,
+  SITE_THEME_STYLE,
   removedThemeSections,
   restoreThemeSection,
   fontStack,
@@ -116,7 +124,14 @@ function ThemeEditor() {
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [adding, setAdding] = useState(false);
+  // which settings each section reads in this theme (reported by the preview); only those are offered
+  const [usedFields, setUsedFields] = useState<Record<string, string[]>>({});
+  // which fields this theme actually puts on the page (the preview's hidden marker test)
+  const [probe, setProbe] = useState<ProbeReport | null>(null);
+  const [textTip, setTextTip] = useState("");
   const frame = useRef<HTMLIFrameElement>(null);
+  const edTour = useRef<(() => void) | null>(null);
+  const leaving = useRef(false);
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/login?redirect=/dashboard/editor");
@@ -150,6 +165,8 @@ function ThemeEditor() {
     setContent(resolved);
     setSavedJson(JSON.stringify(resolved));
     setSelection(null);
+    setUsedFields({});
+    setProbe(null);
   }, [store, themeSlug]);
 
   const dirty = !!content && JSON.stringify(content) !== savedJson;
@@ -157,6 +174,8 @@ function ThemeEditor() {
   useEffect(() => {
     if (!dirty) return;
     const warn = (e: BeforeUnloadEvent) => {
+      // already confirmed in our own dialog: don't ask a second time with the browser's box
+      if (leaving.current) return;
       e.preventDefault();
     };
     window.addEventListener("beforeunload", warn);
@@ -185,6 +204,26 @@ function ThemeEditor() {
         setSelection({ kind: "section", id: e.data.id });
         setMobilePane("edit");
       }
+      if (e.data.type === "fields" && typeof e.data.id === "string" && Array.isArray(e.data.keys)) {
+        const keys = (e.data.keys as unknown[]).filter((k): k is string => typeof k === "string").slice(0, 200);
+        // the latest report replaces the last one (fields read by an older draw don't stay)
+        setUsedFields((u) => {
+          const before = u[e.data.id] || [];
+          return before.length === keys.length && keys.every((k) => before.includes(k)) ? u : { ...u, [e.data.id]: keys };
+        });
+      }
+      if (e.data.type === "text" && typeof e.data.id === "string" && typeof e.data.key === "string" && typeof e.data.value === "string") {
+        const { id, key, value } = e.data as { id: string; key: string; value: string };
+        setContent((c) =>
+          c ? { ...c, sections: c.sections.map((x) => (x.id === id && key in x.settings ? { ...x, settings: { ...x.settings, [key]: value.slice(0, 4000) } } : x)) } : c
+        );
+        setTextTip("");
+      }
+      if (e.data.type === "probe" && e.data.report && typeof e.data.report === "object") {
+        const r = e.data.report as ProbeReport;
+        if (r.sections && Array.isArray(r.header) && Array.isArray(r.footer)) setProbe(r);
+      }
+      if (e.data.type === "text-miss") setTextTip("That text comes from your products or settings. Change it there, or pick the section to edit its fields.");
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
@@ -273,7 +312,7 @@ function ThemeEditor() {
 
   const makeLive = () => {
     const res = storeService.setStoreTheme(store.subdomain, themeSlug);
-    if (!res.success) alert(res.error);
+    if (!res.success) appAlert(res.error);
   };
 
   const previewSrc = `/s/${store.subdomain}${previewPath}?preview_theme=${themeSlug}&editor=1`;
@@ -285,7 +324,15 @@ function ThemeEditor() {
         <Link
           href={dashboardHref}
           onClick={(e) => {
-            if (dirty && !confirm("Leave without saving your changes?")) e.preventDefault();
+            if (dirty) {
+              e.preventDefault();
+              const href = (e.currentTarget as HTMLAnchorElement).href;
+              appConfirm("Your changes aren't saved yet. Leave without saving?", { title: "Unsaved changes", okLabel: "Leave", cancelLabel: "Stay", danger: true }).then((go) => {
+                if (!go) return;
+                leaving.current = true;
+                window.location.href = href;
+              });
+            }
           }}
           className="flex h-10 items-center gap-1.5 rounded-xl px-2.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-black"
         >
@@ -295,10 +342,11 @@ function ThemeEditor() {
         <div className="min-w-0 border-l border-neutral-200 pl-3">
           <p className="truncate text-[13px] font-semibold leading-tight">{store.name}</p>
           <select
+            data-tour="ed-theme"
             value={themeSlug}
             aria-label="Theme to edit"
-            onChange={(e) => {
-              if (dirty && !confirm("Switch theme without saving your changes?")) return;
+            onChange={async (e) => {
+              if (dirty && !(await appConfirm("Your changes to this theme aren't saved yet. Switch without saving?", { title: "Unsaved changes", okLabel: "Switch", cancelLabel: "Stay" }))) return;
               router.replace(`/dashboard/editor?store=${store.subdomain}&theme=${e.target.value}`);
             }}
             className="-ml-1 max-w-[11rem] truncate bg-transparent text-[11px] text-neutral-500 outline-none"
@@ -314,6 +362,7 @@ function ThemeEditor() {
 
         <div className="mx-auto hidden items-center gap-2 md:flex">
           <select
+            data-tour="ed-page"
             value={previewPath}
             onChange={(e) => setPreviewPath(e.target.value)}
             aria-label="Page to preview"
@@ -325,7 +374,7 @@ function ThemeEditor() {
               </option>
             ))}
           </select>
-          <div className="flex rounded-xl bg-neutral-100 p-1">
+          <div className="flex rounded-xl bg-neutral-100 p-1" data-tour="ed-device">
             {(
               [
                 ["desktop", Monitor, "Desktop"],
@@ -357,6 +406,15 @@ function ThemeEditor() {
           </a>
           <button
             type="button"
+            onClick={() => edTour.current?.()}
+            aria-label="Show me how the editor works"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-neutral-600 hover:bg-neutral-100"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            data-tour="ed-save"
             onClick={save}
             disabled={!dirty || saving}
             className="flex h-9 items-center gap-1.5 rounded-xl bg-black px-4 text-[13px] font-semibold text-white transition-opacity disabled:opacity-35"
@@ -366,6 +424,7 @@ function ThemeEditor() {
           </button>
         </div>
       </header>
+      <Tour id="theme-editor" startRef={edTour} steps={EDITOR_TOUR} />
 
       {!isLive && (
         <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-amber-50 px-4 py-2 text-center text-[12px] text-amber-900">
@@ -393,7 +452,7 @@ function ThemeEditor() {
       <div className="flex min-h-0 flex-1">
         {/* sidebar */}
         <aside className={cn("flex w-full shrink-0 flex-col border-r border-neutral-200 bg-white md:flex md:w-[360px]", mobilePane === "edit" ? "flex" : "hidden")}>
-          <nav className="flex shrink-0 gap-1 border-b border-neutral-200 p-2" aria-label="Editor panels">
+          <nav className="flex shrink-0 gap-1 border-b border-neutral-200 p-2" aria-label="Editor panels" data-tour="ed-panels">
             {(
               [
                 ["sections", Layers, "Sections"],
@@ -493,9 +552,11 @@ function ThemeEditor() {
 
             {panel === "sections" && selection?.kind === "header" && (
               <Pane title="Header" onBack={() => setSelection(null)}>
-                <Field label="Announcement bar" help="Leave empty to use the announcement from Settings, or none.">
-                  <input className={input} value={content.announcement} maxLength={200} onChange={(e) => update((c) => ({ ...c, announcement: e.target.value }))} />
-                </Field>
+                {(!probe || probe.header.includes("announcement")) && (
+                  <Field label="Announcement bar" help="Leave empty to use the announcement from Settings, or none.">
+                    <input className={input} value={content.announcement} maxLength={200} onChange={(e) => update((c) => ({ ...c, announcement: e.target.value }))} />
+                  </Field>
+                )}
                 {(
                   [
                     ["catalogLabel", "Catalog menu name"],
@@ -504,12 +565,12 @@ function ThemeEditor() {
                     ["searchPlaceholder", "Search box text"],
                     ["ctaLabel", "Highlighted menu link (optional)"],
                   ] as const
-                ).map(([k, l]) => (
+                ).filter(([k]) => !probe || probe.header.includes(k)).map(([k, l]) => (
                   <Field key={k} label={l}>
                     <input className={input} value={content.header[k]} maxLength={40} onChange={(e) => update((c) => ({ ...c, header: { ...c.header, [k]: e.target.value } }))} />
                   </Field>
                 ))}
-                {content.header.ctaLabel && (
+                {content.header.ctaLabel && (!probe || probe.header.includes("ctaLink")) && (
                   <LinkField label="Highlighted link goes to" store={store} value={content.header.ctaLink} onChange={(v) => update((c) => ({ ...c, header: { ...c.header, ctaLink: v } }))} />
                 )}
                 <p className="text-[12px] text-neutral-400">Your shop name and logo come from Settings.</p>
@@ -518,39 +579,48 @@ function ThemeEditor() {
 
             {panel === "sections" && selection?.kind === "footer" && (
               <Pane title="Footer" onBack={() => setSelection(null)}>
-                <Field label="About your shop">
-                  <textarea className={input} rows={4} value={content.footer.about} maxLength={400} onChange={(e) => update((c) => ({ ...c, footer: { ...c.footer, about: e.target.value } }))} />
-                </Field>
-                <Field label="Newsletter heading">
-                  <input className={input} value={content.footer.newsletterHeading} maxLength={60} onChange={(e) => update((c) => ({ ...c, footer: { ...c.footer, newsletterHeading: e.target.value } }))} />
-                </Field>
-                <Field label="Copyright line">
-                  <input className={input} value={content.footer.copyright} maxLength={80} onChange={(e) => update((c) => ({ ...c, footer: { ...c.footer, copyright: e.target.value } }))} />
-                </Field>
+                {(!probe || probe.footer.includes("about")) && (
+                  <Field label="About your shop">
+                    <textarea className={input} rows={4} value={content.footer.about} maxLength={400} onChange={(e) => update((c) => ({ ...c, footer: { ...c.footer, about: e.target.value } }))} />
+                  </Field>
+                )}
+                {(!probe || probe.footer.includes("newsletterHeading")) && (
+                  <Field label="Newsletter heading">
+                    <input className={input} value={content.footer.newsletterHeading} maxLength={60} onChange={(e) => update((c) => ({ ...c, footer: { ...c.footer, newsletterHeading: e.target.value } }))} />
+                  </Field>
+                )}
+                {(!probe || probe.footer.includes("copyright")) && (
+                  <Field label="Copyright line">
+                    <input className={input} value={content.footer.copyright} maxLength={80} onChange={(e) => update((c) => ({ ...c, footer: { ...c.footer, copyright: e.target.value } }))} />
+                  </Field>
+                )}
                 <p className="text-[12px] text-neutral-400">Instagram, WhatsApp and email links come from Settings.</p>
               </Pane>
             )}
 
             {panel === "sections" && selectedSection && (
               <Pane title={SITE_SECTION_TYPES[selectedSection.type].label} onBack={() => setSelection(null)}>
-                {SITE_SECTION_TYPES[selectedSection.type].fields.length === 0 && (
-                  <p className="text-[13px] text-neutral-500">
-                    This section shows your banners. Add or change them in{" "}
-                    <Link href={`/dashboard?tab=banners&store=${store.subdomain}`} className="font-semibold text-black underline">
-                      Dashboard → Banners
-                    </Link>
-                    .
-                  </p>
-                )}
-                {SITE_SECTION_TYPES[selectedSection.type].fields.filter((f) => !f.design).map((f) => (
-                  <SettingField
-                    key={`${selectedSection.id}-${f.key}`}
-                    field={f}
-                    store={store}
-                    value={selectedSection.settings[f.key] || ""}
-                    onChange={(v) => setSection(selectedSection.id, (s) => ({ ...s, settings: { ...s.settings, [f.key]: v } }))}
-                  />
-                ))}
+                {(() => {
+                  const all = SITE_SECTION_TYPES[selectedSection.type].fields.filter((f) => !f.design);
+                  const shown = all.filter((f) => fieldShown(f, selectedSection.id, probe, usedFields));
+                  return (
+                    <>
+                      {shown.length < all.length && (
+                        <p className="rounded-xl bg-neutral-50 px-3 py-2.5 text-[12px] leading-relaxed text-neutral-500">
+                          Showing only what this theme shows. Tip: double-click any text in the preview to type over it.
+                        </p>
+                      )}
+                      {shown.length === 0 && <p className="text-[13px] text-neutral-500">This section fills itself from your products and categories.</p>}
+                    </>
+                  );
+                })()}
+                <SectionFields
+                  key={selectedSection.id}
+                  fields={SITE_SECTION_TYPES[selectedSection.type].fields.filter((f) => !f.design && fieldShown(f, selectedSection.id, probe, usedFields))}
+                  settings={selectedSection.settings}
+                  store={store}
+                  onChange={(patch) => setSection(selectedSection.id, (s) => ({ ...s, settings: { ...s.settings, ...patch } }))}
+                />
                 <div className="flex flex-wrap gap-2 border-t border-neutral-100 pt-4">
                   <button
                     type="button"
@@ -562,8 +632,8 @@ function ThemeEditor() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (!confirm("Remove this section? You can add it back later with Add section.")) return;
+                    onClick={async () => {
+                      if (!(await appConfirm("You can add it back later with Add section.", { title: "Remove this section?", okLabel: "Remove", danger: true }))) return;
                       update((c) => ({ ...c, sections: c.sections.filter((s) => s.id !== selectedSection.id) }));
                       setSelection(null);
                     }}
@@ -598,6 +668,17 @@ function ThemeEditor() {
 
             {panel === "sections" && selection?.kind === "page" && (
               <Pane title={content.pages[selection.id].title || "Page"} onBack={() => setSelection(null)}>
+                {(POLICY_IDS as readonly string[]).includes(selection.id) ? (
+                  <div className="space-y-3">
+                    <p className="text-[13px] leading-relaxed text-neutral-600">
+                      Your shop&apos;s {POLICY_INFO[selection.id as PolicyId].title.toLowerCase()} is written in Dashboard → Policies, with a ready template. What you write there shows on this page in every theme.
+                    </p>
+                    <Link href={`/dashboard?tab=policies&store=${store.subdomain}`} className="inline-flex h-9 items-center rounded-xl bg-black px-4 text-[13px] font-semibold text-white">
+                      Open Policies
+                    </Link>
+                  </div>
+                ) : (
+                <>
                 <Field label="Title">
                   <input
                     className={input}
@@ -621,7 +702,8 @@ function ThemeEditor() {
                     }}
                   />
                 </Field>
-                {(selection.id === "about" || selection.id === "contact") && (
+                {/* only the page styles that draw a photo (banner, split, card) */}
+                {(selection.id === "about" || selection.id === "contact") && ["banner", "split", "card"].includes(SITE_THEME_STYLE[toSiteTheme(themeSlug)]?.pageStyle || "plain") && (
                   <ImageField
                     label="Photo"
                     help="Shows on themes whose pages have a photo."
@@ -634,6 +716,8 @@ function ThemeEditor() {
                   />
                 )}
                 <p className="text-[12px] text-neutral-400">This page is linked from your shop&apos;s menu and footer.</p>
+                </>
+                )}
               </Pane>
             )}
 
@@ -661,8 +745,16 @@ function ThemeEditor() {
               device === "mobile" ? "w-full md:h-[min(100%,844px)] md:w-[390px]" : "w-full"
             )}
           >
-            <iframe ref={frame} key={previewSrc} src={previewSrc} title="Shop preview" className="h-full w-full border-0" />
+            <iframe ref={frame} key={previewSrc} src={previewSrc} title="Shop preview" className="h-full w-full border-0" data-tour="preview" />
           </div>
+          {textTip && (
+            <div className="fixed bottom-5 left-1/2 z-50 flex max-w-[92vw] -translate-x-1/2 items-start gap-2 rounded-xl bg-neutral-950 px-4 py-3 text-[13px] text-white shadow-xl">
+              <span>{textTip}</span>
+              <button type="button" onClick={() => setTextTip("")} className="ml-2 font-semibold text-white/70 hover:text-white">
+                OK
+              </button>
+            </div>
+          )}
         </section>
       </div>
     </div>
@@ -762,8 +854,162 @@ function Field({ label: text, help, children }: { label: string; help?: string; 
   );
 }
 
+const plural = (w: string) => (/[^aeiou]y$/i.test(w) ? `${w.slice(0, -1)}ies` : /(s|x|ch|sh)$/i.test(w) ? `${w}es` : `${w}s`);
+
+/** "Weave 2: photo" → item "Weave", number 2, short label "Photo". */
+function splitItemLabel(label: string): { family: string; n: number; short: string } | null {
+  const m = label.match(/^(.+?)\s(\d+):\s*(.+)$/);
+  if (!m) return null;
+  return { family: m[1], n: Number(m[2]), short: m[3].charAt(0).toUpperCase() + m[3].slice(1) };
+}
+
+/**
+ * A section's fields, kept short: the section's own fields first, then repeated items (Weave 1,
+ * Weave 2… / Slide 1, Slide 2…) as a compact list. One item opens at a time, showing only its own fields.
+ */
+function SectionFields({
+  fields,
+  settings,
+  store,
+  onChange,
+}: {
+  fields: SectionField[];
+  settings: Record<string, string>;
+  store: StoreData;
+  onChange: (patch: Record<string, string>) => void;
+}) {
+  const general: SectionField[] = [];
+  const families: { family: string; items: { n: number; fields: (SectionField & { short: string })[] }[] }[] = [];
+  for (const f of fields) {
+    const it = splitItemLabel(f.label);
+    if (!it) {
+      general.push(f);
+      continue;
+    }
+    let fam = families.find((x) => x.family === it.family);
+    if (!fam) families.push((fam = { family: it.family, items: [] }));
+    let item = fam.items.find((x) => x.n === it.n);
+    if (!item) fam.items.push((item = { n: it.n, fields: [] }));
+    item.fields.push({ ...f, short: it.short });
+  }
+  for (const fam of families) fam.items.sort((a, b) => a.n - b.n);
+  const [open, setOpen] = useState<string | null>(null);
+  // empty slots the seller just added (shown so they can fill them in)
+  const [added, setAdded] = useState<string[]>([]);
+  const filled = (item: { fields: SectionField[] }) => item.fields.some((f) => (settings[f.key] || "").trim());
+
+  /** Clears an item and moves the ones after it up a place, so the list has no gaps. */
+  const removeItem = async (fam: (typeof families)[number], n: number) => {
+    const name = `${fam.family} ${n}`;
+    if (!(await appConfirm(`${name} will be removed from this section. The ones after it move up.`, { title: `Remove ${name.toLowerCase()}?`, okLabel: "Remove", danger: true }))) return;
+    const items = fam.items;
+    const at = items.findIndex((x) => x.n === n);
+    const suffixOf = (f: SectionField & { short: string }) => f.key.replace(/^[a-z]+\d+/, "");
+    const patch: Record<string, string> = {};
+    for (let i = at; i < items.length; i++) {
+      const nextItem = items[i + 1];
+      for (const f of items[i].fields) {
+        const from = nextItem?.fields.find((g) => suffixOf(g) === suffixOf(f));
+        patch[f.key] = from ? settings[from.key] || "" : "";
+      }
+    }
+    onChange(patch);
+    setOpen(null);
+    setAdded((a) => a.filter((x) => !x.startsWith(`${fam.family}-`)));
+  };
+
+  return (
+    <div className="space-y-4">
+      {general.map((f) => (
+        <SettingField key={f.key} field={f} store={store} value={settings[f.key] || ""} onChange={(v) => onChange({ [f.key]: v })} />
+      ))}
+      {families.map((fam) => {
+        const shown = fam.items.filter((item) => filled(item) || added.includes(`${fam.family}-${item.n}`));
+        const free = fam.items.find((item) => !shown.includes(item));
+        return (
+          <div key={fam.family}>
+            <p className="mb-1.5 text-[12px] font-semibold text-neutral-600">
+              {plural(fam.family)}{" "}
+              <span className="font-normal text-neutral-400">
+                · {shown.length} of {fam.items.length}
+              </span>
+            </p>
+            {shown.length > 0 && (
+              <div className="divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200">
+                {shown.map((item, idx) => {
+                  const id = `${fam.family}-${item.n}`;
+                  const isOpen = open === id;
+                  const photo = item.fields.find((f) => f.kind === "image");
+                  const titleField = item.fields.find((f) => f.kind === "text" || f.kind === "textarea");
+                  const title = (titleField && settings[titleField.key]?.split("\n")[0]) || "";
+                  return (
+                    <div key={id} className={isOpen ? "bg-neutral-50/60" : ""}>
+                      <div className="flex items-center gap-1 pr-1.5">
+                        <button type="button" onClick={() => setOpen(isOpen ? null : id)} aria-expanded={isOpen} className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left hover:bg-neutral-50">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-100 text-[12px] font-semibold text-neutral-500">
+                            {photo && settings[photo.key] ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={settings[photo.key]} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              idx + 1
+                            )}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[13px] font-semibold text-neutral-900">{title || `New ${fam.family.toLowerCase()}`}</span>
+                            <span className="block text-[11px] text-neutral-400">
+                              {fam.family} {idx + 1}
+                              {!filled(item) && " · fill it in to show it"}
+                            </span>
+                          </span>
+                          <ChevronDown className={cn("h-4 w-4 shrink-0 text-neutral-400 transition-transform", isOpen && "rotate-180")} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(fam, item.n)}
+                          aria-label={`Remove ${fam.family} ${idx + 1}`}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      {isOpen && (
+                        <div className="space-y-3 px-3 pb-3.5 pt-1">
+                          {item.fields.map((f) => (
+                            <SettingField key={f.key} field={{ ...f, label: f.short }} store={store} value={settings[f.key] || ""} onChange={(v) => onChange({ [f.key]: v })} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {free ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const id = `${fam.family}-${free.n}`;
+                  setAdded((a) => [...a, id]);
+                  setOpen(id);
+                }}
+                className="mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-neutral-300 text-[13px] font-semibold text-neutral-600 hover:border-black hover:text-black"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add {fam.family.toLowerCase()}
+              </button>
+            ) : (
+              <p className="mt-1.5 text-[11px] text-neutral-400">
+                This theme has room for {fam.items.length} {fam.items.length === 1 ? fam.family.toLowerCase() : plural(fam.family).toLowerCase()}.
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function SettingField({ field, store, value, onChange }: { field: SectionField; store: StoreData; value: string; onChange: (v: string) => void }) {
-  if (field.kind === "image") return <ImageField label={field.label} help={field.help} store={store} value={value} onChange={onChange} />;
+  if (field.kind === "image") return <ImageField label={field.label} help={field.help} store={store} value={value} onChange={onChange} aspect={/^slide\d/.test(field.key) ? 3 : undefined} />;
   if (field.kind === "link") return <LinkField label={field.label} store={store} value={value} onChange={onChange} />;
   if (field.kind === "source") {
     const cats = (store.categories || []).filter((c) => c.isActive ?? true);
@@ -814,7 +1060,33 @@ function SettingField({ field, store, value, onChange }: { field: SectionField; 
   );
 }
 
-function ImageField({ label: text, help, store, value, onChange }: { label: string; help?: string; store: StoreData; value: string; onChange: (v: string) => void }) {
+const EDITOR_TOUR: TourStep[] = [
+  { title: "Edit your website", text: "Here's how the editor works. It takes a few seconds. Replay it any time with the ? button." },
+  { target: '[data-tour="ed-panels"]', title: "Sections and colours", text: "Your homepage is made of sections. Pick one to change its words and photos, drag to reorder, or hide it. Theme colours sets the colours and fonts." },
+  { target: '[data-tour="preview"]', title: "Edit right on the page", text: "Click a section in the preview to open it. Double-click any heading or text to type over it, then press Enter." },
+  { target: '[data-tour="ed-page"]', title: "Other pages", text: "Preview your catalog, product page, bag and policy pages too." },
+  { target: '[data-tour="ed-device"]', title: "Phone or desktop", text: "Most buyers shop on their phone. Check both before you save." },
+  { target: '[data-tour="ed-theme"]', title: "Switch theme", text: "Edit another theme without changing your live shop." },
+  { target: '[data-tour="ed-save"]', title: "Save", text: "Nothing changes on your shop until you save. Leaving with unsaved changes asks you first." },
+];
+
+/**
+ * A field is offered only if this theme shows it. Text, photos and links: the preview's hidden marker
+ * test says whether the field's value ends up on the page. Choices (which products, sizes): offered
+ * if this theme's section uses them. Until the preview has reported, the code's reads decide.
+ */
+function fieldShown(f: SectionField, sectionId: string, probe: ProbeReport | null, used: Record<string, string[]>): boolean {
+  const probed = probe?.sections[sectionId];
+  const reads = used[sectionId];
+  if (f.kind === "select" || f.kind === "source") {
+    if (f.key === "headingSize") return probe ? !!probed?.includes("heading") : !reads || reads.includes("heading");
+    return !reads || reads.includes(f.key);
+  }
+  if (probe) return !!probed?.includes(f.key);
+  return !reads || reads.includes(f.key);
+}
+
+function ImageField({ label: text, help, store, value, onChange, aspect }: { label: string; help?: string; store: StoreData; value: string; onChange: (v: string) => void; aspect?: number }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [showUrl, setShowUrl] = useState(false);
@@ -822,38 +1094,47 @@ function ImageField({ label: text, help, store, value, onChange }: { label: stri
   return (
     <div>
       <span className={label}>{text}</span>
-      <div className="relative aspect-[16/10] overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
-        {value ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={value} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full items-center justify-center text-neutral-300">
-            <ImageIcon className="h-8 w-8" />
-          </div>
-        )}
-        {busy && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/70">
-            <Loader2 className="h-5 w-5 animate-spin" />
-          </div>
-        )}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2">
+      {/* small thumbnail beside its buttons, so a photo takes one line, not half the panel */}
+      <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
           disabled={busy}
-          className="flex h-9 items-center gap-1.5 rounded-xl bg-black px-3 text-[13px] font-semibold text-white disabled:opacity-40"
+          aria-label={value ? "Replace photo" : "Upload photo"}
+          className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 hover:border-black"
         >
-          <Upload className="h-3.5 w-3.5" /> {value ? "Replace" : "Upload"}
+          {value ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={value} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          ) : (
+            <span className="flex h-full items-center justify-center text-neutral-300">
+              <ImageIcon className="h-5 w-5" />
+            </span>
+          )}
+          {busy && (
+            <span className="absolute inset-0 flex items-center justify-center bg-white/70">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </span>
+          )}
         </button>
-        <button type="button" onClick={() => setShowUrl((v) => !v)} className="h-9 rounded-xl border border-neutral-200 px-3 text-[13px] font-medium hover:border-black">
-          Use a link
-        </button>
-        {value && (
-          <button type="button" onClick={() => onChange("")} className="h-9 rounded-xl px-3 text-[13px] font-medium text-neutral-500 hover:text-black">
-            Remove
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={busy}
+            className="flex h-8 items-center gap-1.5 rounded-lg bg-black px-2.5 text-[12px] font-semibold text-white disabled:opacity-40"
+          >
+            <Upload className="h-3.5 w-3.5" /> {value ? "Replace" : "Upload"}
           </button>
-        )}
+          <button type="button" onClick={() => setShowUrl((v) => !v)} className="h-8 rounded-lg px-2 text-[12px] font-medium text-neutral-500 hover:text-black">
+            Link
+          </button>
+          {value && (
+            <button type="button" onClick={() => onChange("")} className="h-8 rounded-lg px-2 text-[12px] font-medium text-neutral-500 hover:text-red-600">
+              Remove
+            </button>
+          )}
+        </div>
       </div>
       {showUrl && <input className={cn(input, "mt-2")} placeholder="https://…" value={value} onChange={(e) => onChange(e.target.value.trim())} />}
       {help && <p className="mt-1 text-[12px] text-neutral-400">{help}</p>}
@@ -871,10 +1152,12 @@ function ImageField({ label: text, help, store, value, onChange }: { label: stri
             setError("Choose a photo under 12 MB.");
             return;
           }
+          const cropped = await cropImage(file, { aspect });
+          if (!cropped) return;
           setBusy(true);
           setError("");
           try {
-            onChange(await storeService.uploadStoreImage(store.subdomain, file));
+            onChange(await storeService.uploadStoreImage(store.subdomain, cropped));
           } catch {
             setError("Couldn't upload this photo. Try another one.");
           } finally {

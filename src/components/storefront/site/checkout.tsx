@@ -8,16 +8,14 @@ import { evaluateCoupon, isValidUpiId, storeService } from "@/lib/store-service"
 import { canUseCoupons } from "@/lib/plans";
 import { createOnlinePayment, fetchOnlineAvailability, openCashfreeCheckout } from "@/lib/payments/client";
 import { cn } from "@/lib/utils";
+import { INDIA_STATES } from "@/lib/india-states";
+import { useAuth } from "@/lib/auth-context";
+import { lookupPincode } from "@/lib/pincode-client";
+import { checkEmail, checkPersonName, checkPhone, checkPincode, checkPlace, checkStreet, cleanPhone, onlyDigits, phoneInput } from "@/lib/validation";
 import { giftNoteKey, rupees, useSite, whatsappLink, type BagLine, type SavedDetails } from "./context";
 import { Container, EmptyState, MLink, QtyStepper } from "./ui";
 
-const STATES = [
-  "Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chandigarh", "Chhattisgarh",
-  "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jammu and Kashmir",
-  "Jharkhand", "Karnataka", "Kerala", "Ladakh", "Lakshadweep", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya",
-  "Mizoram", "Nagaland", "Odisha", "Puducherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
-  "Uttar Pradesh", "Uttarakhand", "West Bengal",
-];
+const STATES = INDIA_STATES;
 
 /** Live prices for the bag, so the bag, checkout and the saved order show the same numbers. */
 type PayMethod = "online" | "upi" | "cod";
@@ -245,7 +243,18 @@ export function SiteCheckout() {
   }, [store.subdomain]);
   const [placing, setPlacing] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [pinBusy, setPinBusy] = React.useState(false);
+  const [pinAreas, setPinAreas] = React.useState<string[]>([]);
+  const [agreed, setAgreed] = React.useState(false);
+  const [agreeError, setAgreeError] = React.useState("");
   const t = useTotals(method);
+
+  // a signed-in buyer's name and email start the form
+  const { user } = useAuth();
+  React.useEffect(() => {
+    if (!user || demo || editing) return;
+    setForm((f) => ({ ...f, name: f.name || user.displayName || "", email: f.email || user.email || "" }));
+  }, [user, demo, editing]);
 
   // the saved address loads after the first render
   const filled = React.useRef(false);
@@ -265,25 +274,52 @@ export function SiteCheckout() {
   }
 
   const set = (k: keyof SavedDetails) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm((f) => ({ ...f, [k]: e.target.value }));
+    let v = e.target.value;
+    if (k === "phone") v = phoneInput(v);
+    if (k === "pincode") v = onlyDigits(v, 6);
+    setForm((f) => ({ ...f, [k]: v }));
     setErrors((er) => ({ ...er, [k]: undefined }));
+    if (k === "pincode") fillFromPin(v);
+  };
+
+  /** A full PIN code fills in the city and state (from this device's earlier lookups, or India Post). */
+  const fillFromPin = async (pin: string) => {
+    setPinAreas([]);
+    if (pin.length !== 6) return;
+    setPinBusy(true);
+    try {
+      const info = await lookupPincode(pin);
+      if (!info) {
+        setErrors((er) => ({ ...er, pincode: "We couldn't find this PIN code. Check it." }));
+        return;
+      }
+      setForm((f) => (f.pincode !== pin ? f : { ...f, city: info.city || f.city, state: info.state || f.state }));
+      setErrors((er) => ({ ...er, city: undefined, state: undefined }));
+      setPinAreas(info.areas);
+    } catch {
+      // lookup unavailable: the buyer types the city and state
+    } finally {
+      setPinBusy(false);
+    }
   };
 
   const validate = () => {
     const er: typeof errors = {};
-    if (form.name.trim().length < 2) er.name = "Enter your full name";
-    if (!/^[6-9][0-9]{9}$/.test(form.phone.replace(/[^0-9]/g, "").slice(-10))) er.phone = "Enter a 10-digit mobile number";
-    if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) er.email = "Check this email";
-    if (form.street.trim().length < 5) er.street = "Enter your house, street and area";
-    if (form.city.trim().length < 2) er.city = "Enter your city";
+    const pick = (k: keyof SavedDetails, msg: string) => msg && (er[k] = msg);
+    pick("name", checkPersonName(form.name, "full name"));
+    pick("phone", checkPhone(form.phone));
+    pick("email", checkEmail(form.email, { required: false }));
+    pick("street", checkStreet(form.street));
+    pick("city", checkPlace(form.city, "city"));
     if (!form.state) er.state = "Choose your state";
-    if (!/^[1-9][0-9]{5}$/.test(form.pincode.trim())) er.pincode = "Enter a 6-digit PIN code";
+    pick("pincode", checkPincode(form.pincode));
+    if (!agreed) setAgreeError("Please agree to the shop's terms to continue.");
     setErrors(er);
-    return Object.keys(er).length === 0;
+    return Object.keys(er).length === 0 && agreed;
   };
 
   const orderInput = () => {
-    const phone = form.phone.replace(/[^0-9]/g, "").slice(-10);
+    const phone = cleanPhone(form.phone);
     return {
       phone,
       body: {
@@ -338,7 +374,7 @@ export function SiteCheckout() {
   /** Starts the payment on the seller's Cashfree account; the order is saved once Cashfree confirms it. */
   const payOnline = async () => {
     try {
-      const phone = form.phone.replace(/[^0-9]/g, "").slice(-10);
+      const phone = cleanPhone(form.phone);
       const back = new URL(href("/order/"), window.location.origin);
       const res = await createOnlinePayment({
         store: store.subdomain,
@@ -406,12 +442,20 @@ export function SiteCheckout() {
               <h2 className="m-h text-[length:calc(18px*var(--m-scale))]">Contact</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 {field("name", "Full name", { autoComplete: "name", maxLength: 80 })}
-                {field("phone", "Mobile number", { autoComplete: "tel", inputMode: "numeric", maxLength: 14, placeholder: "10-digit number" })}
+                {field("phone", "Mobile number", { autoComplete: "tel-national", inputMode: "tel", placeholder: "10-digit number" })}
               </div>
-              {field("email", "Email (optional, for order updates)", { type: "email", autoComplete: "email" })}
+              {field("email", "Email (optional, for order updates)", { type: "email", autoComplete: "email", maxLength: 200 })}
               <h2 className="m-h mt-4 text-[length:calc(18px*var(--m-scale))]">Delivery address</h2>
+              <div>
+                {field("pincode", pinBusy ? "PIN code · finding your city…" : "PIN code", { autoComplete: "postal-code", inputMode: "numeric", maxLength: 6, placeholder: "6-digit PIN code" })}
+                {pinAreas.length > 0 && !errors.pincode && (
+                  <span className="m-muted mt-1 block text-[length:calc(12px*var(--m-scale))]">
+                    {form.city}, {form.state} · {pinAreas.slice(0, 3).join(", ")}
+                  </span>
+                )}
+              </div>
               {field("street", "House no., street, area", { autoComplete: "street-address", maxLength: 200 })}
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 {field("city", "City", { autoComplete: "address-level2", maxLength: 60 })}
                 <label className="block">
                   <span className="mb-1.5 block text-[length:calc(13px*var(--m-scale))] font-medium">State</span>
@@ -423,12 +467,28 @@ export function SiteCheckout() {
                   </select>
                   {errors.state && <span className="mt-1 block text-[length:calc(12px*var(--m-scale))] text-red-600">{errors.state}</span>}
                 </label>
-                {field("pincode", "PIN code", { autoComplete: "postal-code", inputMode: "numeric", maxLength: 6 })}
               </div>
               <label className="block">
                 <span className="mb-1.5 block text-[length:calc(13px*var(--m-scale))] font-medium">Note for the shop (optional)</span>
                 <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} className="m-field" placeholder="Landmark, gift message…" />
               </label>
+              <label className="flex items-start gap-3 text-[length:calc(13px*var(--m-scale))]">
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={(e) => (setAgreed(e.target.checked), setAgreeError(""))}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--m-text)]"
+                  style={{ minHeight: 0, minWidth: 0 }}
+                />
+                <span>
+                  I agree to the shop&apos;s{" "}
+                  <MLink to="/pages/terms" className="underline underline-offset-2">terms</MLink>,{" "}
+                  <MLink to="/pages/returns" className="underline underline-offset-2">returns &amp; refunds</MLink>,{" "}
+                  <MLink to="/pages/shipping" className="underline underline-offset-2">shipping</MLink> and{" "}
+                  <MLink to="/pages/privacy" className="underline underline-offset-2">privacy</MLink> policies.
+                </span>
+              </label>
+              {agreeError && <span className="-mt-2 block text-[length:calc(12px*var(--m-scale))] text-red-600">{agreeError}</span>}
               <button type="submit" className="m-btn mt-4 h-12 w-full sm:w-auto sm:px-12">
                 Continue to payment
               </button>
@@ -538,7 +598,7 @@ export function SiteCheckout() {
                         : `Place order · ${rupees(t.total)}`}
                 </button>
               )}
-              <p className="m-faint text-center text-[length:calc(12px*var(--m-scale))]">By placing your order you agree to the shop's terms and returns policy.</p>
+              <p className="m-faint text-center text-[length:calc(12px*var(--m-scale))]">Your details are sent securely and only shared with {store.name} to deliver your order.</p>
             </div>
           )}
         </div>

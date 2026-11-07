@@ -86,6 +86,14 @@ export async function trackOrders(store: string, tokens: string[]): Promise<Orde
   return r.orders || [];
 }
 
+/** Buyer: cancel the order (before shipping) or ask for a return, if the shop allows it. */
+export async function requestOrderChange(store: string, token: string, kind: "cancel" | "return", reason: string): Promise<OrderData> {
+  const r = await json<{ order: OrderData }>(
+    await fetch("/api/orders/request", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ store, token, kind, reason }) })
+  );
+  return r.order;
+}
+
 export async function findOrderToken(store: string, number: string, phone: string): Promise<string> {
   const r = await json<{ token: string }>(
     await fetch("/api/orders/find", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ store, number, phone }) })

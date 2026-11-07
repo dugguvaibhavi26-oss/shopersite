@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm, appPrompt } from "@/components/ui/app-dialog";
 
 import * as React from "react";
 import { CheckCircle2, ExternalLink, Loader2, Mail, Send, Trash2 } from "lucide-react";
@@ -69,7 +70,7 @@ export function EmailPanel({ store, storeWebDomain, onRemoveSubscriber }: { stor
     }
   };
   const disconnect = async () => {
-    if (!confirm("Disconnect Gmail? You can connect it again any time.")) return;
+    if (!(await appConfirm("You can connect it again any time.", { title: "Disconnect Gmail?", okLabel: "Disconnect", danger: true }))) return;
     await api(`/api/email/connect?store=${store.subdomain}`, { method: "DELETE" }).catch(() => null);
     await refresh();
   };
@@ -108,7 +109,7 @@ export function EmailPanel({ store, storeWebDomain, onRemoveSubscriber }: { stor
     e.preventDefault();
     setSendMsg(null);
     if (!subject.trim() || !message.trim()) return setSendMsg({ ok: false, text: "Add a subject and a message." });
-    if (!confirm(`Send this email to ${subs.length} subscriber${subs.length === 1 ? "" : "s"}?`)) return;
+    if (!(await appConfirm(`It goes to ${subs.length} subscriber${subs.length === 1 ? "" : "s"} from your Gmail.`, { title: "Send this email?", okLabel: "Send" }))) return;
     setSending(true);
     try {
       const r = await api<{ sent: number; failed: number; total: number }>("/api/email/send", {

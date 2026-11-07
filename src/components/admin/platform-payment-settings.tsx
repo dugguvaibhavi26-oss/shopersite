@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm, appPrompt } from "@/components/ui/app-dialog";
 
 import React, { useEffect, useState } from "react";
 import { Check, Plus, QrCode, Trash2 } from "lucide-react";
@@ -48,13 +49,13 @@ export function PlatformPaymentSettings() {
     }
   };
 
-  const useForPayments = (upiId: string) => {
-    if (!window.confirm(`Sellers will pay their subscriptions to ${upiId} from now on. Continue?`)) return;
+  const useForPayments = async (upiId: string) => {
+    if (!(await appConfirm(`Sellers will pay their subscriptions to ${upiId} from now on.`, { title: "Switch payment account?" }))) return;
     save({ ...settings, activeUpiId: upiId }, "Now in use");
   };
 
-  const remove = (upiId: string) => {
-    if (!window.confirm(`Remove ${upiId}?`)) return;
+  const remove = async (upiId: string) => {
+    if (!(await appConfirm(`${upiId} will be removed.`, { title: "Remove this UPI ID?", okLabel: "Remove", danger: true }))) return;
     save({ ...settings, accounts: settings.accounts.filter((a) => a.upiId !== upiId) }, "Removed");
   };
 

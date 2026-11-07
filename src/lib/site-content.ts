@@ -686,8 +686,11 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
   },
   banners: {
     label: "Banner slider",
-    description: "Your banners from Dashboard → Banners",
-    fields: [],
+    description: "Wide photos that slide one after another",
+    fields: [1, 2, 3, 4].flatMap((n): SectionField[] => [
+      { key: `slide${n}Image`, label: `Slide ${n}: photo`, kind: "image", help: n === 1 ? "Wide photos work best (3:1). Leave a slide empty to skip it." : undefined },
+      { key: `slide${n}Link`, label: `Slide ${n}: opens`, kind: "link" },
+    ]),
   },
   categories: {
     label: "Category tiles",

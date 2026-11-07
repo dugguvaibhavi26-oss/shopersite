@@ -4,6 +4,9 @@ import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { checkEmail } from "@/lib/validation";
 import { storeService } from "@/lib/store-service";
 import {
   AuthShell,
@@ -42,6 +45,27 @@ function LoginFormContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetNote, setResetNote] = useState("");
+
+  /** Sends Firebase's password reset link. The same message either way, so nobody can test which emails have accounts. */
+  const handleForgot = async () => {
+    setError(null);
+    setResetNote("");
+    const wrong = checkEmail(email);
+    if (wrong) return setError(email ? wrong : "Enter your email above, then tap Forgot password.");
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email.trim().toLowerCase(), { url: `${window.location.origin}/login` });
+    } catch (err: any) {
+      if (err?.code === "auth/too-many-requests") {
+        setLoading(false);
+        return setError("Too many tries. Please wait a few minutes.");
+      }
+      // unknown email etc.: say the same thing
+    }
+    setLoading(false);
+    setResetNote(`If ${email.trim()} has an account, a link to reset the password is on its way. Check your inbox and spam.`);
+  };
 
   // If already logged in, redirect
   React.useEffect(() => {
@@ -149,6 +173,12 @@ function LoginFormContent() {
           trailing={<PasswordToggle shown={showPassword} onToggle={() => setShowPassword(!showPassword)} />}
           required
         />
+        <div className="-mt-2 flex justify-end">
+          <button type="button" onClick={handleForgot} className="text-sm font-semibold text-neutral-600 underline underline-offset-4 hover:text-black !min-h-0">
+            Forgot password?
+          </button>
+        </div>
+        {resetNote && <p className="rounded-[10px] bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">{resetNote}</p>}
 
         <AuthButton type="submit" loading={loading} loadingText="Logging in…" className="!mt-7">
           Log in

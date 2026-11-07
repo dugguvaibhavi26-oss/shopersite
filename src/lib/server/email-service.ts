@@ -199,6 +199,40 @@ export async function sendTest(store: StoreData) {
   return { to: acc.email };
 }
 
+/**
+ * One email to the buyer of an order (cancellation, return, refund or delivery news), from the
+ * shop's Gmail. The address comes from the order itself, never from the request.
+ */
+export async function emailBuyer(store: StoreData, orderId: string, subject: string, message: string) {
+  requireEmailPlan(store);
+  const order = (store.orders || []).find((o) => o.id === orderId);
+  if (!order) throw new ApiError(404, "Order not found.");
+  const to = order.customer?.email?.trim().toLowerCase();
+  if (!to) throw new ApiError(400, "This buyer didn't give an email address. Message them on WhatsApp instead.");
+  const acc = await account(store.subdomain);
+  if (!acc) throw new ApiError(400, "Connect your Gmail in Plugins → Email first.");
+  const u = await usage(store.subdomain);
+  if (remaining(store, u) < 1) throw new ApiError(429, "You've used all your emails for now.");
+  const t = transport(acc.email, open(acc.secret));
+  try {
+    const link = shopUrl(store, `/order/${order.token}`);
+    const body = render(store, { subject, message, ctaText: `View order ${order.number}`, ctaUrl: link, unsubscribe: link });
+    // order emails aren't marketing: no unsubscribe line
+    const html = body.html.replace(/<p style="max-width:520px;margin:14px auto 0;[^]*?<\/p>/, "");
+    await t.sendMail({ from: { name: store.name, address: acc.email }, to, replyTo: acc.email, subject: `${subject} · ${store.name}`, html, text: `${subject}
+
+${message}
+
+Your order: ${link}` });
+  } catch (err) {
+    throw gmailError(err);
+  } finally {
+    t.close();
+  }
+  await count(store.subdomain, 1);
+  return { to };
+}
+
 /** Sends an email to every subscriber, within the plan's limits. */
 export async function sendToSubscribers(
   store: StoreData,

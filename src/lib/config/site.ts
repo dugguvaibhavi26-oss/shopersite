@@ -30,9 +30,9 @@ export const siteConfig = {
   supportWhatsApp: process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP || "", // digits with country code, e.g. 919876543210
   helpCenterUrl: process.env.NEXT_PUBLIC_HELP_CENTER_URL || "",
   legal: {
-    terms: process.env.NEXT_PUBLIC_TERMS_URL || "",
-    privacy: process.env.NEXT_PUBLIC_PRIVACY_URL || "",
-    refunds: process.env.NEXT_PUBLIC_REFUND_POLICY_URL || "",
+    terms: process.env.NEXT_PUBLIC_TERMS_URL || "/legal/terms",
+    privacy: process.env.NEXT_PUBLIC_PRIVACY_URL || "/legal/privacy",
+    refunds: process.env.NEXT_PUBLIC_REFUND_POLICY_URL || "/legal/refunds",
   },
   social: {
     instagram: process.env.NEXT_PUBLIC_INSTAGRAM_URL || "",

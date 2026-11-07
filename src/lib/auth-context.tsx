@@ -6,6 +6,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as fbSignOut,
+  sendEmailVerification,
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
@@ -87,6 +88,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, pass: string, displayName?: string): Promise<User> => {
     const cred = await createUserWithEmailAndPassword(auth, email.trim(), pass);
+    // confirm the email belongs to them (needed before orders are matched by email)
+    sendEmailVerification(cred.user).catch(() => {});
     if (displayName) {
       try {
         await updateProfile(cred.user, { displayName });

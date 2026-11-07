@@ -17,14 +17,19 @@ service firebase.storage {
         && request.auth.token.email is string && request.auth.token.email.lower() in adminEmails();
     }
 
+    // images only; no SVG (it can carry scripts)
     function isImage() {
-      return request.resource.contentType.matches('image/.*') && request.resource.size < 8 * 1024 * 1024;
+      return request.resource.contentType.matches('image/(jpeg|png|webp|gif|avif)') && request.resource.size < 8 * 1024 * 1024;
     }
 
     match /store_assets/{store}/{file=**} {
       allow read: if true;
-      allow create: if request.auth != null && resource == null && isImage();
       allow update, delete: if isAdmin();
+    }
+
+    // new photos go in the uploader's own folder (u_<uid>), so nobody can add files under someone else's name
+    match /store_assets/{store}/{owner}/{file=**} {
+      allow create: if request.auth != null && owner == 'u_' + request.auth.uid && resource == null && isImage();
     }
 
     match /platform_banners/{file=**} {

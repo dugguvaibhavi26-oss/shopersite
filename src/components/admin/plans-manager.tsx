@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm, appPrompt } from "@/components/ui/app-dialog";
 
 import React, { useEffect, useState } from "react";
 import { Check, Pencil, RotateCcw, X } from "lucide-react";
@@ -194,8 +195,8 @@ function PlanEditor({
     onSaved();
   };
 
-  const reset = () => {
-    if (!window.confirm(`Put ${details.name} back to its original name, price, features and limits?`)) return;
+  const reset = async () => {
+    if (!(await appConfirm(`${details.name} goes back to its original name, price, features and limits.`, { title: "Reset this plan?", okLabel: "Reset" }))) return;
     storeService.resetPlan(id);
     onSaved();
   };

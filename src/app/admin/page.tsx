@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm, appPrompt } from "@/components/ui/app-dialog";
 
 import React, { useState, useEffect, useMemo, Suspense } from "react";
 import Link from "next/link";
@@ -407,7 +408,7 @@ function AdminDashboardContent() {
 
   const handleCopyTargetEmails = () => {
     if (targetEmails.length === 0) {
-      alert("No email addresses found for the selected merchant target.");
+      appAlert("No email addresses found for the selected merchant target.");
       return;
     }
     navigator.clipboard.writeText(targetEmails.join(", "));
@@ -417,7 +418,7 @@ function AdminDashboardContent() {
 
   const handleCopyAllEmails = () => {
     if (allMerchantEmails.length === 0) {
-      alert("No merchant emails available.");
+      appAlert("No merchant emails available.");
       return;
     }
     navigator.clipboard.writeText(allMerchantEmails.join(", "));
@@ -427,7 +428,7 @@ function AdminDashboardContent() {
 
   const handleOpenGmailWeb = () => {
     if (!broadcastSubject.trim() || !broadcastMessage.trim()) {
-      alert("Please provide both a subject and message before launching Gmail.");
+      appAlert("Please provide both a subject and message before launching Gmail.");
       return;
     }
     const bccList = targetEmails.join(",");
@@ -480,7 +481,7 @@ function AdminDashboardContent() {
   const handleSendBroadcast = (e: React.FormEvent) => {
     e.preventDefault();
     if (!broadcastSubject || !broadcastMessage) {
-      alert("Please provide both subject and message.");
+      appAlert("Please provide both subject and message.");
       return;
     }
 
@@ -2221,8 +2222,8 @@ function AdminDashboardContent() {
                             size="sm"
                             variant="outline"
                             className="text-xs"
-                            onClick={() => {
-                              const reason = window.prompt("Why is it rejected? The seller will see this.", "We couldn't find this payment in our account.");
+                            onClick={async () => {
+                              const reason = await appPrompt("The seller will see this.", { title: "Why is it rejected?", defaultValue: "We couldn't find this payment in our account.", okLabel: "Reject", danger: true });
                               if (reason === null) return;
                               storeService.rejectThemePurchase(s.subdomain, p.id, reason);
                               refreshData();
@@ -2233,8 +2234,8 @@ function AdminDashboardContent() {
                           <Button
                             size="sm"
                             className="text-xs bg-emerald-600 text-white hover:bg-emerald-700"
-                            onClick={() => {
-                              if (!window.confirm(`Approve ${p.amountFormatted} from ${s.name} for ${p.themeName}?`)) return;
+                            onClick={async () => {
+                              if (!(await appConfirm(`${p.amountFormatted} from ${s.name} for ${p.themeName}.`, { title: "Approve this payment?", okLabel: "Approve" }))) return;
                               storeService.verifyThemePurchase(s.subdomain, p.id);
                               refreshData();
                             }}
@@ -2286,8 +2287,8 @@ function AdminDashboardContent() {
                               size="sm"
                               variant="outline"
                               className="text-xs"
-                              onClick={() => {
-                                const reason = window.prompt("Why is it rejected? The seller will see this.", "We couldn't find this payment in our account.");
+                              onClick={async () => {
+                                const reason = await appPrompt("The seller will see this.", { title: "Why is it rejected?", defaultValue: "We couldn't find this payment in our account.", okLabel: "Reject", danger: true });
                                 if (reason === null) return;
                                 storeService.rejectSubscriptionPayment(s.subdomain, reason);
                                 refreshData();
@@ -2298,8 +2299,8 @@ function AdminDashboardContent() {
                             <Button
                               size="sm"
                               className="text-xs bg-emerald-600 text-white hover:bg-emerald-700"
-                              onClick={() => {
-                                if (!window.confirm(`Approve ${req.amountFormatted} from ${s.name} and switch them to ${req.planName}?`)) return;
+                              onClick={async () => {
+                                if (!(await appConfirm(`${req.amountFormatted} from ${s.name}. Their store switches to ${req.planName}.`, { title: "Approve this payment?", okLabel: "Approve" }))) return;
                                 storeService.verifySubscriptionPayment(s.subdomain, req.id);
                                 refreshData();
                               }}

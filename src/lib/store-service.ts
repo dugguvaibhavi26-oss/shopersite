@@ -17,6 +17,8 @@ import {
   getDocs,
   onSnapshot,
 } from "firebase/firestore";
+import { isReservedSubdomain } from "./reserved-names";
+import type { OrderPolicy, PolicyId, StorePolicy } from "./policies";
 import { BILLING_KEYS, OWNER_LOCKED_KEYS, mergeStoreParts, splitStoreUpdate } from "./store-keys";
 
 export interface ProductVariant {
@@ -98,6 +100,8 @@ export interface OrderData {
     phone: string;
     email?: string;
   };
+  /** the buyer's account, when they were signed in to the shop while ordering */
+  customerUid?: string;
   address: {
     street: string;
     city: string;
@@ -123,6 +127,28 @@ export interface OrderData {
   trackingNumber?: string;
   trackingUrl?: string;
   notes?: string;
+  /** set when the order is marked delivered (starts the return window) */
+  deliveredAt?: string;
+  cancelledAt?: string;
+  cancelledBy?: "buyer" | "seller";
+  /** shown to the buyer */
+  cancelReason?: string;
+  /** a buyer's return request and the shop's answer */
+  returnRequest?: {
+    status: "requested" | "approved" | "declined" | "received";
+    reason: string;
+    requestedAt: string;
+    answeredAt?: string;
+    /** the shop's note to the buyer (why declined, how to send it back…) */
+    note?: string;
+  };
+  /** money owed back to the buyer after a cancellation or return */
+  refund?: {
+    status: "due" | "refunded";
+    amount: number; // paise
+    reference?: string;
+    refundedAt?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -150,6 +176,8 @@ export interface CategoryData {
   slug: string;
   description?: string;
   imageUrl?: string;
+  /** wide photo across the top of the category's page, in themes that show one (falls back to imageUrl) */
+  bannerUrl?: string;
   itemCount?: number;
   isActive: boolean;
   position: number;
@@ -228,6 +256,10 @@ export interface StoreData {
   /** theme payments, newest first */
   themePurchases?: ThemePurchase[];
   discounts?: DiscountData[];
+  /** the shop's own legal pages, written in Dashboard → Policies */
+  policies?: Partial<Record<PolicyId, StorePolicy>>;
+  /** whether buyers can cancel / return orders themselves */
+  orderPolicy?: OrderPolicy;
   pluginsConfig?: PluginsConfigData;
   homepageSections?: string[];
   themeSectionOrders?: Record<string, string[]>;
@@ -415,6 +447,19 @@ type NewStoreInput = {
 
 /** Set by the test setup: no database connection at all. */
 const isOffline = () => (globalThis as { __SHOPERSITE_OFFLINE__?: boolean }).__SHOPERSITE_OFFLINE__ === true;
+
+/** Price in paise above 0, MRP (if any) above the price, stock a whole number: what every product must have. */
+export function productProblem(p: Pick<ProductData, "price" | "compareAtPrice" | "stock"> & { title?: string }): string {
+  if (p.title !== undefined && !p.title.trim()) return "Give your product a name.";
+  if (!Number.isInteger(p.price) || p.price <= 0) return "Price must be more than ₹0.";
+  if (p.price > 100000000) return "Price can't be more than ₹10,00,000.";
+  if (p.compareAtPrice !== undefined && p.compareAtPrice !== null) {
+    if (!Number.isInteger(p.compareAtPrice) || p.compareAtPrice < 0) return "MRP can't be negative.";
+    if (p.compareAtPrice > 0 && p.compareAtPrice <= p.price) return "MRP must be higher than the selling price.";
+  }
+  if (!Number.isInteger(p.stock) || p.stock < 0) return "Stock is a whole number, 0 or more.";
+  return "";
+}
 
 // Global Store State Manager with Firebase Firestore Cloud Sync & LocalStorage fallback
 class StoreService {
@@ -745,6 +790,7 @@ class StoreService {
     const newStore = this.buildStore(input);
     const cleanSubdomain = newStore.subdomain;
     if (cleanSubdomain.length < 3) throw new Error("Use at least 3 letters or numbers for your web address.");
+    if (isReservedSubdomain(cleanSubdomain)) throw new Error(`${getStoreDomain(cleanSubdomain)} can't be used. Try another.`);
     if (await this.isSubdomainTaken(cleanSubdomain)) {
       throw new Error(`${getStoreDomain(cleanSubdomain)} is taken. Try another.`);
     }
@@ -892,6 +938,9 @@ class StoreService {
       };
     }
 
+    const bad = productProblem(product);
+    if (bad) return { success: false, error: bad };
+
     const now = new Date().toISOString();
     const newProduct: ProductData = {
       ...product,
@@ -903,6 +952,59 @@ class StoreService {
     store.products.unshift(newProduct);
     this.updateStore(store.subdomain, { products: store.products });
     return { success: true, product: newProduct };
+  }
+
+  /**
+   * Bulk upload: adds many products (and any categories they name that don't exist yet) in one save.
+   * Every row is checked first; nothing is added if one is wrong or the plan's limit would be passed.
+   */
+  public addProductsBulk(
+    subdomain: string,
+    rows: Omit<ProductData, "id" | "storeId" | "createdAt">[]
+  ): { success: boolean; added?: number; newCategories?: string[]; error?: string } {
+    this.initClient();
+    const store = this.getStore(subdomain);
+    if (!store) return { success: false, error: "Store not found." };
+    if (!rows.length) return { success: false, error: "There are no products to add." };
+    const quota = canAddProduct(store.products.length + rows.length - 1, store.planId);
+    if (!quota.allowed) {
+      const room = Math.max(0, (quota.limit ?? 0) - store.products.length);
+      return { success: false, error: `Your plan allows ${quota.limit} products. You can add ${room} more; upgrade to add the rest.` };
+    }
+    for (const [i, r] of rows.entries()) {
+      const bad = productProblem(r);
+      if (bad) return { success: false, error: `Row ${i + 1}: ${bad}` };
+    }
+    const categories = [...(store.categories || [])];
+    const newCategories: string[] = [];
+    const now = new Date();
+    for (const r of rows) {
+      const name = r.category.trim();
+      if (categories.some((c) => !c.isParent && c.name.toLowerCase() === name.toLowerCase())) {
+        r.category = categories.find((c) => !c.isParent && c.name.toLowerCase() === name.toLowerCase())!.name;
+        continue;
+      }
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `category-${categories.length + 1}`;
+      categories.push({
+        id: `cat-${store.subdomain}-${now.getTime().toString(36)}-${categories.length}`,
+        name,
+        slug: categories.some((c) => c.slug === slug) ? `${slug}-${categories.length}` : slug,
+        description: "",
+        isActive: true,
+        position: categories.length,
+        createdAt: now.toISOString(),
+        isParent: false,
+      });
+      newCategories.push(name);
+    }
+    const added: ProductData[] = rows.map((r, i) => ({
+      ...r,
+      id: `prod-${store.subdomain}-${now.getTime().toString(36)}-${i.toString(36)}`,
+      storeId: store.id,
+      createdAt: new Date(now.getTime() + i).toISOString(),
+    }));
+    this.updateStore(store.subdomain, { products: [...added.reverse(), ...store.products], categories });
+    return { success: true, added: added.length, newCategories };
   }
 
   public updateProduct(
@@ -918,6 +1020,8 @@ class StoreService {
     if (index === -1) throw new Error("Product not found.");
 
     const updated = { ...store.products[index], ...updates };
+    const bad = productProblem(updated);
+    if (bad) throw new Error(bad);
     store.products[index] = updated;
     this.updateStore(store.subdomain, { products: store.products });
     return updated;
@@ -1179,7 +1283,8 @@ class StoreService {
       notes?: string;
     }
   ): Promise<OrderData> {
-    const { order } = await this.callApi<{ order: OrderData }>("/api/orders/place", { store: subdomain, ...input });
+    // signed-in buyers send their login so the order shows in their account on any device
+    const { order } = await this.callApi<{ order: OrderData }>("/api/orders/place", { store: subdomain, ...input }, !!auth.currentUser);
     return order;
   }
 
@@ -1277,7 +1382,10 @@ class StoreService {
 
   /** Uploads a photo for the store's theme (editor images) to Storage, or keeps a small compressed copy. */
   public async uploadStoreImage(subdomain: string, file: File): Promise<string> {
-    const { url } = await hostPlatformImage(file, `store_assets/${subdomain}/theme`, 1400);
+    // each uploader writes only inside their own folder (storage.rules checks the uid)
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error("Please sign in again.");
+    const { url } = await hostPlatformImage(file, `store_assets/${subdomain}/u_${uid}/theme`, 1400);
     return url;
   }
 
@@ -1338,6 +1446,7 @@ class StoreService {
       slug?: string;
       description?: string;
       imageUrl?: string;
+      bannerUrl?: string;
       isActive?: boolean;
       isParent?: boolean;
       parentId?: string;
@@ -1379,6 +1488,7 @@ class StoreService {
       slug: generatedSlug,
       description: data.description?.trim() || "",
       imageUrl: data.imageUrl?.trim() || undefined,
+      bannerUrl: data.bannerUrl?.trim() || undefined,
       isActive: data.isActive !== false,
       position: store.categories.length,
       createdAt: now,

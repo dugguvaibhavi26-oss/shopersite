@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm, appPrompt } from "@/components/ui/app-dialog";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, Eye, EyeOff, FileArchive, Loader2, Search, Trash2, Upload } from "lucide-react";
@@ -259,7 +260,7 @@ function ThemeCard({
                   const msg = shops
                     ? `${shops} shop${shops === 1 ? " uses" : "s use"} “${theme.name}”. Deleting it moves ${shops === 1 ? "it" : "them"} back to the default theme. Delete anyway?`
                     : `Delete “${theme.name}”?`;
-                  if (confirm(msg)) storeService.deletePlatformTheme(custom.slug);
+                  appConfirm(msg, { title: "Delete this theme?", danger: true }).then((ok) => ok && storeService.deletePlatformTheme(custom.slug));
                 }}
                 className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
               >

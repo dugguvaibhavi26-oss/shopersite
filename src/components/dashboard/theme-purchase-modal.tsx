@@ -1,4 +1,5 @@
 "use client";
+import { appAlert, appConfirm, appPrompt } from "@/components/ui/app-dialog";
 
 import * as React from "react";
 import { Check, Clock, Loader2, X } from "lucide-react";
@@ -84,9 +85,9 @@ export function ThemePurchaseModal({
             </p>
             <button
               type="button"
-              onClick={() => {
-                if (confirm("Withdraw this payment request? Do this only if you haven't paid or typed the wrong reference."))
-                  storeService.cancelThemePurchase(store.subdomain, waiting.id).catch((err) => alert(err instanceof Error ? err.message : "Couldn't withdraw."));
+              onClick={async () => {
+                if (await appConfirm("Do this only if you haven't paid or typed the wrong reference.", { title: "Withdraw this payment request?", okLabel: "Withdraw", danger: true }))
+                  storeService.cancelThemePurchase(store.subdomain, waiting.id).catch((err) => appAlert(err instanceof Error ? err.message : "Couldn't withdraw."));
               }}
               className="mt-4 text-xs font-semibold text-neutral-500 underline-offset-4 hover:text-black hover:underline"
             >
