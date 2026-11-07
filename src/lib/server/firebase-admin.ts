@@ -4,6 +4,7 @@ import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { firebaseConfig } from "../firebase-config";
 import type { StoreData } from "../store-service";
 import { ApiError } from "./api-error";
+import { effectivePlan } from "../subscription";
 import { verifyFirebaseIdToken } from "./id-token";
 
 /**
@@ -77,5 +78,6 @@ export async function getStoreDoc(subdomain: string): Promise<StoreData | null> 
   const clean = String(subdomain || "").toLowerCase().trim();
   if (!/^[a-z0-9-]{1,63}$/.test(clean)) return null;
   const snap = await adminDb().collection("stores").doc(clean).get();
-  return snap.exists ? (snap.data() as StoreData) : null;
+  // an ended paid plan counts as Free here too
+  return snap.exists ? effectivePlan(snap.data() as StoreData) : null;
 }

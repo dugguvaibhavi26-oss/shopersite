@@ -34,6 +34,8 @@ async function seed() {
     await setDoc(doc(db, "platform_settings/payment"), { activeUpiId: "shop@ybl" });
     await setDoc(doc(db, "payments/ord_1"), { status: "PENDING" });
     await setDoc(doc(db, "upi_claims/p_123456789012"), { kind: "plan" });
+    await setDoc(doc(db, "email_accounts/lume"), { email: "lume@gmail.com", secret: "v1.x.y.z" });
+    await setDoc(doc(db, "email_usage/lume"), { month: "2026-11", monthCount: 999 });
     await setDoc(doc(db, "cashfree_merchants/lume"), { state: "kyc_pending" });
     await setDoc(doc(db, "orders/ord_1"), { total: 100 });
     await ctx.storage().ref ? null : null;
@@ -134,6 +136,10 @@ await check("visitor can't write payments", "DENY", () => setDoc(doc(visitor(), 
 await check("seller can't mark a payment paid", "DENY", () => updateDoc(doc(owner(), "payments/ord_1"), { status: "PAID" }));
 await check("seller can't activate their own Cashfree account", "DENY", () => updateDoc(doc(owner(), "cashfree_merchants/lume"), { state: "active" }));
 await check("nobody can free a used UPI reference", "DENY", () => deleteDoc(doc(owner(), "upi_claims/p_123456789012")));
+await check("owner can't read the saved Gmail App Password", "DENY", () => getDoc(doc(owner(), "email_accounts/lume")));
+await check("admin can't read the saved Gmail App Password from a browser", "DENY", () => getDoc(doc(admin(), "email_accounts/lume")));
+await check("stranger can't swap in their own Gmail login", "DENY", () => setDoc(doc(stranger(), "email_accounts/lume"), { email: "x@gmail.com", secret: "v1.a.b.c" }));
+await check("owner can't reset their email usage", "DENY", () => setDoc(doc(owner(), "email_usage/lume"), { month: "2026-11", monthCount: 0 }));
 await check("visitor can't add fake subscribers", "DENY", () => setDoc(doc(visitor(), "subscribers/x"), { email: "a@b.c" }));
 await check("leftover test collections are closed", "DENY", () => getDoc(doc(visitor(), "_health_check/x")));
 

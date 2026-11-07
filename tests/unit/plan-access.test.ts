@@ -21,15 +21,16 @@ describe("admin-controlled feature access per plan", () => {
     expect(getAllPlanAccess()).toEqual(getDefaultPlanAccess());
     expect(canUseCoupons("free")).toBe(false);
     expect(canUseCoupons("starter")).toBe(true);
-    expect(canUseEmail("starter")).toBe(false);
+    expect(canUseEmail("free")).toBe(false);
+    expect(canUseEmail("starter")).toBe(true);
     expect(canUseEmail("pro")).toBe(true);
     expect(canUseCustomDomain("pro")).toBe(true);
   });
 
   it("applies admin changes to every check for that plan", () => {
-    applyPlanAccess({ free: { coupons: true, maxProducts: 120, maxBanners: 3 }, starter: { email: true } });
+    applyPlanAccess({ free: { coupons: true, maxProducts: 120, maxBanners: 3 }, starter: { email: false } });
     expect(canUseCoupons("free")).toBe(true);
-    expect(canUseEmail("starter")).toBe(true);
+    expect(canUseEmail("starter")).toBe(false);
     expect(canAddProduct(119, "free").allowed).toBe(true);
     expect(canAddProduct(120, "free").allowed).toBe(false);
     expect(canAddBanner(2, "free")).toEqual({ allowed: true, limit: 3 });
@@ -54,7 +55,7 @@ describe("admin-controlled feature access per plan", () => {
 
   it("names the cheapest plan that unlocks a feature", () => {
     expect(cheapestPlanWith("reviews")?.id).toBe("starter");
-    expect(cheapestPlanWith("email")?.id).toBe("pro");
+    expect(cheapestPlanWith("email")?.id).toBe("starter");
     applyPlanAccess({ free: { reviews: true } });
     expect(cheapestPlanWith("reviews")?.id).toBe("free");
     applyPlanAccess({ free: { email: false }, starter: { email: false }, pro: { email: false } });

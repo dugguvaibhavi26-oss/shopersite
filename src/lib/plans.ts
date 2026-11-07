@@ -64,6 +64,7 @@ export const PLATFORM_PLANS: Record<string, PlanFeature> = {
       "Theme editor: your own text, photos and colours",
       "Discount coupons",
       "Customer reviews",
+      "Email your subscribers from your Gmail (1,000 a month)",
       "Payment gateway",
     ],
   },
@@ -87,7 +88,7 @@ export const PLATFORM_PLANS: Record<string, PlanFeature> = {
       "Unlimited products",
       "Connect your own domain",
       "Automatic invoices to generate and download",
-      "Email integration",
+      "Unlimited emails to subscribers (within Gmail's daily limit)",
       "Your store as an Android app (APK)",
       "Priority WhatsApp support",
     ],
@@ -227,7 +228,7 @@ export interface PlanAccess {
 
 const DEFAULT_PLAN_ACCESS: Record<PlanId, PlanAccess> = {
   free: { maxProducts: 75, maxBanners: 1, coupons: false, reviews: false, email: false, customDomain: false, themeEditor: false },
-  starter: { maxProducts: 200, maxBanners: 5, coupons: true, reviews: true, email: false, customDomain: false, themeEditor: true },
+  starter: { maxProducts: 200, maxBanners: 5, coupons: true, reviews: true, email: true, customDomain: false, themeEditor: true },
   pro: { maxProducts: UNLIMITED, maxBanners: 20, coupons: true, reviews: true, email: true, customDomain: true, themeEditor: true },
 };
 

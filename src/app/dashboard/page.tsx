@@ -2,6 +2,7 @@
 
 import { RAIL_WIDTH, SidebarRail } from "./sidebar-rail";
 import { MobileDock } from "./mobile-dock";
+import { EmailPanel, sendNewProductAlert } from "@/components/dashboard/email-panel";
 import { planMove, rankOf, REMIND_DAYS, subscriptionState } from "@/lib/subscription";
 import React, { useState, useEffect, useMemo, Suspense } from "react";
 import Link from "next/link";
@@ -660,6 +661,12 @@ function DashboardPageContent() {
         alert(res.error);
         setActiveTab("billing");
         return;
+      }
+      // new product alert to subscribers (if switched on); wait a moment so the product is saved first
+      if (res.product && canUseEmail(store.planId) && store.pluginsConfig?.gmailIntegration?.autoSendNewDropAlerts) {
+        const added = res.product;
+        const snapshot = store;
+        window.setTimeout(() => sendNewProductAlert(snapshot, added), 4000);
       }
     }
 
@@ -5505,246 +5512,7 @@ function DashboardPageContent() {
                 }
               />
             ) : (
-              /* Email: Gmail settings, compose, subscribers */
-              (() => {
-                const subs = store.subscribers || [];
-                const sent = store.pluginsConfig?.gmailIntegration?.campaignsSentCount || 0;
-                const templates = [
-                  {
-                    label: "New drop",
-                    subject: "New collection just dropped",
-                    tag: "New Arrivals",
-                    message: "Our newest pieces are live on the store. Take a look before your size sells out.",
-                  },
-                  {
-                    label: "Restock",
-                    subject: "Back in stock",
-                    tag: "Bestsellers",
-                    message: "Your favourites are back. They went fast last time, so don't wait too long.",
-                  },
-                  {
-                    label: "Weekend offer",
-                    subject: "A little something for the weekend",
-                    tag: "Full Store",
-                    message: "Thanks for being on our list. Use code WEEKEND10 at checkout for 10% off this weekend.",
-                  },
-                ];
-                return (
-                  <div className="space-y-4">
-                    {/* Summary */}
-                    <div className="relative overflow-hidden rounded-2xl bg-neutral-950 p-5 text-white sm:p-6">
-                      <div aria-hidden className="pointer-events-none absolute -right-14 -top-14 h-44 w-44 rounded-full bg-white/[0.04]" />
-                      <div className="relative flex items-start justify-between gap-3">
-                        <div>
-                          <span className="text-xs text-neutral-400">Email</span>
-                          <p className="mt-1 text-lg font-semibold">Tell subscribers what's new</p>
-                        </div>
-                        <span
-                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            gmailConnected ? "bg-emerald-500/15 text-emerald-300" : "bg-white/10 text-neutral-300"
-                          }`}
-                        >
-                          <span className={`h-1.5 w-1.5 rounded-full ${gmailConnected ? "bg-emerald-400" : "bg-neutral-400"}`} />
-                          {gmailConnected ? "Gmail connected" : "Gmail not set up"}
-                        </span>
-                      </div>
-                      <div className="relative mt-5 grid grid-cols-2 gap-3">
-                        <div className="rounded-xl bg-white/[0.06] p-3">
-                          <span className="block text-2xl font-semibold tabular-nums">{subs.length}</span>
-                          <span className="block text-xs text-neutral-400">Subscribers</span>
-                        </div>
-                        <div className="rounded-xl bg-white/[0.06] p-3">
-                          <span className="block text-2xl font-semibold tabular-nums">{sent}</span>
-                          <span className="block text-xs text-neutral-400">Emails sent</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                      {/* Gmail settings */}
-                      <form onSubmit={handleSaveGmailConfig} className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
-                        <h3 className="text-base font-semibold">Send from</h3>
-                        <p className="mt-0.5 text-sm text-neutral-500">Emails go out from your Gmail address.</p>
-
-                        <label className={`mt-4 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors`}>
-                          <Mail className="h-4 w-4 shrink-0 text-neutral-400" />
-                          <input
-                            type="email"
-                            required
-                            value={gmailEmailInput}
-                            onChange={(e) => setGmailEmailInput(e.target.value)}
-                            placeholder="yourstore@gmail.com"
-                            className="w-full bg-transparent text-sm outline-none"
-                          />
-                        </label>
-
-                        <div className="mt-4 flex items-center justify-between gap-4 rounded-xl bg-neutral-50 p-4">
-                          <span className="min-w-0">
-                            <span className="block text-sm font-semibold">New product alerts</span>
-                            <span className="block text-xs text-neutral-500">Email subscribers automatically when you add products</span>
-                          </span>
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={gmailAutoAlerts}
-                            aria-label="New product alerts"
-                            onClick={() => setGmailAutoAlerts(!gmailAutoAlerts)}
-                            style={{ minHeight: 0, height: 24 }}
-                            className={`relative w-11 shrink-0 rounded-full transition-colors ${gmailAutoAlerts ? "bg-emerald-500" : "bg-neutral-300"}`}
-                          >
-                            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${gmailAutoAlerts ? "left-[22px]" : "left-0.5"}`} />
-                          </button>
-                        </div>
-
-                        <div className="mt-5 grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={handleSendTestEmail}
-                            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-neutral-200 text-sm font-semibold text-neutral-800 hover:border-neutral-900"
-                          >
-                            <Send className="h-4 w-4" />
-                            Send test
-                          </button>
-                          <button type="submit" className="h-11 rounded-xl bg-neutral-950 text-sm font-semibold text-white hover:bg-black">
-                            Save
-                          </button>
-                        </div>
-                        {(gmailSaveToast || testEmailToast) && (
-                          <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
-                            <CheckCircle2 className="h-4 w-4" />
-                            {gmailSaveToast ? "Saved." : `Test email sent to ${gmailEmailInput}.`}
-                          </p>
-                        )}
-                      </form>
-
-                      {/* Compose */}
-                      <form onSubmit={handleSendDropAnnouncement} className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
-                        <h3 className="text-base font-semibold">New email</h3>
-                        <p className="mt-0.5 text-sm text-neutral-500">Goes to all {subs.length} subscriber{subs.length === 1 ? "" : "s"}.</p>
-
-                        <div className="mt-4 flex flex-wrap items-center gap-2">
-                          <span className="text-xs text-neutral-400">Start from:</span>
-                          {templates.map((t) => (
-                            <button
-                              key={t.label}
-                              type="button"
-                              onClick={() => {
-                                setDropSubject(t.subject);
-                                setDropCollection(t.tag);
-                                setDropMessage(t.message);
-                              }}
-                              style={{ minHeight: 0 }} className="h-8 rounded-full border border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-700 hover:border-neutral-900"
-                            >
-                              {t.label}
-                            </button>
-                          ))}
-                        </div>
-
-                        <label className="mt-4 block text-sm font-medium" htmlFor="email-subject">Subject</label>
-                        <div className={`mt-1.5 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors`}>
-                          <input
-                            id="email-subject"
-                            required
-                            value={dropSubject}
-                            onChange={(e) => setDropSubject(e.target.value)}
-                            placeholder="New collection just dropped"
-                            className="w-full bg-transparent text-sm outline-none"
-                          />
-                        </div>
-
-                        <label className="mt-3 block text-sm font-medium" htmlFor="email-tag">
-                          Collection <span className="font-normal text-neutral-400">(optional)</span>
-                        </label>
-                        <div className={`mt-1.5 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors`}>
-                          <input
-                            id="email-tag"
-                            value={dropCollection}
-                            onChange={(e) => setDropCollection(e.target.value)}
-                            placeholder="New Arrivals"
-                            className="w-full bg-transparent text-sm outline-none"
-                          />
-                        </div>
-
-                        <label className="mt-3 block text-sm font-medium" htmlFor="email-message">Message</label>
-                        <textarea
-                          id="email-message"
-                          rows={4}
-                          required
-                          value={dropMessage}
-                          onChange={(e) => setDropMessage(e.target.value)}
-                          placeholder="Tell subscribers about your newest pieces or an offer…"
-                          className="mt-1.5 w-full rounded-xl border border-neutral-200 bg-white p-3.5 text-sm leading-relaxed outline-none transition-colors focus:border-neutral-900"
-                        />
-
-                        <button
-                          type="submit"
-                          disabled={dropSending || subs.length === 0}
-                          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-neutral-950 text-sm font-semibold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {dropSending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                          {dropSending ? "Sending…" : `Send to ${subs.length} subscriber${subs.length === 1 ? "" : "s"}`}
-                        </button>
-                        {subs.length === 0 && (
-                          <p className="mt-2 text-center text-xs text-neutral-500">You can send once someone subscribes on your store.</p>
-                        )}
-                        {dropSentSuccess && (
-                          <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
-                            <CheckCircle2 className="h-4 w-4" />
-                            Sent to all subscribers.
-                          </p>
-                        )}
-                      </form>
-                    </div>
-
-                    {/* Subscribers */}
-                    <div className="rounded-2xl border border-neutral-200 bg-white">
-                      <div className="flex items-center justify-between gap-3 p-5 sm:px-6">
-                        <div>
-                          <h3 className="text-base font-semibold">Subscribers</h3>
-                          <p className="mt-0.5 text-sm text-neutral-500">People who signed up in your store&apos;s footer.</p>
-                        </div>
-                        <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-neutral-700">{subs.length}</span>
-                      </div>
-                      {subs.length === 0 ? (
-                        <div className="border-t border-neutral-100 px-6 py-10 text-center">
-                          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-100">
-                            <Mail className="h-5 w-5 text-neutral-500" />
-                          </span>
-                          <p className="mt-3 text-sm font-semibold">No subscribers yet</p>
-                          <p className="mx-auto mt-1 max-w-xs text-xs text-neutral-500">
-                            Shoppers can sign up in the footer of {storeWebDomain}. They&apos;ll show up here.
-                          </p>
-                        </div>
-                      ) : (
-                        <ul className="divide-y divide-neutral-100 border-t border-neutral-100">
-                          {subs.map((sub) => (
-                            <li key={sub.id} className="flex items-center gap-3 px-5 py-3 sm:px-6">
-                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold uppercase text-neutral-700">
-                                {sub.email.charAt(0)}
-                              </span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-medium">{sub.email}</span>
-                                <span className="block text-xs text-neutral-500">
-                                  Joined {new Date(sub.subscribedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                                </span>
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveSubscriber(sub.email)}
-                                aria-label={`Remove ${sub.email}`}
-                                style={{ minHeight: 0 }}
-                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-neutral-400 hover:bg-red-50 hover:text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()
+              <EmailPanel store={store} storeWebDomain={storeWebDomain} onRemoveSubscriber={handleRemoveSubscriber} />
             )}
           </div>
         )}

@@ -18,12 +18,13 @@ describe("subscription plans", () => {
     expect(PLATFORM_PLANS.pro.maxProducts).toBeGreaterThanOrEqual(9999);
   });
 
-  it("unlocks coupons and reviews on Growth, email integration only on Pro", () => {
+  it("unlocks coupons, reviews and email on Growth (email has a monthly limit there)", () => {
     expect(canUseCoupons("free")).toBe(false);
     expect(canUseCoupons("starter")).toBe(true);
     expect(canUseReviews("free")).toBe(false);
     expect(canUseReviews("starter")).toBe(true);
-    expect(canUseEmail("starter")).toBe(false);
+    expect(canUseEmail("free")).toBe(false);
+    expect(canUseEmail("starter")).toBe(true);
     expect(canUseEmail("pro")).toBe(true);
   });
 
