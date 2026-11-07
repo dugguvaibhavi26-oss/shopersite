@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { siteConfig } from "@/lib/config/site";
 import { usePlatformSettings } from "@/lib/use-platform-settings";
 import { PLATFORM_PLANS, planDiscountPercent, calculatePlanPrice, BILLING_CYCLES, type BillingCycle } from "@/lib/plans";
-import { PLATFORM_THEMES } from "@/lib/themes";
+import { PLATFORM_THEMES, themeThumb } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 import {
   StoreMockup,
@@ -962,12 +962,12 @@ function ThemesCarousel() {
                     active ? "shadow-[0_30px_60px_-30px_rgba(0,0,0,0.45)]" : ""
                   }`}
                 >
-                  {theme.previewImage && (
+                  {themeThumb(theme) && (
                     <img
-                      src={theme.previewImage}
+                      src={themeThumb(theme)}
                       alt={`${theme.name} theme preview`}
                       loading="lazy"
-                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
                     />
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/0" />

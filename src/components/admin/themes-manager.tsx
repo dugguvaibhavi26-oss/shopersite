@@ -4,7 +4,7 @@ import { appAlert, appConfirm, appPrompt } from "@/components/ui/app-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, Eye, EyeOff, FileArchive, Loader2, Search, Trash2, Upload } from "lucide-react";
 import { storeService, type StoreData } from "@/lib/store-service";
-import { getTheme, PLATFORM_THEMES, type ThemeDefinition } from "@/lib/themes";
+import { getTheme, PLATFORM_THEMES, themeThumb, type ThemeDefinition } from "@/lib/themes";
 import { buildThemeZip, readThemePackage, themeZipName } from "@/lib/theme-package";
 import { ALL_THEMES_FREE, defaultThemePlan, defaultThemePrice, formatThemePrice, getThemePlan, getThemePrice, type ThemePlan } from "@/lib/theme-pricing";
 import type { CustomThemeDef } from "@/lib/site-content";
@@ -201,9 +201,9 @@ function ThemeCard({
   return (
     <div className={`overflow-hidden rounded-xl border border-neutral-200 bg-white ${hidden ? "opacity-70" : ""}`}>
       <div className="relative aspect-[16/9] bg-neutral-100">
-        {theme.previewImage ? (
+        {themeThumb(theme) ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={theme.previewImage} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+          <img src={themeThumb(theme)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover object-top" />
         ) : (
           <div className="absolute inset-0 flex">
             {theme.previewColors.map((c, i) => (

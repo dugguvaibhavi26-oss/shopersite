@@ -104,7 +104,7 @@ function ThemeMarketplace() {
   };
 
   const useHref = (t: ThemeDefinition) => {
-    return user ? "/dashboard?tab=themes" : `/register?theme=${t.slug}`;
+    return user ? `/dashboard?tab=themes&use=${t.slug}` : `/register?theme=${t.slug}`;
   };
 
   const clear = () => {

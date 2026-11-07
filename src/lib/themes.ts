@@ -802,3 +802,11 @@ export function getTheme(slug?: string): ThemeDefinition {
   if (custom) return customThemeDefinition(custom);
   return (slug && PLATFORM_THEMES[slug]) || PLATFORM_THEMES["classic-bloom"];
 }
+
+/**
+ * A theme's thumbnail: a screenshot of its homepage as a buyer first sees it (public/theme-previews,
+ * made from /themes/preview/<slug>?shot=1). Themes uploaded by the admin use their own preview image.
+ */
+export function themeThumb(theme: Pick<ThemeDefinition, "slug" | "previewImage">): string {
+  return getCustomTheme(theme.slug) ? theme.previewImage || "" : `/theme-previews/${theme.slug}.webp`;
+}

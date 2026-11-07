@@ -7,6 +7,7 @@ import { EmailPanel, sendNewProductAlert } from "@/components/dashboard/email-pa
 import { SITE_THEME_STYLE, toSiteTheme } from "@/lib/site-content";
 import { cropImage } from "@/components/ui/image-cropper";
 import { Tour, type TourStep } from "@/components/ui/tour";
+import { LiveShopFrame } from "@/components/dashboard/live-shop-frame";
 import { OrderActions } from "@/components/dashboard/order-actions";
 import { PoliciesPanel } from "@/components/dashboard/policies-panel";
 import { missingPolicies } from "@/lib/policies";
@@ -41,7 +42,7 @@ import { CashfreePaymentsCard } from "@/components/dashboard/cashfree-payments";
 import { fetchPaidOnlineOrders } from "@/lib/payments/client";
 import { ThemePurchaseModal } from "@/components/dashboard/theme-purchase-modal";
 import { canEditTheme, canUseTheme, formatThemePrice, getThemePrice, ownsTheme, planIncludesTheme } from "@/lib/theme-pricing";
-import { getTheme, getAllThemes } from "@/lib/themes";
+import { getTheme, getAllThemes, themeThumb } from "@/lib/themes";
 import { computeSalesAnalytics } from "@/lib/sales-analytics";
 import { siteConfig, getStoreUrl, getPublicStoreUrl, getPublicStoreAddress } from "@/lib/config/site";
 import { Button } from "@/components/ui/button";
@@ -950,6 +951,24 @@ function DashboardPageContent() {
     refreshStore();
     setTimeout(() => setThemeAppliedToast(null), 3500);
   };
+
+  // "Use this theme" in the marketplace comes back here with ?use=<theme>
+  const useParam = searchParams.get("use");
+  useEffect(() => {
+    if (!useParam || !store) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("use");
+    window.history.replaceState(null, "", url.toString());
+    const theme = getTheme(useParam);
+    if (theme.slug !== useParam) return;
+    if (theme.slug === getTheme(store.activeThemeSlug).slug) return;
+    if (canUseTheme(store, theme.slug)) {
+      appConfirm(`${theme.name} becomes the look of your shop. Your products and settings stay the same.`, { title: `Make ${theme.name} live?`, okLabel: "Make live" }).then(
+        (ok) => ok && handleActivateTheme(theme.slug)
+      );
+    } else setThemeToBuy(theme.slug);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useParam, store?.subdomain]);
 
   const handleUpdateOrderStatus = (
     orderId: string,
@@ -4622,10 +4641,24 @@ function DashboardPageContent() {
           const editorOn = canUseThemeEditor(store.planId);
           const editorPlan = cheapestPlanWith("themeEditor");
           const activeSlug = getTheme(store.activeThemeSlug).slug;
+          const live = getTheme(activeSlug);
           // the live theme came with a plan that has lapsed: the shop shows the free default until renewed or bought
           const lapsed = !canUseTheme(store, activeSlug);
+          const onFree = !isPaidPlan(store.planId);
+          const editHref = (slug: string) => `/dashboard/editor?store=${store.subdomain}&theme=${slug}`;
+          const previewHref = (slug: string) => getStoreUrl(store.subdomain, `?preview_theme=${slug}`);
+          // themes this shop has worked on: edited, bought, or switched to through its plan
+          const mine = allThemes.filter(
+            (t) => t.slug !== activeSlug && (store.themeContent?.[t.slug] !== undefined || ownsTheme(store, t.slug) || (store.planThemes || []).includes(t.slug))
+          );
+          // a few picks the shop can use now (free ones on the Free plan); the rest live in the marketplace
+          const picks = allThemes
+            .filter((t) => t.slug !== activeSlug && !mine.includes(t) && canUseTheme(store, t.slug) && (!onFree || getThemePrice(t.slug) === 0))
+            .slice(0, 3);
+          const moreCount = allThemes.length - 1 - mine.length - picks.length;
+          const moreThumbs = allThemes.filter((t) => t.slug !== activeSlug && !mine.includes(t) && !picks.includes(t)).slice(0, 3);
           return (
-            <div className="mt-6 space-y-6 animate-enter-blur">
+            <div className="mt-6 space-y-8 animate-enter-blur">
               {lapsed && (
                 <div className="p-4 rounded-2xl border border-neutral-900 bg-white flex flex-col sm:flex-row sm:items-center gap-3">
                   <Lock className="w-5 h-5 shrink-0" />
@@ -4657,100 +4690,144 @@ function DashboardPageContent() {
                 </div>
               )}
 
-              <div>
-                <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-950">Themes</h2>
-                <p className="text-sm text-neutral-500 mt-1">
-                  Pick the look of your shop. Buy a theme once to keep and edit it on any plan{editorOn ? ", and edit every theme you use in the editor." : ", or upgrade for more themes and the editor."}
-                </p>
-              </div>
 
-              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                {allThemes.map((theme) => {
-                  const isCurrent = activeSlug === theme.slug;
-                  const price = getThemePrice(theme.slug);
-                  const owned = ownsTheme(store, theme.slug);
-                  const usable = canUseTheme(store, theme.slug);
-                  const editable = canEditTheme(store, theme.slug);
-                  const latest = store.themePurchases?.find((p) => p.themeSlug === theme.slug);
-                  const checking = latest?.status === "pending_verification";
-                  const refused = latest?.status === "rejected" && latest.note !== "Cancelled by seller" ? latest : null;
-                  const tag = owned ? "Owned" : price === 0 ? "Free" : planIncludesTheme(store, theme.slug) ? "With your plan" : formatThemePrice(price);
-                  return (
-                    <div
-                      key={theme.slug}
-                      className={`rounded-3xl overflow-hidden bg-white border flex flex-col ${isCurrent ? "border-black ring-2 ring-black" : "border-neutral-200"}`}
-                    >
+              {/* live theme */}
+              <section className="overflow-hidden rounded-3xl border border-neutral-200 bg-white">
+                <div className="grid md:grid-cols-[1.35fr_1fr]">
+                  <a href={liveStoreUrl} target="_blank" rel="noreferrer" className="group relative block aspect-[16/10] overflow-hidden bg-neutral-100 md:aspect-auto md:min-h-[300px]" aria-label="Open your live shop">
+                    {/* your real shop, as buyers see it right now */}
+                    <LiveShopFrame src={`/s/${store.subdomain}`} fallback={themeThumb(live)} />
+                    <span className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+                    <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-neutral-900 shadow-sm">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Live now
+                    </span>
+                    <span className="absolute bottom-4 left-4 right-4 truncate text-sm font-semibold text-white">{storeWebDomain}</span>
+                  </a>
+                  <div className="flex flex-col p-5 sm:p-7">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-400">Your live theme</span>
+                    <h2 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">{live.name}</h2>
+                    <p className="mt-2 text-sm leading-relaxed text-neutral-500">{live.description}</p>
+                    <span className="mt-4 flex gap-1.5">
+                      {live.previewColors.map((c) => (
+                        <span key={c} className="h-5 w-5 rounded-full border border-neutral-200" style={{ backgroundColor: c }} />
+                      ))}
+                    </span>
+                    <div className="mt-auto flex flex-wrap gap-2 pt-6">
                       <button
                         type="button"
-                        onClick={() => {
-                          window.location.href = getStoreUrl(store.subdomain, `?preview_theme=${theme.slug}`);
-                        }}
-                        className="relative aspect-[16/10] w-full overflow-hidden bg-neutral-100 group"
-                        aria-label={`Preview ${theme.name}`}
+                        onClick={() => router.push(editHref(activeSlug))}
+                        className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-neutral-950 px-4 text-[13px] font-semibold text-white hover:bg-black"
                       >
-                        <img src={theme.previewImage} alt="" className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
-                        {isCurrent && (
-                          <span className="absolute top-3 left-3 inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-white text-black shadow-sm">
-                            <Check className="w-3 h-3" /> Live
-                          </span>
-                        )}
-                        <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-full bg-black/75 text-white backdrop-blur">
-                          <Eye className="w-3.5 h-3.5" /> Preview
-                        </span>
-                        <span className="absolute top-3 right-3 inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-white text-black shadow-sm">
-                          {!usable && <Lock className="w-3 h-3" />}
-                          {tag}
-                        </span>
+                        {canEditTheme(store, activeSlug) ? <SlidersHorizontal className="h-4 w-4" /> : <Lock className="h-4 w-4" />} Edit website
                       </button>
-                      <div className="p-5 flex-1 flex flex-col">
-                        <div className="flex items-center justify-between gap-3">
-                          <h3 className="text-base font-semibold text-neutral-950">{theme.name}</h3>
-                          <span className="flex gap-1">
-                            {theme.previewColors.map((c) => (
-                              <span key={c} className="w-3.5 h-3.5 rounded-full border border-neutral-200" style={{ backgroundColor: c }} />
-                            ))}
-                          </span>
-                        </div>
-                        <p className="text-[13px] text-neutral-500 mt-1.5 leading-relaxed flex-1">{theme.description}</p>
-                        {refused && <p className="mt-2 text-[12px] text-red-600">Payment not verified: {refused.note}</p>}
-                        <div className="mt-4 flex gap-2">
-                          {!usable ? (
-                            checking ? (
-                              <button type="button" onClick={() => setThemeToBuy(theme.slug)} className="h-10 px-4 rounded-xl bg-neutral-100 text-[13px] font-semibold text-neutral-700 flex items-center gap-1.5">
-                                <Clock className="w-4 h-4" /> Checking payment
-                              </button>
-                            ) : (
-                              <button type="button" onClick={() => setThemeToBuy(theme.slug)} className="h-10 px-4 rounded-xl bg-black text-white text-[13px] font-semibold hover:bg-neutral-800">
-                                Buy for {formatThemePrice(price)}
-                              </button>
-                            )
-                          ) : isCurrent ? (
-                            <span className="h-10 px-4 rounded-xl bg-neutral-100 text-[13px] font-semibold text-neutral-700 flex items-center gap-1.5">
-                              <CheckCircle className="w-4 h-4 text-emerald-600" /> Live theme
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleActivateTheme(theme.slug)}
-                              className="h-10 px-4 rounded-xl bg-black text-white text-[13px] font-semibold hover:bg-neutral-800"
-                            >
+                      <a href={liveStoreUrl} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-neutral-300 px-4 text-[13px] font-semibold hover:border-black">
+                        View shop <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* themes this shop has worked on */}
+              {mine.length > 0 && (
+                <section>
+                  <h3 className="text-sm font-semibold text-neutral-950">Your other themes</h3>
+                  <p className="mt-0.5 text-xs text-neutral-500">Themes you&apos;ve edited or own. Buyers only see your live theme.</p>
+                  <div className="mt-3 divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+                    {mine.map((t) => {
+                      const usable = canUseTheme(store, t.slug);
+                      const status = ownsTheme(store, t.slug) ? "Owned" : store.themeContent?.[t.slug] !== undefined ? "Edited" : "With your plan";
+                      return (
+                        <div key={t.slug} className="flex items-center gap-3 p-3 sm:gap-4 sm:p-4">
+                          <a href={previewHref(t.slug)} className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-neutral-100 sm:h-16 sm:w-24" aria-label={`Preview ${t.name}`}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={themeThumb(t)} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
+                          </a>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-neutral-950">{t.name}</p>
+                            <p className="truncate text-xs text-neutral-500">
+                              {status}
+                              {!usable && " · locked until you renew or buy"}
+                            </p>
+                          </div>
+                          {usable ? (
+                            <button type="button" onClick={() => handleActivateTheme(t.slug)} className="hidden h-9 rounded-xl border border-neutral-300 px-3 text-xs font-semibold hover:border-black sm:block">
                               Make live
                             </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => router.push(`/dashboard/editor?store=${store.subdomain}&theme=${theme.slug}`)}
-                            className="h-10 px-4 rounded-xl border border-neutral-300 text-[13px] font-semibold text-neutral-900 hover:border-black flex items-center gap-1.5"
-                          >
-                            {editable ? <SlidersHorizontal className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                            Edit website
+                          ) : getThemePrice(t.slug) > 0 ? (
+                            <button type="button" onClick={() => setThemeToBuy(t.slug)} className="h-9 rounded-xl bg-neutral-950 px-3 text-xs font-semibold text-white">
+                              Buy
+                            </button>
+                          ) : null}
+                          <button type="button" onClick={() => router.push(editHref(t.slug))} className="h-9 rounded-xl bg-neutral-100 px-3 text-xs font-semibold hover:bg-neutral-200">
+                            Edit
                           </button>
+                          {usable && (
+                            <button type="button" onClick={() => handleActivateTheme(t.slug)} className="h-9 rounded-xl border border-neutral-300 px-3 text-xs font-semibold sm:hidden">
+                              Use
+                            </button>
+                          )}
                         </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {/* a few picks, then the marketplace */}
+              <section>
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-neutral-950">{onFree ? "Free themes for your shop" : "Included in your plan"}</h3>
+                    <p className="mt-0.5 text-xs text-neutral-500">Preview any of them with your products. Your shop only changes when you make one live.</p>
+                  </div>
+                  <Link href="/themes" className="hidden shrink-0 text-xs font-semibold text-neutral-600 underline-offset-4 hover:text-black hover:underline sm:block">
+                    All themes
+                  </Link>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+                  {picks.map((t) => (
+                    <div key={t.slug} className="group flex flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+                      <a href={previewHref(t.slug)} className="relative block aspect-[4/3] overflow-hidden bg-neutral-100" aria-label={`Preview ${t.name}`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={themeThumb(t)} alt="" className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04]" />
+                        <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white opacity-0 backdrop-blur transition-opacity group-hover:opacity-100">
+                          <Eye className="h-3 w-3" /> Preview
+                        </span>
+                      </a>
+                      <div className="flex items-center justify-between gap-2 p-3">
+                        <span className="min-w-0">
+                          <span className="block truncate text-[13px] font-semibold text-neutral-950">{t.name}</span>
+                          <span className="block text-[11px] text-neutral-400">{getThemePrice(t.slug) === 0 ? "Free" : "With your plan"}</span>
+                        </span>
+                        <button type="button" onClick={() => handleActivateTheme(t.slug)} className="h-8 shrink-0 rounded-lg bg-neutral-100 px-3 text-xs font-semibold hover:bg-neutral-950 hover:text-white">
+                          Use
+                        </button>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+                  {/* marketplace */}
+                  <Link href="/themes" className="group relative flex min-h-[200px] flex-col justify-between overflow-hidden rounded-2xl bg-neutral-950 p-4 text-white sm:p-5">
+                    <span className="relative flex -space-x-6">
+                      {moreThumbs.map((t, i) => (
+                        <span key={t.slug} className="relative h-16 w-14 overflow-hidden rounded-lg border-2 border-neutral-950 bg-neutral-800 transition-transform duration-500 group-hover:-translate-y-1" style={{ rotate: `${(i - 1) * 6}deg`, transitionDelay: `${i * 60}ms` }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={themeThumb(t)} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
+                        </span>
+                      ))}
+                    </span>
+                    <span className="relative">
+                      <span className="block text-base font-semibold">Theme marketplace</span>
+                      <span className="mt-1 block text-xs leading-relaxed text-white/60">
+                        {moreCount > 0 ? `${moreCount} more themes, free and paid. ` : ""}Browse, preview and buy.
+                      </span>
+                      <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold">
+                        Open marketplace <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                      </span>
+                    </span>
+                  </Link>
+                </div>
+              </section>
 
               {!editorOn && (
                 <div className="p-5 rounded-2xl bg-white border border-neutral-200 flex flex-col sm:flex-row sm:items-center gap-4">
