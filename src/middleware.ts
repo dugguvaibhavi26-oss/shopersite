@@ -75,6 +75,9 @@ export default async function middleware(req: NextRequest) {
     path.startsWith("/dashboard") ||
     path.startsWith("/register") ||
     path.startsWith("/gallery") ||
+    path.startsWith("/explore") ||
+    path.startsWith("/themes") ||
+    path.startsWith("/docs") ||
     path.startsWith("/orders") ||
     path.startsWith("/invoice/")
   ) {

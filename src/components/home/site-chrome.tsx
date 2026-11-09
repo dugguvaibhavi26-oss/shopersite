@@ -5,7 +5,7 @@ import Link from "next/link";
 import { siteConfig } from "@/lib/config/site";
 import { cn } from "@/lib/utils";
 import { ShopperLogo, ShopperWordmark } from "@/components/brand/shopper-logo";
-import { BookOpen, ChevronDown, LayoutGrid, LifeBuoy, Megaphone, Menu, MessageCircle, Package, Palette, QrCode, Store, X } from "lucide-react";
+import { BookOpen, ChevronDown, Compass, FileText, LayoutGrid, LifeBuoy, Megaphone, Menu, MessageCircle, Package, Palette, QrCode, Store, X } from "lucide-react";
 
 /**
  * The marketing site's floating header and dark footer, shared by the homepage and the theme marketplace. Links
@@ -20,8 +20,9 @@ const PRODUCT_MENU = [
 ];
 
 const RESOURCES_MENU = [
-  { icon: LayoutGrid, title: "Design System", text: "Components behind every store", href: "/gallery" },
+  { icon: Compass, title: "Explore", text: "Trends, campaigns, ideas & academy", href: "/explore" },
   { icon: BookOpen, title: "Theme marketplace", text: "Browse every storefront design", href: "/themes" },
+  { icon: FileText, title: "Documentation", text: "Setup guides, payments & integrations", href: "/docs" },
   { icon: LifeBuoy, title: "Help & FAQ", text: "Answers to common questions", href: "/#faq" },
 ];
 
@@ -224,7 +225,7 @@ const FOOTER_COLUMNS = [
     links: [
       { label: "All Themes", href: "/themes" },
       { label: "On the homepage", href: "/#themes" },
-      { label: "Design System", href: "/gallery" },
+      { label: "Explore & Resources", href: "/explore" },
     ],
   },
   {
@@ -238,6 +239,7 @@ const FOOTER_COLUMNS = [
   {
     title: "Support",
     links: [
+      { label: "Documentation", href: "/docs" },
       { label: "FAQ", href: "/#faq" },
       { label: "How it works", href: "/#how-it-works" },
       { label: "Contact us", href: "/legal/contact" },
