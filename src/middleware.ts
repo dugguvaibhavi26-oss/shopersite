@@ -1,3 +1,4 @@
+import { LEGACY_DOC_IDS, LEGACY_EXPLORE_SECTIONS } from "@/lib/resources/legacy";
 import { NextRequest, NextResponse } from "next/server";
 import { getStoreSubdomainFromHost, siteConfig } from "./lib/config/site";
 
@@ -68,6 +69,17 @@ export default async function middleware(req: NextRequest) {
     }
   }
 
+  // Old Help Center / Explore links (?article=…, ?section=…) move to their own pages, so those pages
+  // stay static and each article has one address for search engines
+  if (!storeSub && path === "/docs" && url.searchParams.has("article")) {
+    const id = url.searchParams.get("article") || "";
+    return NextResponse.redirect(new URL(`/docs/${LEGACY_DOC_IDS[id] || id}`, url), 308);
+  }
+  if (!storeSub && path === "/explore" && (url.searchParams.has("section") || url.searchParams.has("view"))) {
+    const id = url.searchParams.get("section") || url.searchParams.get("view") || "";
+    return NextResponse.redirect(new URL(LEGACY_EXPLORE_SECTIONS[id] || "/explore", url), 308);
+  }
+
   // If path already starts with /s/, /dashboard, /register, /gallery, or /orders, don't rewrite
   if (
     path.startsWith("/s/") ||
@@ -75,9 +87,6 @@ export default async function middleware(req: NextRequest) {
     path.startsWith("/dashboard") ||
     path.startsWith("/register") ||
     path.startsWith("/gallery") ||
-    path.startsWith("/explore") ||
-    path.startsWith("/themes") ||
-    path.startsWith("/docs") ||
     path.startsWith("/orders") ||
     path.startsWith("/invoice/")
   ) {

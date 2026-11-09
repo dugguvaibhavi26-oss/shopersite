@@ -5,6 +5,8 @@ import { siteConfig } from "@/lib/config/site";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  // relative canonical and Open Graph links on marketing pages resolve against the main site
+  metadataBase: new URL(`https://www.${siteConfig.domain}`),
   title: `${siteConfig.name} - Store Builder for Social Sellers`,
   description: siteConfig.description,
 };

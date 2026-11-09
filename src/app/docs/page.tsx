@@ -1,410 +1,169 @@
-"use client";
-
-import * as React from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import {
-  Search,
-  X,
-  Rocket,
-  Package,
-  QrCode,
-  Truck,
-  Palette,
-  CreditCard,
-  Code,
-  ChevronRight,
-  ChevronDown,
-  Copy,
-  Check,
-  ArrowRight,
-  ArrowLeft,
-  ExternalLink,
-  BookOpen,
-  Info,
-  CheckCircle2,
-  AlertTriangle,
-  FileText,
-  ThumbsUp,
-  ThumbsDown,
-} from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
-import { SiteFooter, SiteHeader } from "@/components/home/site-chrome";
-import { DOCS_CATEGORIES, type DocArticle, type DocCategory } from "@/lib/docs-data";
+import type { Metadata } from "next";
+import { ArrowRight, Clock, LifeBuoy, Mail } from "lucide-react";
+import { LegalShell } from "@/components/legal/legal-shell";
+import { DocsSearch } from "@/components/resources/docs-search";
+import { JsonLd } from "@/components/resources/blocks";
+import { DOC_ICONS, GuideCard, StartBand } from "@/components/resources/parts";
+import { DOC_BY_SLUG, DOC_CATEGORIES, DOCS, POPULAR_DOCS, docsIn } from "@/lib/resources/docs";
+import { GUIDES } from "@/lib/resources/guides";
+import { SITE_URL, breadcrumbLd, searchIndex } from "@/lib/resources";
 
-const ICON_MAP: Record<string, React.ElementType> = {
-  Rocket,
-  Package,
-  QrCode,
-  Truck,
-  Palette,
-  CreditCard,
-  Code,
+export const metadata: Metadata = {
+  title: "Help Center — set up and run your online shop | Shopersite",
+  description:
+    "Step-by-step guides for Shopersite sellers: create your shop, add products, take payments with COD and Razorpay, ship with Shiprocket, design your website and grow sales.",
+  alternates: { canonical: "/docs" },
+  openGraph: {
+    title: "Shopersite Help Center",
+    description: "Everything you need to set up and run your online shop, step by step.",
+    url: `${SITE_URL}/docs`,
+    type: "website",
+  },
 };
 
-export default function DocsPage() {
-  return (
-    <React.Suspense fallback={null}>
-      <DocsContent />
-    </React.Suspense>
-  );
-}
-
-function DocsContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { user, signOut } = useAuth();
-
-  const articleIdParam = searchParams.get("article") || "create-account";
-  const [searchQuery, setSearchQuery] = React.useState("");
-  const [copiedCode, setCopiedCode] = React.useState<string | null>(null);
-  const [feedback, setFeedback] = React.useState<"up" | "down" | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-
-  // Find active article & its category
-  let activeArticle: DocArticle | null = null;
-  let activeCategory: DocCategory | null = null;
-
-  for (const cat of DOCS_CATEGORIES) {
-    const found = cat.articles.find((a) => a.id === articleIdParam);
-    if (found) {
-      activeArticle = found;
-      activeCategory = cat;
-      break;
-    }
-  }
-
-  // Fallback to first article if param not found
-  if (!activeArticle) {
-    activeCategory = DOCS_CATEGORIES[0];
-    activeArticle = activeCategory.articles[0];
-  }
-
-  const selectArticle = (id: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("article", id);
-    router.replace(`/docs?${params.toString()}`, { scroll: true });
-    setMobileMenuOpen(false);
-    setFeedback(null);
-  };
-
-  const handleCopyCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2000);
-  };
-
-  const q = searchQuery.trim().toLowerCase();
-
-  // Search filtering across all articles & steps
-  const searchResults = React.useMemo(() => {
-    if (!q) return null;
-    const matches: { article: DocArticle; category: DocCategory }[] = [];
-    for (const cat of DOCS_CATEGORIES) {
-      for (const art of cat.articles) {
-        if (
-          art.title.toLowerCase().includes(q) ||
-          art.summary.toLowerCase().includes(q) ||
-          art.steps.some((s) => s.title.toLowerCase().includes(q) || s.description.toLowerCase().includes(q))
-        ) {
-          matches.push({ article: art, category: cat });
-        }
-      }
-    }
-    return matches;
-  }, [q]);
-
-  // Find Next & Previous articles for bottom pagination
-  const allArticlesList: { article: DocArticle; category: DocCategory }[] = [];
-  for (const c of DOCS_CATEGORIES) {
-    for (const a of c.articles) {
-      allArticlesList.push({ article: a, category: c });
-    }
-  }
-  const currentIndex = allArticlesList.findIndex((item) => item.article.id === activeArticle?.id);
-  const prevArticle = currentIndex > 0 ? allArticlesList[currentIndex - 1] : null;
-  const nextArticle = currentIndex < allArticlesList.length - 1 ? allArticlesList[currentIndex + 1] : null;
+export default function DocsHome() {
+  const popular = POPULAR_DOCS.map((s) => DOC_BY_SLUG[s]).filter(Boolean);
+  const guides = GUIDES.filter((g) => g.featured).slice(0, 3);
 
   return (
-    <div className="home-sans flex min-h-screen flex-col overflow-x-clip bg-white font-[Inter,sans-serif] text-neutral-950">
-      <SiteHeader user={!!user} onSignOut={() => signOut()} />
+    <LegalShell>
+      <JsonLd data={breadcrumbLd([{ name: "Home", path: "/" }, { name: "Help Center", path: "/docs" }])} />
 
-      <main className="flex-1 border-t border-neutral-200">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
-          {/* Top Breadcrumb & Mobile Menu Switcher */}
-          <div className="flex items-center justify-between pb-6 border-b border-neutral-200 mb-6">
-            <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-neutral-500">
-              <Link href="/explore" className="hover:text-black">
-                Explore Hub
-              </Link>
-              <ChevronRight className="w-3.5 h-3.5 text-neutral-400" />
-              <span className="text-neutral-700">{activeCategory?.title}</span>
-              <ChevronRight className="w-3.5 h-3.5 text-neutral-400" />
-              <span className="font-bold text-neutral-950">{activeArticle.title}</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden px-3 py-1.5 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-800 flex items-center gap-1.5"
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>All Docs Topics</span>
-            </button>
+      {/* hero */}
+      <section className="relative overflow-hidden border-b border-neutral-200 bg-[radial-gradient(90%_70%_at_50%_0%,#f4f4f5_0%,#ffffff_70%)]">
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.035)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.035)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(70%_60%_at_50%_0%,#000_30%,transparent_80%)]" />
+        <div className="relative mx-auto max-w-3xl px-4 pb-16 pt-16 text-center sm:px-6 sm:pb-20 sm:pt-24">
+          <span className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1 text-[12px] font-medium text-neutral-600">
+            <LifeBuoy className="h-3.5 w-3.5" /> Shopersite Help Center
+          </span>
+          <h1 className="mt-5 text-[38px] font-semibold leading-[1.05] tracking-[-0.03em] text-neutral-950 sm:text-[56px]">How can we help?</h1>
+          <p className="mx-auto mt-4 max-w-xl text-[16px] leading-relaxed text-neutral-500 sm:text-[17px]">
+            {DOCS.length} step-by-step guides to set up your shop, take orders and grow — written for Indian sellers.
+          </p>
+          <div className="mx-auto mt-8 max-w-xl">
+            <DocsSearch entries={searchIndex()} />
           </div>
+          <p className="mt-4 text-[13px] text-neutral-400">
+            Popular:{" "}
+            {["online-payments-razorpay", "ship-with-shiprocket", "policy-pages"].map((s, i) => (
+              <span key={s}>
+                {i > 0 && " · "}
+                <Link href={`/docs/${s}`} className="text-neutral-600 underline decoration-neutral-300 underline-offset-2 hover:text-neutral-950">
+                  {DOC_BY_SLUG[s].title.replace(/ with .*/, "")}
+                </Link>
+              </span>
+            ))}
+          </p>
+        </div>
+      </section>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* Left Sidebar Navigation */}
-            <aside
-              className={`lg:col-span-4 xl:col-span-3 space-y-6 lg:block ${
-                mobileMenuOpen ? "block" : "hidden"
-              }`}
-            >
-              {/* Docs Search Box */}
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                <input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search documentation..."
-                  className="w-full h-10 pl-9 pr-8 rounded-xl bg-neutral-100 border border-neutral-200 text-xs font-medium focus:bg-white focus:ring-1 focus:ring-black outline-none transition-all placeholder:text-neutral-400"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-
-              {/* If Searching: Search Results List */}
-              {searchResults ? (
-                <div className="space-y-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 block">
-                    Found {searchResults.length} Match{searchResults.length === 1 ? "" : "es"}
-                  </span>
-                  <div className="space-y-1">
-                    {searchResults.map((res) => (
-                      <button
-                        key={res.article.id}
-                        type="button"
-                        onClick={() => {
-                          selectArticle(res.article.id);
-                          setSearchQuery("");
-                        }}
-                        className="w-full text-left p-2.5 rounded-xl border border-neutral-200/80 hover:border-black bg-white hover:bg-neutral-50 transition-colors block"
-                      >
-                        <span className="text-xs font-bold text-neutral-950 block">{res.article.title}</span>
-                        <span className="text-[10px] text-neutral-500 block mt-0.5">{res.category.title}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                /* Category Accordion / List */
-                <nav className="space-y-6">
-                  {DOCS_CATEGORIES.map((cat) => {
-                    const Icon = ICON_MAP[cat.iconName] || FileText;
-                    const isCurrentCat = cat.id === activeCategory?.id;
-
-                    return (
-                      <div key={cat.id} className="space-y-1.5">
-                        <div className="flex items-center gap-2 px-2 py-1 text-xs font-bold uppercase tracking-wider text-neutral-900">
-                          <Icon className="w-3.5 h-3.5 text-neutral-700" />
-                          <span>{cat.title}</span>
-                        </div>
-
-                        <div className="space-y-0.5 pl-2 border-l border-neutral-200">
-                          {cat.articles.map((art) => {
-                            const isSelected = art.id === activeArticle?.id;
-                            return (
-                              <button
-                                key={art.id}
-                                type="button"
-                                onClick={() => selectArticle(art.id)}
-                                className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition-colors block ${
-                                  isSelected
-                                    ? "bg-black text-white font-bold shadow-2xs"
-                                    : "text-neutral-600 hover:text-black hover:bg-neutral-100"
-                                }`}
-                              >
-                                {art.title}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </nav>
-              )}
-            </aside>
-
-            {/* Main Article Reading Area */}
-            <article className="lg:col-span-8 xl:col-span-9 max-w-3xl space-y-8">
-              {/* Article Header */}
-              <div className="border-b border-neutral-200 pb-6 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-800 text-xs font-bold uppercase tracking-wider">
-                    {activeCategory?.title}
-                  </span>
-                  <span className="text-xs text-neutral-500 font-medium">
-                    {activeArticle.readTime} • Updated {activeArticle.updatedAt}
-                  </span>
-                </div>
-
-                <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-neutral-950">
-                  {activeArticle.title}
-                </h1>
-
-                <p className="text-sm sm:text-base text-neutral-600 leading-relaxed font-medium">
-                  {activeArticle.summary}
-                </p>
-              </div>
-
-              {/* Step-by-Step Sections */}
-              <div className="space-y-8">
-                {activeArticle.steps.map((step, idx) => (
-                  <div key={idx} className="space-y-3">
-                    <h2 className="text-lg font-bold text-neutral-950 flex items-center gap-2">
-                      <span>{step.title}</span>
-                    </h2>
-
-                    <p className="text-sm text-neutral-700 leading-relaxed">
-                      {step.description}
-                    </p>
-
-                    {step.bulletPoints && (
-                      <ul className="space-y-1.5 text-xs sm:text-sm text-neutral-700 pl-4 border-l-2 border-neutral-200 my-3">
-                        {step.bulletPoints.map((b, bIdx) => (
-                          <li key={bIdx} className="leading-relaxed">
-                            • {b}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-
-                    {step.codeBlock && (
-                      <div className="relative my-3 rounded-xl bg-neutral-950 text-neutral-200 p-4 font-mono text-xs overflow-x-auto">
-                        <button
-                          type="button"
-                          onClick={() => handleCopyCode(step.codeBlock!)}
-                          className="absolute right-3 top-3 px-2 py-1 rounded bg-neutral-800 text-[11px] font-sans font-bold text-neutral-300 hover:text-white flex items-center gap-1"
-                        >
-                          {copiedCode === step.codeBlock ? (
-                            <>
-                              <Check className="w-3 h-3 text-emerald-400" />
-                              <span className="text-emerald-400">Copied</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3 h-3" />
-                              <span>Copy</span>
-                            </>
-                          )}
-                        </button>
-                        <pre className="whitespace-pre-wrap">{step.codeBlock}</pre>
-                      </div>
-                    )}
-
-                    {step.alert && (
-                      <div
-                        className={`p-4 rounded-xl text-xs sm:text-sm my-3 flex items-start gap-3 ${
-                          step.alert.type === "tip"
-                            ? "bg-emerald-50 text-emerald-900 border border-emerald-200"
-                            : step.alert.type === "warning"
-                            ? "bg-amber-50 text-amber-900 border border-amber-200"
-                            : "bg-blue-50 text-blue-900 border border-blue-200"
-                        }`}
-                      >
-                        {step.alert.type === "tip" && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />}
-                        {step.alert.type === "warning" && <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />}
-                        {step.alert.type === "note" && <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />}
-                        <div className="leading-relaxed font-medium">
-                          <strong>{step.alert.type.toUpperCase()}: </strong>
-                          <span>{step.alert.text}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Feedback Widget */}
-              <div className="p-5 rounded-2xl border border-neutral-200 bg-neutral-50/70 flex flex-col sm:flex-row items-center justify-between gap-4 mt-12">
-                <span className="text-xs font-bold text-neutral-800">
-                  Was this article helpful?
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setFeedback("up")}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors ${
-                      feedback === "up"
-                        ? "bg-black text-white border-black"
-                        : "bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-100"
-                    }`}
-                  >
-                    <ThumbsUp className="w-3.5 h-3.5" />
-                    <span>Yes, helpful</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFeedback("down")}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors ${
-                      feedback === "down"
-                        ? "bg-black text-white border-black"
-                        : "bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-100"
-                    }`}
-                  >
-                    <ThumbsDown className="w-3.5 h-3.5" />
-                    <span>Need more detail</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Bottom Pagination (Previous & Next Articles) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-neutral-200">
-                {prevArticle ? (
-                  <button
-                    type="button"
-                    onClick={() => selectArticle(prevArticle.article.id)}
-                    className="p-4 rounded-xl border border-neutral-200 hover:border-black text-left group transition-all"
-                  >
-                    <span className="text-[11px] font-bold text-neutral-400 block mb-1">
-                      ← Previous Article
-                    </span>
-                    <span className="text-xs font-bold text-neutral-950 group-hover:underline">
-                      {prevArticle.article.title}
-                    </span>
-                  </button>
-                ) : <div />}
-
-                {nextArticle ? (
-                  <button
-                    type="button"
-                    onClick={() => selectArticle(nextArticle.article.id)}
-                    className="p-4 rounded-xl border border-neutral-200 hover:border-black text-right group transition-all sm:col-start-2"
-                  >
-                    <span className="text-[11px] font-bold text-neutral-400 block mb-1">
-                      Next Article →
-                    </span>
-                    <span className="text-xs font-bold text-neutral-950 group-hover:underline">
-                      {nextArticle.article.title}
-                    </span>
-                  </button>
-                ) : <div />}
-              </div>
-            </article>
+      {/* topics */}
+      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <h2 className="text-[26px] font-semibold tracking-[-0.02em] text-neutral-950 sm:text-[32px]">Browse by topic</h2>
+            <p className="mt-1.5 text-[15px] text-neutral-500">Pick a topic to see every article in it.</p>
           </div>
         </div>
-      </main>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {DOC_CATEGORIES.map((c) => {
+            const Icon = DOC_ICONS[c.icon];
+            const list = docsIn(c.id);
+            return (
+              <div key={c.id} id={c.id} className="group flex scroll-mt-28 flex-col rounded-[22px] border border-neutral-200 bg-white p-6 transition-all duration-300 hover:border-neutral-300 hover:shadow-[0_24px_50px_-34px_rgba(0,0,0,0.35)]">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-950 text-white">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-[17px] font-semibold text-neutral-950">{c.title}</h3>
+                    <p className="text-[12.5px] text-neutral-400">{list.length} articles</p>
+                  </div>
+                </div>
+                <p className="mt-3 text-[14px] leading-relaxed text-neutral-500">{c.text}</p>
+                <ul className="mt-4 space-y-1 border-t border-neutral-100 pt-4">
+                  {list.slice(0, 4).map((d) => (
+                    <li key={d.slug}>
+                      <Link href={`/docs/${d.slug}`} className="flex items-center justify-between gap-2 rounded-lg py-1.5 text-[14px] text-neutral-700 hover:text-neutral-950">
+                        <span className="truncate">{d.title}</span>
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0 text-neutral-300 transition-colors group-hover:text-neutral-500" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                {list.length > 4 && (
+                  <Link href={`/docs/${list[0].slug}`} className="mt-3 text-[13px] font-semibold text-neutral-950 hover:underline">
+                    All {list.length} articles
+                  </Link>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
-      <SiteFooter />
-    </div>
+      {/* popular */}
+      <section className="border-y border-neutral-200 bg-neutral-50/70">
+        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1fr_2fr]">
+          <div>
+            <h2 className="text-[26px] font-semibold tracking-[-0.02em] text-neutral-950 sm:text-[32px]">Most read</h2>
+            <p className="mt-2 max-w-sm text-[15px] leading-relaxed text-neutral-500">The articles new sellers open first. Start here and you'll be taking orders today.</p>
+          </div>
+          <ol className="grid gap-3 sm:grid-cols-2">
+            {popular.map((d, i) => (
+              <li key={d.slug}>
+                <Link href={`/docs/${d.slug}`} className="group flex h-full gap-4 rounded-2xl border border-neutral-200 bg-white p-5 transition-colors hover:border-neutral-950">
+                  <span className="text-[22px] font-semibold tabular-nums text-neutral-300 group-hover:text-neutral-950">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="min-w-0">
+                    <span className="block text-[15px] font-semibold text-neutral-950">{d.title}</span>
+                    <span className="mt-1 line-clamp-2 block text-[13.5px] leading-relaxed text-neutral-500">{d.summary}</span>
+                    <span className="mt-2 inline-flex items-center gap-1 text-[12px] text-neutral-400">
+                      <Clock className="h-3 w-3" /> {d.minutes} min
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* guides */}
+      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="text-[26px] font-semibold tracking-[-0.02em] text-neutral-950 sm:text-[32px]">Learn to sell more</h2>
+            <p className="mt-1.5 text-[15px] text-neutral-500">In-depth guides on pricing, shipping, marketing and growth.</p>
+          </div>
+          <Link href="/explore" className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-neutral-950 hover:underline">
+            All guides <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+        <div className="mt-8 grid gap-5 md:grid-cols-3">
+          {guides.map((g) => (
+            <GuideCard key={g.slug} guide={g} />
+          ))}
+        </div>
+      </section>
+
+      {/* contact */}
+      <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6">
+        <div className="flex flex-col items-start gap-5 rounded-[22px] border border-neutral-200 p-6 sm:flex-row sm:items-center sm:p-8">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-neutral-100">
+            <Mail className="h-5 w-5 text-neutral-700" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[18px] font-semibold text-neutral-950">Still stuck?</h2>
+            <p className="mt-1 text-[14.5px] text-neutral-500">Ask Roxy inside your dashboard for an instant answer, or write to us and a person will reply.</p>
+          </div>
+          <Link href="/legal/contact" className="inline-flex h-11 items-center rounded-full bg-neutral-950 px-5 text-[14px] font-semibold text-white hover:bg-black">
+            Contact support
+          </Link>
+        </div>
+      </section>
+
+      <StartBand />
+    </LegalShell>
   );
 }
-
