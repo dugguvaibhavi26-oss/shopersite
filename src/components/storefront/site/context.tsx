@@ -3,6 +3,7 @@
 import * as React from "react";
 import type { OrderItemData, ProductData, StoreData, CategoryData } from "@/lib/store-service";
 import { canEditTheme } from "@/lib/theme-pricing";
+import { captureShopTestPass } from "@/lib/payments/client";
 import { resolveSiteContent, SITE_THEME_STYLE, toSiteTheme, type SiteContent, type SiteThemeSlug } from "@/lib/site-content";
 
 /** One line in the bag. `key` keeps the same product in two sizes apart. */
@@ -131,6 +132,10 @@ export function SiteProvider({
   const [details, setDetails] = useStored<SavedDetails>(`shopersite_details_${sub}`, EMPTY_DETAILS);
   const [toast, setToast] = React.useState<{ text: string; bag: boolean } | null>(null);
   const toastTimer = React.useRef<number | undefined>(undefined);
+  // the owner's "Try a test payment" link: remember the pass for this tab
+  React.useEffect(() => {
+    if (!demo && !editing) captureShopTestPass();
+  }, [demo, editing]);
 
   // Edits show on plans with the theme editor, and on a theme the shop bought; otherwise the theme as it comes
   const content = React.useMemo(() => {

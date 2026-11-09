@@ -4,6 +4,7 @@ import { INDIA_STATES } from "@/lib/india-states";
 import { checkEmail, checkPersonName, checkPhone, checkPincode, checkPlace, checkStreet, cleanPhone } from "@/lib/validation";
 import { ApiError, handle } from "@/lib/server/api-error";
 import { createPayment } from "@/lib/server/payment-service";
+import { optionalUser } from "@/lib/server/firebase-admin";
 
 const Body = z.object({
   store: z.string().min(1).max(63),
@@ -26,6 +27,8 @@ const Body = z.object({
 /** POST: starts an online payment on the seller's own Cashfree account. Public (buyers). */
 export async function POST(req: Request) {
   return handle(async () => {
+    // Cashfree is switched off for now
+    if (process.env.CASHFREE_ENABLED !== "true") throw new ApiError(409, "Online payment isn't available for this shop right now. Please choose another payment option.");
     const parsed = Body.safeParse(await req.json().catch(() => null));
     if (!parsed.success) throw new ApiError(400, "Please check your delivery details and try again.");
     const b = parsed.data;
@@ -41,8 +44,10 @@ export async function POST(req: Request) {
     if (wrong || !isIndianMobile(phone)) throw new ApiError(400, wrong || "Enter a 10-digit mobile number.");
     const email = b.customer.email?.trim().toLowerCase() || undefined;
     if (email && !isEmail(email)) throw new ApiError(400, "Check your email address.");
+    const buyer = await optionalUser(req);
     const result = await createPayment(
       {
+        ...(buyer ? { buyerUid: buyer.uid } : {}),
         subdomain: b.store.toLowerCase(),
         items: b.items,
         couponCode: b.couponCode || undefined,

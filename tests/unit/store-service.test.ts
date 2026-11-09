@@ -53,7 +53,8 @@ describe("Platform Multi-Tenant Store & Subscription Engine", () => {
       expect(isThemeAllowed("theme03", plan)).toBe(true);
       expect(isThemeAllowed("theme04", plan)).toBe(true);
       expect(isThemeAllowed("theme05", plan)).toBe(true);
-      expect(isThemeAllowed("bento-tech", plan)).toBe(false);
+      // an uploaded theme counts only when it's switched on
+      expect(isThemeAllowed("custom-not-uploaded", plan)).toBe(false);
     }
     // shops still set to a removed theme show Lume Editorial
     expect(getTheme("bento-tech").slug).toBe("classic-bloom");

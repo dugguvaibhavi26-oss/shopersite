@@ -46,7 +46,7 @@ function seed(planId: string, subscribers = 3) {
 }
 const store = async () => (await readStore(SUB))!;
 
-beforeEach(() => seed("starter"));
+beforeEach(() => seed("pro"));
 
 describe("email to subscribers", () => {
   it("connects only with a working App Password, and stores it encrypted", async () => {
@@ -66,7 +66,7 @@ describe("email to subscribers", () => {
 
   it("Free can't use it", async () => {
     seed("free");
-    await expect(email.connectGmail(await store(), "lume@gmail.com", "abcdefghijklmnop")).rejects.toThrow(/Growth and Pro/);
+    await expect(email.connectGmail(await store(), "lume@gmail.com", "abcdefghijklmnop")).rejects.toThrow(/Pro/);
   });
 
   it("sends one email per subscriber, each with its own unsubscribe link, and counts them", async () => {
@@ -77,14 +77,13 @@ describe("email to subscribers", () => {
     expect(sent[0].html).toContain("&lt;b&gt;there&lt;/b&gt;"); // message text is escaped
     expect(sent[0].html).toContain("/s/lume/products/tee");
     expect(sent[0].headers?.["List-Unsubscribe"]).toMatch(/unsubscribe\?store=lume/);
-    expect((await email.emailStatus(await store())).usage).toMatchObject({ month: 3, day: 3, perMonth: 1000 });
+    expect((await email.emailStatus(await store())).usage).toMatchObject({ month: 3, day: 3, perMonth: null });
   });
 
-  it("Growth stops at 1,000 a month; Pro has no monthly limit but keeps under Gmail's daily limit", async () => {
-    await email.connectGmail(await store(), "lume@gmail.com", "abcdefghijklmnop");
+  it("email is Pro only; Pro has no monthly limit but keeps under Gmail's daily limit", async () => {
     const month = new Date().toISOString().slice(0, 7);
-    docs.set(`email_usage/${SUB}`, { month, monthCount: 999, day: "old", dayCount: 0 });
-    await expect(email.sendToSubscribers(await store(), { subject: "a", message: "b" })).rejects.toThrow(/1 of 1,000 emails left this month/);
+    seed("starter");
+    await expect(email.connectGmail(await store(), "lume@gmail.com", "abcdefghijklmnop")).rejects.toThrow(/Pro/);
     expect(sent).toHaveLength(0);
 
     seed("pro");

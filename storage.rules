@@ -12,9 +12,13 @@ service firebase.storage {
       return [/*ADMIN_EMAILS*/'tejaswithreddy0101@gmail.com'/*END_ADMIN_EMAILS*/];
     }
 
+    // owners (the list above) plus admins added from Admin → Admins (platform_admins/{email} in Firestore)
     function isAdmin() {
       return request.auth != null && request.auth.token.email_verified == true
-        && request.auth.token.email is string && request.auth.token.email.lower() in adminEmails();
+        && request.auth.token.email is string && (
+          request.auth.token.email.lower() in adminEmails() ||
+          firestore.exists(/databases/(default)/documents/platform_admins/$(request.auth.token.email.lower()))
+        );
     }
 
     // images only; no SVG (it can carry scripts)

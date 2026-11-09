@@ -26,7 +26,7 @@ const SLIDES = [
   },
   {
     eyebrow: "Get paid",
-    title: "Paid straight to your UPI.",
+    title: "Cash on delivery or online.",
     text: "No middleman and 0% commission. Money goes straight to your bank.",
   },
 ] as const;
@@ -187,7 +187,7 @@ function PaidCard() {
         <Check className="h-5 w-5" />
       </span>
       <div className="mt-3 text-3xl font-semibold tracking-tight">₹1,299</div>
-      <div className="mt-1 text-xs text-neutral-500">Paid straight to your UPI ID</div>
+      <div className="mt-1 text-xs text-neutral-500">Cash on delivery, or online on Growth</div>
       <span className="mt-3 inline-block rounded-full border border-neutral-200 px-3 py-1 text-[11px] font-semibold">
         0% commission
       </span>

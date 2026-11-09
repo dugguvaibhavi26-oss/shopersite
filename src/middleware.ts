@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStoreSubdomainFromHost } from "./lib/config/site";
+import { getStoreSubdomainFromHost, siteConfig } from "./lib/config/site";
 
 export const config = {
   matcher: [
@@ -14,13 +14,48 @@ export const config = {
   ],
 };
 
-export default function middleware(req: NextRequest) {
+/** The platform's own addresses: the main domain, www, deployment URLs, local and LAN development. */
+function isPlatformHost(hostname: string): boolean {
+  const own = siteConfig.domain.toLowerCase();
+  return (
+    hostname === own ||
+    hostname.endsWith(`.${own}`) ||
+    hostname.endsWith(".vercel.app") ||
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) ||
+    !hostname.includes(".")
+  );
+}
+
+// custom domain → store, remembered for a couple of minutes per server instance
+const domainCache = new Map<string, { sub: string | null; until: number }>();
+
+async function storeForCustomDomain(req: NextRequest, hostname: string): Promise<string | null> {
+  const hit = domainCache.get(hostname);
+  if (hit && hit.until > Date.now()) return hit.sub;
+  let sub: string | null = null;
+  try {
+    const res = await fetch(new URL(`/api/domains/resolve?host=${encodeURIComponent(hostname)}`, req.nextUrl.origin), { headers: { accept: "application/json" } });
+    if (res.ok) sub = ((await res.json()) as { subdomain?: string | null }).subdomain || null;
+  } catch {
+    // lookup failed: treat as unknown this time, try again on the next request
+    return null;
+  }
+  domainCache.set(hostname, { sub, until: Date.now() + (sub ? 120_000 : 30_000) });
+  return sub;
+}
+
+export default async function middleware(req: NextRequest) {
   const url = req.nextUrl;
   const hostname = req.headers.get("host") || "";
+  const bareHost = hostname.replace(/:\d+$/, "").toLowerCase();
 
-  // Only a store's own address (roxtenn.shopersite.in, roxtenn.localhost) is a storefront. The main
-  // domain, www and deployment URLs like rox-shop-xyz.vercel.app all serve the main app.
-  const storeSub = getStoreSubdomainFromHost(hostname);
+  // A store's own address (roxtenn.shopersite.in, roxtenn.localhost), or a Pro store's connected
+  // domain (www.brand.com). The main domain, www and deployment URLs serve the main app.
+  let storeSub = getStoreSubdomainFromHost(hostname);
+  const customDomain = !storeSub && !isPlatformHost(bareHost);
+  if (customDomain) storeSub = await storeForCustomDomain(req, bareHost);
   const path = url.pathname;
 
   if (storeSub) {
@@ -40,7 +75,8 @@ export default function middleware(req: NextRequest) {
     path.startsWith("/dashboard") ||
     path.startsWith("/register") ||
     path.startsWith("/gallery") ||
-    path.startsWith("/orders")
+    path.startsWith("/orders") ||
+    path.startsWith("/invoice/")
   ) {
     return NextResponse.next();
   }

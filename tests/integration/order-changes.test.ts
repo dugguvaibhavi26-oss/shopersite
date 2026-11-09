@@ -27,6 +27,7 @@ function seed(over: Record<string, unknown> = {}) {
     ownerId: "owner1",
     status: "published",
     planId: "pro",
+    policies: { terms: { body: "t".repeat(200), updatedAt: "2026-11-08" } },
     upiId: "lume@okaxis",
     codEnabled: true,
     codFee: 0,

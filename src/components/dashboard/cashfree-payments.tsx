@@ -75,6 +75,10 @@ export function CashfreePaymentsCard({ store }: { store: StoreData }) {
 
   const state = status?.state;
   const needsForm = state === "not_started";
+
+  // Until Cashfree is switched on for the platform, say nothing: a "coming soon" note here
+  // would contradict the Razorpay option right below it.
+  if (comingSoon) return null;
   const canContinueKyc = state === "kyc_pending" || state === "rejected" || state === "in_review";
 
   return (
@@ -83,7 +87,7 @@ export function CashfreePaymentsCard({ store }: { store: StoreData }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="flex items-center gap-2 text-base font-semibold">
-              Online payments
+              Online payments <span className="text-sm font-normal text-neutral-400">via Cashfree</span>
               {status?.mode === "sandbox" && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-800">Test mode</span>}
             </h3>
             <p className="mt-0.5 text-sm text-neutral-500">

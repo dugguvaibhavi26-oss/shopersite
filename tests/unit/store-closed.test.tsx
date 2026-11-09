@@ -27,7 +27,7 @@ describe("seller switches the shop off", () => {
         tagline: "",
       } as any);
     }
-    storeService.updateStore(sub, { isClosed: false, closedMessage: "" });
+    storeService.updateStore(sub, { isClosed: false, closedMessage: "", policies: { terms: { body: "t".repeat(200), updatedAt: "2026-11-08" } } });
   });
 
   it("shows nothing while the shop is open", () => {
@@ -54,6 +54,16 @@ describe("seller switches the shop off", () => {
     storeService.updateStore(sub, { isClosed: true });
     render(<StoreClosedGate />);
     expect(screen.getByText(DEFAULT_CLOSED_MESSAGE)).toBeTruthy();
+  });
+
+  it("stays closed until the shop has a policy page", () => {
+    storeService.updateStore(sub, { isClosed: false, policies: {} });
+    render(<StoreClosedGate />);
+    expect(screen.getByText("Closed Shop isn't open yet")).toBeTruthy();
+    act(() => {
+      storeService.updateStore(sub, { policies: { privacy: { body: "p".repeat(200), updatedAt: "2026-11-08" } } });
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
 });

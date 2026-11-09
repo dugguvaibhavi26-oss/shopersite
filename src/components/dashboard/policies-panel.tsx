@@ -53,7 +53,6 @@ export function PoliciesPanel({ store, onSaved }: { store: StoreData; onSaved: (
           </p>
           <p className="mt-1 text-xs leading-relaxed text-neutral-600">
             Indian consumer and data protection law expects every online shop to show its terms, return &amp; refund, shipping and privacy policies.
-            They protect you in disputes, and buyers agree to them before they pay. The templates are a starting point, not legal advice: change them to match how you work.
           </p>
         </div>
       </div>
@@ -61,7 +60,7 @@ export function PoliciesPanel({ store, onSaved }: { store: StoreData; onSaved: (
       {/* what buyers can do themselves */}
       <section className="rounded-2xl border border-neutral-200 bg-white p-5">
         <h3 className="text-sm font-semibold text-neutral-900">Cancellations &amp; returns</h3>
-        <p className="mt-1 text-xs text-neutral-500">Let buyers send requests from their order page. You approve or decline each one, and they get your reason.</p>
+        <p className="mt-1 text-xs text-neutral-500">Let buyers send requests from their order page.</p>
         <div className="mt-4 space-y-3">
           <Toggle
             on={op.cancelEnabled}

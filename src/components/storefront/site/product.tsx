@@ -310,7 +310,7 @@ export function SiteProduct({ slug }: { slug: string }) {
         <Price product={product} className="text-[length:calc(20px*var(--m-scale))]" />
         {off > 0 && <span className="m-cap bg-[var(--m-accent)] px-2 py-1 text-[length:calc(10px*var(--m-scale))] font-bold tracking-wider text-[var(--m-accent-text)]">Save {off}%</span>}
       </div>
-      <p className="m-faint mt-1 text-[length:calc(12px*var(--m-scale))]">Inclusive of all taxes</p>
+      {store.pricesIncludeTax !== false && <p className="m-faint mt-1 text-[length:calc(12px*var(--m-scale))]">Inclusive of all taxes</p>}
       {showReviews && reviewList.length > 0 && (
         <a href="#reviews" className="mt-3 inline-flex items-center gap-2 text-[length:calc(14px*var(--m-scale))]">
           <Stars value={avg} /> <span className="m-muted underline underline-offset-4">{reviewList.length} review{reviewList.length === 1 ? "" : "s"}</span>
@@ -378,7 +378,11 @@ export function SiteProduct({ slug }: { slug: string }) {
       <ul className="m-soft mt-6 space-y-3 rounded-2xl p-5 text-[length:calc(13px*var(--m-scale))]">
         <li className="flex items-center gap-3">
           <Truck className="h-4 w-4 shrink-0" />
-          {store.freeDeliveryThreshold > 0 ? `Free delivery on orders over ${rupees(store.freeDeliveryThreshold)}` : "Free delivery on every order"}
+          {!(store.standardDeliveryFee > 0)
+            ? "Free delivery on every order"
+            : store.freeDeliveryThreshold > 0
+              ? `Free delivery on orders over ${rupees(store.freeDeliveryThreshold)}`
+              : `Delivery ${rupees(store.standardDeliveryFee)} per order`}
         </li>
         {store.codEnabled && (
           <li className="flex items-center gap-3">

@@ -17,7 +17,7 @@ describe("admin-editable plan details", () => {
 
   it("starts from the built-in plans", () => {
     expect(getAllPlanDetails()).toEqual(getDefaultPlanDetails());
-    expect(PLATFORM_PLANS.starter.priceFormatted).toBe("₹299 / month");
+    expect(PLATFORM_PLANS.starter.priceFormatted).toBe("₹199 / month");
   });
 
   it("renames and re-prices a plan everywhere it's read", () => {
@@ -40,7 +40,7 @@ describe("admin-editable plan details", () => {
   it("keeps Free at ₹0 and ignores broken values", () => {
     applyPlanDetails({ free: { priceRupees: 500 }, starter: { priceRupees: -10, name: "  " } });
     expect(PLATFORM_PLANS.free.priceMonthly).toBe(0);
-    expect(PLATFORM_PLANS.starter.priceMonthly).toBe(29900);
+    expect(PLATFORM_PLANS.starter.priceMonthly).toBe(19900);
     expect(PLATFORM_PLANS.starter.name).toBe("Growth");
   });
 

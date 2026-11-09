@@ -10,6 +10,8 @@
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { evaluateCoupon } from "../coupons";
+import { deliveryFee } from "../delivery";
+import { minOrderProblem } from "../checkout-rules";
 import type { OrderData, OrderItemData, StoreData } from "../store-service";
 
 // ---------------------------------------------------------------------------------------------
@@ -82,7 +84,7 @@ export interface OnlineQuote {
 
 export class QuoteError extends Error {}
 
-type QuoteStore = Pick<StoreData, "products" | "discounts" | "planId" | "freeDeliveryThreshold" | "standardDeliveryFee">;
+type QuoteStore = Pick<StoreData, "products" | "discounts" | "planId" | "freeDeliveryThreshold" | "standardDeliveryFee" | "checkoutRules">;
 
 /** Prices a bag for online payment (no COD fee, at least ₹1). */
 export function quoteOnlineOrder(store: QuoteStore, bag: BagItemInput[], couponCode?: string): OnlineQuote {
@@ -130,7 +132,10 @@ export function quoteOrder(
   const subtotal = items.reduce((n, l) => n + l.price * l.quantity, 0);
   const coupon = couponCode ? evaluateCoupon(store, couponCode, subtotal) : null;
   const discount = coupon?.ok ? coupon.amount : 0;
-  const delivery = subtotal === 0 || subtotal >= store.freeDeliveryThreshold ? 0 : store.standardDeliveryFee;
+  // the seller's minimum order (Settings → Checkout), on the items after any discount
+  const tooSmall = minOrderProblem(store, Math.max(0, subtotal - discount));
+  if (tooSmall) throw new QuoteError(tooSmall);
+  const delivery = deliveryFee(store, subtotal);
   const codFee = Math.max(0, Math.round(opts.codFee || 0));
   const total = Math.max(0, subtotal - discount) + delivery + codFee;
   if (total < opts.minTotal) throw new QuoteError("Online payment needs an order of at least ₹1.");

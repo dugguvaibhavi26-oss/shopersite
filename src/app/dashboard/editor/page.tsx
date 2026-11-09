@@ -39,7 +39,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { storeService, type StoreData } from "@/lib/store-service";
 import { cheapestPlanWith } from "@/lib/plans";
-import { canEditTheme } from "@/lib/theme-pricing";
+import { canEditTheme, canUseTheme } from "@/lib/theme-pricing";
 import { getTheme } from "@/lib/themes";
 import {
   SITE_BODY_FONTS,
@@ -86,7 +86,7 @@ function Hold({ text }: { text: string }) {
   );
 }
 
-type Panel = "sections" | "theme";
+type Panel = "sections" | "theme" | "media";
 type Selection =
   | { kind: "style" }
   | { kind: "header" }
@@ -182,6 +182,14 @@ function ThemeEditor() {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
+  // Free plan: only the Media section (change the theme's photos); Growth and Pro get the full editor
+  const mediaOnly = !!store && !canEditTheme(store, themeSlug) && canUseTheme(store, themeSlug);
+  const mediaOnlyRef = useRef(mediaOnly);
+  mediaOnlyRef.current = mediaOnly;
+  useEffect(() => {
+    if (mediaOnly) setPanel("media");
+  }, [mediaOnly]);
+
   // send the unsaved content to the preview whenever it changes
   const post = useCallback((msg: Record<string, unknown>) => {
     frame.current?.contentWindow?.postMessage({ source: "shopersite-editor", ...msg }, window.location.origin);
@@ -200,6 +208,7 @@ function ThemeEditor() {
         if (selection?.kind === "section") post({ type: "select", id: selection.id });
       }
       if (e.data.type === "select") {
+        if (mediaOnlyRef.current) return;
         setPanel("sections");
         setSelection({ kind: "section", id: e.data.id });
         setMobilePane("edit");
@@ -212,7 +221,7 @@ function ThemeEditor() {
           return before.length === keys.length && keys.every((k) => before.includes(k)) ? u : { ...u, [e.data.id]: keys };
         });
       }
-      if (e.data.type === "text" && typeof e.data.id === "string" && typeof e.data.key === "string" && typeof e.data.value === "string") {
+      if (!mediaOnlyRef.current && e.data.type === "text" && typeof e.data.id === "string" && typeof e.data.key === "string" && typeof e.data.value === "string") {
         const { id, key, value } = e.data as { id: string; key: string; value: string };
         setContent((c) =>
           c ? { ...c, sections: c.sections.map((x) => (x.id === id && key in x.settings ? { ...x, settings: { ...x.settings, [key]: value.slice(0, 4000) } } : x)) } : c
@@ -236,7 +245,7 @@ function ThemeEditor() {
 
   const dashboardHref = `/dashboard?tab=themes&store=${store.subdomain}`;
 
-  if (!canEditTheme(store, themeSlug)) {
+  if (!canEditTheme(store, themeSlug) && !mediaOnly) {
     const plan = cheapestPlanWith("themeEditor");
     return (
       <div className="home-sans min-h-screen bg-neutral-100 px-4 py-6 font-[Inter,sans-serif] sm:py-12">
@@ -453,11 +462,12 @@ function ThemeEditor() {
         {/* sidebar */}
         <aside className={cn("flex w-full shrink-0 flex-col border-r border-neutral-200 bg-white md:flex md:w-[360px]", mobilePane === "edit" ? "flex" : "hidden")}>
           <nav className="flex shrink-0 gap-1 border-b border-neutral-200 p-2" aria-label="Editor panels" data-tour="ed-panels">
-            {(
-              [
-                ["sections", Layers, "Sections"],
-                ["theme", Palette, "Theme colours"],
-              ] as const
+            {(mediaOnly
+              ? ([["media", ImageIcon, "Media"]] as const)
+              : ([
+                  ["sections", Layers, "Sections"],
+                  ["theme", Palette, "Theme colours"],
+                ] as const)
             ).map(([id, Icon, name]) => (
               <button
                 key={id}
@@ -477,6 +487,38 @@ function ThemeEditor() {
           </nav>
 
           <div className="min-h-0 flex-1 overflow-y-auto">
+            {panel === "media" && (
+              <div className="space-y-5 p-4">
+                <div className="rounded-xl bg-neutral-950 p-3.5 text-white">
+                  <p className="text-[13px] font-semibold">Change your theme&apos;s photos</p>
+                  <p className="mt-0.5 text-[12px] text-white/60">Edit text, sections and colours on Growth.</p>
+                  <button type="button" onClick={() => router.push(`/dashboard?tab=billing&store=${store.subdomain}`)} className="mt-2.5 h-8 rounded-lg bg-white px-3 text-[12px] font-semibold text-neutral-950">
+                    Try Growth free
+                  </button>
+                </div>
+                {sections
+                  .filter((sec) => !sec.hidden)
+                  .map((sec) => {
+                    const images = SITE_SECTION_TYPES[sec.type].fields.filter((f) => f.kind === "image" && !f.design && fieldShown(f, sec.id, probe, usedFields));
+                    if (!images.length) return null;
+                    return (
+                      <div key={sec.id}>
+                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">{SITE_SECTION_TYPES[sec.type].label}</p>
+                        <SectionFields
+                          fields={images}
+                          settings={sec.settings}
+                          store={store}
+                          onChange={(patch) => setSection(sec.id, (x) => ({ ...x, settings: { ...x.settings, ...patch } }))}
+                        />
+                      </div>
+                    );
+                  })}
+                {!sections.some((sec) => !sec.hidden && SITE_SECTION_TYPES[sec.type].fields.some((f) => f.kind === "image" && !f.design)) && (
+                  <p className="text-[13px] text-neutral-500">This theme takes its photos from your products. Add product photos in Products.</p>
+                )}
+              </div>
+            )}
+
             {panel === "sections" && !selection && (
               <div className="p-3">
                 <SidebarRow icon={Type} title="Text, buttons & photos" subtitle={`Text size ${content.settings.textSize}% · ${content.settings.headingFont}`} onClick={() => setSelection({ kind: "style" })} />
@@ -764,9 +806,7 @@ function ThemeEditor() {
 function SidebarRow({ icon: Icon, title, subtitle, onClick }: { icon: typeof PanelTop; title: string; subtitle: string; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-neutral-50">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100">
-        <Icon className="h-4 w-4" />
-      </span>
+      <Icon className="h-5 w-5 shrink-0 text-neutral-900" />
       <span className="min-w-0">
         <span className="block text-[13px] font-semibold">{title}</span>
         <span className="block truncate text-[12px] text-neutral-500">{subtitle}</span>

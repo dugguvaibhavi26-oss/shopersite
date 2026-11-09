@@ -36,6 +36,8 @@ export const OWNER_LOCKED_KEYS = [
   "pauseMessage",
   "status",
   "createdAt",
+  // set by the server once a domain is connected (Settings → Domain)
+  "customDomain",
 ] as const;
 
 const PRIVATE = new Set<string>(PRIVATE_STORE_KEYS);

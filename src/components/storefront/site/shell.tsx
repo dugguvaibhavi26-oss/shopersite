@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { effectivePlan } from "@/lib/subscription";
+import { planHas } from "@/lib/plans";
 import { useRouter } from "next/navigation";
 import { Check, Heart, Menu, MessageCircle, Plus, Search, ShoppingBag, User, X, ChevronDown, Mail } from "lucide-react";
 import { storeService } from "@/lib/store-service";
@@ -699,9 +701,12 @@ export function SiteFooter() {
         </div>
         <div className="mt-10 flex flex-col gap-2 border-t sm:mt-14 border-[color-mix(in_srgb,var(--f-fg)_10%,transparent)] pt-6 text-[length:calc(12px*var(--m-scale))] text-[color-mix(in_srgb,var(--f-fg)_40%,transparent)] sm:flex-row sm:justify-between">
           <span>{content.footer.copyright}</span>
-          <a href="https://shopersite.in" target="_blank" rel="noopener noreferrer" className="hover:text-[color-mix(in_srgb,var(--f-fg)_70%,transparent)]">
-            Made with Shopersite
-          </a>
+          {/* Shopersite branding on Free and Growth; Pro can remove it */}
+          {!planHas(effectivePlan(store).planId, "removeBranding") && (
+            <a href="https://shopersite.in" target="_blank" rel="noopener noreferrer" className="hover:text-[color-mix(in_srgb,var(--f-fg)_70%,transparent)]">
+              Made with Shopersite
+            </a>
+          )}
         </div>
         {look.footerWordmark && (
           <p aria-hidden className={cn("m-h m-display pointer-events-none mt-10 select-none overflow-hidden whitespace-nowrap text-center text-[length:calc(clamp(64px,17vw,280px)*var(--m-scale))] leading-[0.8]", look.footerWordmarkTone === "accent" ? "text-[var(--m-accent)]" : "text-[color-mix(in_srgb,var(--f-fg)_9%,transparent)]")}>

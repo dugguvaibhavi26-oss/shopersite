@@ -26,8 +26,12 @@ service cloud.firestore {
       return signedIn() && request.auth.token.email_verified == true && request.auth.token.email is string;
     }
 
+    // owners (the list above) plus admins added from Admin → Admins (platform_admins/{email}, server-written)
     function isAdmin() {
-      return verifiedEmail() && request.auth.token.email.lower() in adminEmails();
+      return verifiedEmail() && (
+        request.auth.token.email.lower() in adminEmails() ||
+        exists(/databases/$(database)/documents/platform_admins/$(request.auth.token.email.lower()))
+      );
     }
 
     // the store's owner: by account id, or (older stores with no id) by verified email
@@ -46,7 +50,7 @@ service cloud.firestore {
     // public fields an owner may never change, plus private fields that never belong here
     function lockedPublicKeys() {
       return ['id', 'subdomain', 'ownerId', 'ownerEmail', 'planId', 'planPaidUntil', 'ownedThemes',
-              'isPaused', 'pauseMessage', 'status', 'createdAt',
+              'isPaused', 'pauseMessage', 'status', 'createdAt', 'customDomain',
               'orders', 'customers', 'subscribers', 'pendingSubscription', 'subscriptionHistory', 'themePurchases'];
     }
 
@@ -115,6 +119,6 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // orders, subscribers, payments, cashfree_merchants, upi_claims and anything else: server only
+    // orders, subscribers, payments, cashfree_merchants, upi_claims, platform_admins and anything else: server only
   }
 }

@@ -8,7 +8,7 @@ import { storeService } from "@/lib/store-service";
 import { siteConfig, getStoreUrl, getPublicStoreUrl, getPublicStoreAddress } from "@/lib/config/site";
 import { cn } from "@/lib/utils";
 import { isReservedSubdomain } from "@/lib/reserved-names";
-import { PLATFORM_PLANS, type BillingCycle } from "@/lib/plans";
+import { introOfferText, PLATFORM_PLANS, type BillingCycle } from "@/lib/plans";
 import { usePlatformSettings } from "@/lib/use-platform-settings";
 import { getTheme } from "@/lib/themes";
 import {
@@ -48,7 +48,7 @@ import {
   Loader2,
   Plus,
 } from "lucide-react";
-import { checkEmail, checkPassword, checkPersonName, checkPhone, checkUpiId, cleanPhone, phoneInput } from "@/lib/validation";
+import { checkEmail, checkPassword, checkPersonName, checkPhone, cleanPhone, phoneInput } from "@/lib/validation";
 
 const CATEGORIES = [
   { value: "Fashion & Apparel", label: "Fashion & Apparel", icon: Shirt },
@@ -60,7 +60,7 @@ const CATEGORIES = [
   { value: "Others", label: "Others", icon: Plus },
 ];
 
-type QuestionId = "name" | "address" | "category" | "tagline" | "owner" | "phone" | "email" | "password" | "upi";
+type QuestionId = "name" | "address" | "category" | "tagline" | "owner" | "phone" | "email" | "password" | "plan";
 
 export default function RegisterStorePage() {
   return (
@@ -112,7 +112,6 @@ function RegisterStoreContent() {
   const [contactEmail, setContactEmail] = useState("");
   const [accountPassword, setAccountPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [upiId, setUpiId] = useState("");
 
   // Plan picked on the homepage pricing (?plan=starter|pro&cycle=...), switchable on the last step.
   // A paid plan only switches on after payment, so the store launches on Free and payment follows.
@@ -190,7 +189,7 @@ function RegisterStoreContent() {
         ownerName: ownerName.trim(),
         contactPhone: cleanPhone(contactPhone),
         contactEmail: contactEmail || activeUser.email || undefined,
-        upiId: upiId.trim(),
+        upiId: "",
         tagline: tagline || `Welcome to ${storeName}`,
         ownerId: activeUser.uid,
         ownerEmail: activeUser.email || contactEmail || undefined,
@@ -226,7 +225,7 @@ function RegisterStoreContent() {
     ...(user
       ? []
       : [{ key: "account", fields: ["email", "password"] as QuestionId[], title: "Create your login.", text: "You'll use these to sign in to your seller dashboard." }]),
-    { key: "upi", fields: ["upi"], title: "Where should buyers pay you?", text: "Payments go straight to this UPI ID." },
+    { key: "plan", fields: ["plan"], title: "Choose your plan.", text: "Start free, or try Growth free for 10 days. You can change any time." },
   ];
   const current = steps[Math.min(qIndex, steps.length - 1)];
   const fields = current.fields;
@@ -255,8 +254,7 @@ function RegisterStoreContent() {
         return checkEmail(contactEmail);
       case "password":
         return checkPassword(accountPassword);
-      case "upi":
-        if (checkUpiId(upiId)) return checkUpiId(upiId);
+      case "plan":
         return agreed ? "" : "Please agree to the Terms and Privacy Policy to launch your store.";
       default:
         return "";
@@ -427,25 +425,10 @@ function RegisterStoreContent() {
               />
             )}
 
-            {fields.includes("upi") && (
+            {fields.includes("plan") && (
               <>
-                <AuthInput
-                  label="UPI ID"
-                  icon={QrCode}
-                  placeholder="e.g. ramesh@okhdfcbank"
-                  value={upiId}
-                  onChange={(e) => (setUpiId(e.target.value), setQError(""))}
-                  autoFocus
-                  hint={
-                    <span className="flex items-start gap-1.5">
-                      <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-px text-black" />
-                      Buyers pay you directly. {siteConfig.name} never holds or pools your money.
-                    </span>
-                  }
-                />
                 {/* Plan: pre-selected from the pricing page, switchable here */}
-                <div className="mt-6">
-                  <span className="text-sm font-semibold">Your plan</span>
+                <div>
                   <div role="radiogroup" aria-label="Choose your plan" className="mt-2 grid grid-cols-3 gap-2">
                     {(["free", "starter", "pro"] as const).map((id) => {
                       const p = PLATFORM_PLANS[id];
@@ -467,8 +450,8 @@ function RegisterStoreContent() {
                             {p.priceFormatted.split(" ")[0]}
                             {id !== "free" && <span className={cn("text-xs font-normal", on ? "text-white/60" : "text-neutral-500")}>/mo</span>}
                           </span>
-                          <span className={cn("block h-4 text-xs line-through", on ? "text-white/50" : "text-neutral-400")}>
-                            {p.originalPriceFormatted?.split(" ")[0]}
+                          <span className={cn("block h-4 text-[11px]", on ? "text-white/60" : "text-neutral-500")}>
+                            {p.trialDays ? `${p.trialDays} days free` : p.introPriceMonthly ? `₹${p.introPriceMonthly / 100} first ${p.introMonths} mo` : ""}
                           </span>
                         </button>
                       );
@@ -486,7 +469,11 @@ function RegisterStoreContent() {
                     </ul>
                     {planId !== "free" && (
                       <p className="mt-3 border-t border-neutral-100 pt-3 text-xs text-neutral-500">
-                        Your store goes live right away. Next you&apos;ll pay {chosenPlan.priceFormatted.split(" ")[0]}/mo to switch on {chosenPlan.name}.
+                        {chosenPlan.trialDays
+                          ? `Your store goes live right away. Next you'll set up payment to start your ${chosenPlan.trialDays}-day free trial; your first ${chosenPlan.priceFormatted.split(" ")[0]} charge is on day ${chosenPlan.trialDays + 1}. Cancel any time before that and you won't be charged.`
+                          : chosenPlan.introPriceMonthly
+                            ? `Your store goes live right away. Next you'll subscribe: ${introOfferText(chosenPlan)}.`
+                            : `Your store goes live right away. Next you'll subscribe to ${chosenPlan.name}.`}
                       </p>
                     )}
                   </div>
@@ -505,10 +492,11 @@ function RegisterStoreContent() {
                 />
                 <span>
                   I agree to the{" "}
-                  <Link href="/legal/terms" target="_blank" className="font-semibold underline underline-offset-2">Seller Terms</Link>,{" "}
-                  <Link href="/legal/privacy" target="_blank" className="font-semibold underline underline-offset-2">Privacy Policy</Link> and{" "}
+                  <Link href="/legal/terms" target="_blank" className="font-semibold underline underline-offset-2">Terms of Service</Link>,{" "}
+                  <Link href="/legal/privacy" target="_blank" className="font-semibold underline underline-offset-2">Privacy Policy</Link>,{" "}
+                  <Link href="/legal/payments" target="_blank" className="font-semibold underline underline-offset-2">Payments Policy</Link> and{" "}
                   <Link href="/legal/acceptable-use" target="_blank" className="font-semibold underline underline-offset-2">what can&apos;t be sold</Link>.
-                  I&apos;ll add my shop&apos;s own return and privacy policies.
+                  I&apos;ll add my shop&apos;s own policies (my shop stays closed until I add at least one).
                 </span>
               </label>
             )}
@@ -551,7 +539,7 @@ function RegisterStoreContent() {
           <AuthHeading title={`${storeName} is live!`} text="Your store is set up and ready for its first order." />
 
           <ul className="mb-5 space-y-2">
-            {["Store address claimed", "UPI checkout connected", `${appliedTheme} theme applied`, "Starter collections added"].map((t, i) => (
+            {["Store address claimed", "Cash on delivery ready", `${appliedTheme} theme applied`, "Starter collections added"].map((t, i) => (
               <li
                 key={t}
                 className="flex items-center gap-2.5 text-sm text-neutral-700 animate-enter-blur"
@@ -699,7 +687,7 @@ function StorePreview({
             <Check className="w-3.5 h-3.5" />
           </span>
           <span>
-            <span className="block text-[10px] text-neutral-500">UPI received</span>
+            <span className="block text-[10px] text-neutral-500">New order</span>
             <span className="block text-sm font-semibold">₹4,999</span>
           </span>
         </div>

@@ -30,6 +30,7 @@ function seed(over: Record<string, unknown> = {}) {
     ownerId: "owner1",
     status: "published",
     planId: "pro",
+    policies: { terms: { body: "t".repeat(200), updatedAt: "2026-11-08" } },
     upiId: "lume@okaxis",
     codEnabled: true,
     codFee: 4000,
@@ -68,16 +69,8 @@ describe("buyer orders", () => {
     expect(docs.get(`orders/${o.id}`)).toBeTruthy();
   });
 
-  it("UPI: needs a real 12-digit UTR and is never marked paid by the buyer", async () => {
-    await expect(orders.placeOrder({ ...buyer, method: "upi" })).rejects.toThrow(/12-digit/);
-    await expect(orders.placeOrder({ ...buyer, method: "upi", utr: "ABC123" })).rejects.toThrow(/12-digit/);
-    const o = await orders.placeOrder({ ...buyer, method: "upi", utr: "412345678901" });
-    expect(o).toMatchObject({ paymentMethod: "upi", paymentStatus: "awaiting_verification", paymentUtr: "412345678901", codFee: 0, total: 74900 });
-  });
-
-  it("a UPI reference can pay for one order only", async () => {
-    await orders.placeOrder({ ...buyer, method: "upi", utr: "412345678901" });
-    await expect(orders.placeOrder({ ...buyer, customer: { name: "Ravi", phone: "9123456780" }, method: "upi", utr: "412345678901" })).rejects.toThrow(/already used/);
+  it("no longer takes manual UPI orders (buyers pay online or on delivery)", async () => {
+    await expect(orders.placeOrder({ ...buyer, method: "upi", utr: "412345678901" })).rejects.toThrow(/isn't available/);
   });
 
   it("applies coupons on the server and counts their use", async () => {
@@ -91,10 +84,26 @@ describe("buyer orders", () => {
     await expect(orders.placeOrder({ ...buyer, method: "cod", items: [{ productId: "p1", quantity: 6 }] })).rejects.toThrow(/no longer available/);
     seed({ isClosed: true });
     await expect(orders.placeOrder({ ...buyer, method: "cod" })).rejects.toThrow(/unavailable/);
+    // with no online payment, Cash on Delivery is the only way to pay, so it stays available
     seed({ codEnabled: false });
-    await expect(orders.placeOrder({ ...buyer, method: "cod" })).rejects.toThrow(/Cash on delivery isn't available/);
+    await expect(orders.placeOrder({ ...buyer, method: "cod" })).resolves.toMatchObject({ paymentMethod: "cod" });
     seed({ isPaused: true });
     await expect(orders.placeOrder({ ...buyer, method: "cod" })).rejects.toThrow(/unavailable/);
+    seed({ policies: {} });
+    await expect(orders.placeOrder({ ...buyer, method: "cod" })).rejects.toThrow(/unavailable/);
+  });
+
+  it("enforces the seller's checkout rules on the server", async () => {
+    seed({ checkoutRules: { minOrder: 10_000_00 } });
+    await expect(orders.placeOrder({ ...buyer, method: "cod" })).rejects.toThrow(/minimum order is ₹10,000/);
+    // the COD limit applies only when the buyer can pay online instead (no online here, so COD stays open)
+    seed({ checkoutRules: { codMax: 100 } });
+    await expect(orders.placeOrder({ ...buyer, method: "cod" })).resolves.toMatchObject({ paymentMethod: "cod" });
+    seed({ checkoutRules: { requireLogin: true } });
+    await expect(orders.placeOrder({ ...buyer, method: "cod" })).rejects.toThrow(/sign in/);
+    await expect(orders.placeOrder({ ...buyer, method: "cod", customerUid: "buyer-1" })).resolves.toBeTruthy();
+    seed({ checkoutRules: { email: "required" } });
+    await expect(orders.placeOrder({ ...buyer, method: "cod", customer: { ...buyer.customer, email: undefined } })).rejects.toThrow(/email/);
   });
 
   it("won't take manual UPI when the shop has live Cashfree payments", async () => {

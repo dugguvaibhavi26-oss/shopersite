@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Bell, ChevronsUpDown, Lock, LogOut, UserRound } from "lucide-react";
+import { ChevronsUpDown, Lock, LogOut, UserRound } from "lucide-react";
+import { INotifications } from "@/components/icons";
 import { ShopperMark, ShopperWordmark } from "@/components/brand/shopper-logo";
 
 export type RailItem<T extends string> = {
@@ -105,24 +106,11 @@ export function SidebarRail<T extends string>({
     `group/nav relative z-[1] flex h-11 w-full shrink-0 items-center rounded-[14px] text-left [@media(max-height:900px)]:h-9 outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-white/70 ${
       on ? "bg-white/[0.12] text-white" : `text-white/45 hover:text-white ${ownHover ? "hover:bg-white/[0.07]" : ""}`
     }`;
-  // the icon leans a few pixels towards the cursor, like it's being pulled by a magnet
-  const magnet = (e: React.PointerEvent<HTMLElement>) => {
-    const box = e.currentTarget.querySelector<HTMLElement>("[data-rail-icon]");
-    if (!box || e.pointerType === "touch") return;
-    const r = box.getBoundingClientRect();
-    const clamp = (v: number) => Math.max(-4, Math.min(4, v));
-    box.style.setProperty("--mx", `${clamp(((e.clientX - r.left) / r.width - 0.5) * 8)}px`);
-    box.style.setProperty("--my", `${clamp(((e.clientY - r.top) / r.height - 0.5) * 8)}px`);
-  };
-  const unmagnet = (e: React.PointerEvent<HTMLElement>) => {
-    const box = e.currentTarget.querySelector<HTMLElement>("[data-rail-icon]");
-    box?.style.setProperty("--mx", "0px");
-    box?.style.setProperty("--my", "0px");
-  };
-  const pull = { onPointerMove: magnet, onPointerLeave: unmagnet };
+  // icons stay still on hover (only the highlight moves)
+  const pull = {};
   const iconBox = "flex h-full w-11 shrink-0 items-center justify-center";
   const iconCls =
-    "h-[19px] w-[19px] translate-x-[var(--mx,0px)] translate-y-[var(--my,0px)] transition-[translate,scale,rotate] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/nav:scale-110";
+    "h-[19px] w-[19px]";
   // names fade and slide in just after the rail starts to open, and leave at once when it closes
   const label =
     "flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap pr-3 text-[13.5px] font-medium tracking-[-0.005em] opacity-0 -translate-x-1.5 transition-[opacity,translate] duration-200 group-data-[open=true]/rail:translate-x-0 group-data-[open=true]/rail:opacity-100 group-data-[open=true]/rail:delay-100 group-data-[open=true]/rail:duration-[400ms]";
@@ -234,7 +222,7 @@ export function SidebarRail<T extends string>({
         >
           {notificationsActive && bar}
           <span data-rail-icon className={`relative ${iconBox}`}>
-            <Bell className={`${iconCls} group-hover/nav:rotate-[14deg]`} />
+            <INotifications className={`${iconCls}`} />
             {hasUnread && <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-white ring-2 ring-[#0a0a0a]" />}
           </span>
           <span className={label}>

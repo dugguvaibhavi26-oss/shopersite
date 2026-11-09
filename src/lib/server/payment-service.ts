@@ -16,6 +16,9 @@ import {
 } from "../payments/cashfree-core";
 import type { OrderData, StoreData } from "../store-service";
 import { ApiError } from "./api-error";
+import { isShopClosed } from "../policies";
+import { buyerProblem } from "../checkout-rules";
+import { notifySellerOfOrder } from "./order-alerts";
 import { adminDb } from "./firebase-admin";
 import { readStore, readStoreTx, writeStoreTx } from "./store-data";
 import {
@@ -264,12 +267,16 @@ export interface CreatePaymentInput {
   notes?: string;
   /** absolute URL of the store's order page prefix, e.g. https://lume.shopersite.in/order/ */
   returnBase: string;
+  /** the signed-in buyer's account id, when there is one (from a verified token) */
+  buyerUid?: string;
 }
 
 export async function createPayment(input: CreatePaymentInput, requestOrigin: string | null) {
   const store = await readStore(input.subdomain);
   if (!store) throw new ApiError(404, "Store not found.");
-  if (store.isClosed || store.isPaused || store.status === "suspended") throw new ApiError(409, "This shop is currently unavailable.");
+  if (isShopClosed(store) || store.isPaused || store.status === "suspended") throw new ApiError(409, "This shop is currently unavailable.");
+  const buyerIssue = buyerProblem(store, { email: input.customer.email, signedIn: !!input.buyerUid });
+  if (buyerIssue) throw new ApiError(400, buyerIssue);
 
   const merchant = await getMerchantRecord(store.subdomain);
   if (!merchant || merchant.state !== "active" || merchant.mode !== cashfreeConfig().mode) {
@@ -434,7 +441,10 @@ export async function verifyPayment(orderId: string): Promise<VerifyResult> {
 async function recordPaid(orderId: string, cfPaymentId?: string): Promise<OrderData> {
   const db = adminDb();
   const payRef = db.collection(PAYMENTS).doc(orderId);
-  return db.runTransaction(async (tx) => {
+  // set inside the transaction when this call is the one that records the payment
+  let alert: { store: StoreData; order: OrderData } | null = null;
+  const result = await db.runTransaction(async (tx) => {
+    alert = null;
     const paySnap = await tx.get(payRef);
     const rec = paySnap.data() as PaymentRecord;
     if (rec.status === "PAID") return rec.order as OrderData;
@@ -447,6 +457,7 @@ async function recordPaid(orderId: string, cfPaymentId?: string): Promise<OrderD
       const applied = applyPaidOrder(store, rec.order as PendingOrder, { cfPaymentId, paidAt, couponId: rec.couponId });
       if (applied) {
         order = applied.order;
+        alert = { store, order };
         writeStoreTx(tx, rec.storeSubdomain, { ...applied.changes });
       } else {
         order = store.orders.find((o) => o.id === orderId)!;
@@ -459,6 +470,9 @@ async function recordPaid(orderId: string, cfPaymentId?: string): Promise<OrderD
     tx.update(payRef, clean({ status: "PAID", order, paidAt, updatedAt: paidAt, ...(cfPaymentId ? { cfPaymentId } : {}) }));
     return order;
   });
+  const done = alert as { store: StoreData; order: OrderData } | null;
+  if (done) await notifySellerOfOrder(done.store, done.order);
+  return result;
 }
 
 export async function findPaymentByToken(token: string): Promise<PaymentRecord | null> {

@@ -3,11 +3,21 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Check, CreditCard, Lock, MessageCircle, Smartphone, Tag, Trash2, Wallet, X } from "lucide-react";
-import { UpiPayPanel } from "@/components/payments/upi-pay-panel";
-import { evaluateCoupon, isValidUpiId, storeService } from "@/lib/store-service";
+import { evaluateCoupon, storeService } from "@/lib/store-service";
 import { canUseCoupons } from "@/lib/plans";
-import { createOnlinePayment, fetchOnlineAvailability, openCashfreeCheckout } from "@/lib/payments/client";
+import {
+  createOnlinePayment,
+  createRazorpayPayment,
+  fetchOnlineAvailability,
+  openCashfreeCheckout,
+  openRazorpayCheckout,
+  verifyRazorpayPayment,
+  type OnlineAvailability,
+} from "@/lib/payments/client";
 import { cn } from "@/lib/utils";
+import { checkoutRulesOf, codAllowedFor, codLimitText, minOrderProblem } from "@/lib/checkout-rules";
+import { BuyerAuth } from "./buyer-auth";
+import { amountToFreeDelivery, deliveryFee } from "@/lib/delivery";
 import { INDIA_STATES } from "@/lib/india-states";
 import { useAuth } from "@/lib/auth-context";
 import { lookupPincode } from "@/lib/pincode-client";
@@ -18,7 +28,7 @@ import { Container, EmptyState, MLink, QtyStepper } from "./ui";
 const STATES = INDIA_STATES;
 
 /** Live prices for the bag, so the bag, checkout and the saved order show the same numbers. */
-type PayMethod = "online" | "upi" | "cod";
+type PayMethod = "online" | "cod";
 
 function useTotals(paymentMethod?: PayMethod) {
   const { store, bag, coupon } = useSite();
@@ -30,7 +40,7 @@ function useTotals(paymentMethod?: PayMethod) {
   const subtotal = lines.reduce((n, l) => n + l.price * l.quantity, 0);
   const couponResult = coupon ? evaluateCoupon(store, coupon, subtotal) : null;
   const discount = couponResult?.ok ? couponResult.amount : 0;
-  const delivery = subtotal === 0 || subtotal >= store.freeDeliveryThreshold ? 0 : store.standardDeliveryFee;
+  const delivery = deliveryFee(store, subtotal);
   const codFee = paymentMethod === "cod" ? store.codFee || 0 : 0;
   const total = Math.max(0, subtotal - discount) + delivery + codFee;
   const unavailable = lines.filter((l) => l.available < l.quantity);
@@ -89,9 +99,9 @@ function Summary({ paymentMethod, compact }: { paymentMethod?: PayMethod; compac
           </div>
         )}
       </div>
-      {t.delivery > 0 && store.freeDeliveryThreshold > t.subtotal && (
+      {t.delivery > 0 && amountToFreeDelivery(store, t.subtotal) > 0 && (
         <div className="mt-4">
-          <p className="m-muted text-[length:calc(12px*var(--m-scale))]">Add {rupees(store.freeDeliveryThreshold - t.subtotal)} more for free delivery</p>
+          <p className="m-muted text-[length:calc(12px*var(--m-scale))]">Add {rupees(amountToFreeDelivery(store, t.subtotal))} more for free delivery</p>
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--m-text)_10%,transparent)]">
             <div className="h-full bg-[var(--m-text)]" style={{ width: `${Math.min(100, (t.subtotal / store.freeDeliveryThreshold) * 100)}%` }} />
           </div>
@@ -209,28 +219,28 @@ type Step = "details" | "payment";
 export function SiteCheckout() {
   const { store, bag, details, saveDetails, coupon, clearBag, rememberOrder, href, editing, demo } = useSite();
   const router = useRouter();
-  // online payment through the seller's own Cashfree account, once their KYC is approved
-  const [onlineOn, setOnlineOn] = React.useState(false);
+  const { user } = useAuth();
+  const [onlineAvail, setOnlineAvail] = React.useState<OnlineAvailability>({ online: false, provider: null });
+  const onlineOn = onlineAvail.online;
+  // asked again once sign-in is known: a shop on test keys offers online payment only to its owner
   React.useEffect(() => {
     if (demo || editing) return;
     let live = true;
-    fetchOnlineAvailability(store.subdomain).then((on) => live && setOnlineOn(on));
+    fetchOnlineAvailability(store.subdomain).then((avail) => live && setOnlineAvail(avail));
     return () => {
       live = false;
     };
-  }, [store.subdomain, demo, editing]);
-  // with online payment on, the manual UPI (scan and type the UTR) option is replaced by it
-  const upiOn = !onlineOn && isValidUpiId(store.upiId || "");
-  const codOn = store.codEnabled;
+  }, [store.subdomain, demo, editing, user?.uid]);
+  // payment options: online (Growth and Pro with a gateway) and Cash on Delivery. Without online
+  // payment, Cash on Delivery is always offered so buyers can still order.
+  const codOn = store.codEnabled || !onlineOn;
   const [step, setStep] = React.useState<Step>("details");
   const [form, setForm] = React.useState<SavedDetails>(details);
   const [errors, setErrors] = React.useState<Partial<Record<keyof SavedDetails, string>>>({});
-  const [method, setMethod] = React.useState<PayMethod>(upiOn ? "upi" : "cod");
+  const [method, setMethod] = React.useState<PayMethod>("cod");
   React.useEffect(() => {
     if (onlineOn) setMethod("online");
   }, [onlineOn]);
-  // UPI opens the payment screen; the order is placed only after the buyer enters the UTR
-  const [upiOpen, setUpiOpen] = React.useState(false);
   const [note, setNote] = React.useState("");
   // a gift note written on the homepage (Theme 34) starts the order note
   React.useEffect(() => {
@@ -246,11 +256,21 @@ export function SiteCheckout() {
   const [pinBusy, setPinBusy] = React.useState(false);
   const [pinAreas, setPinAreas] = React.useState<string[]>([]);
   const [agreed, setAgreed] = React.useState(false);
+  // opt-in (unticked) to one reminder email if the checkout isn't finished
+  const [remindOk, setRemindOk] = React.useState(false);
   const [agreeError, setAgreeError] = React.useState("");
   const t = useTotals(method);
+  // the seller's checkout rules (Settings → Checkout); the server checks the same ones
+  const rules = checkoutRulesOf(store);
+  const minIssue = minOrderProblem(store, Math.max(0, t.subtotal - t.discount));
+  const codTotal = t.total - t.codFee + (store.codFee || 0);
+  const codUsable = codOn && codAllowedFor(store, codTotal, onlineOn);
+  const loginNeeded = rules.requireLogin && !user && !demo && !editing;
+  React.useEffect(() => {
+    if (method === "cod" && !codUsable && onlineOn) setMethod("online");
+  }, [method, codUsable, onlineOn]);
 
   // a signed-in buyer's name and email start the form
-  const { user } = useAuth();
   React.useEffect(() => {
     if (!user || demo || editing) return;
     setForm((f) => ({ ...f, name: f.name || user.displayName || "", email: f.email || user.email || "" }));
@@ -308,7 +328,7 @@ export function SiteCheckout() {
     const pick = (k: keyof SavedDetails, msg: string) => msg && (er[k] = msg);
     pick("name", checkPersonName(form.name, "full name"));
     pick("phone", checkPhone(form.phone));
-    pick("email", checkEmail(form.email, { required: false }));
+    if (rules.email !== "hidden") pick("email", checkEmail(form.email, { required: rules.email === "required" }));
     pick("street", checkStreet(form.street));
     pick("city", checkPlace(form.city, "city"));
     if (!form.state) er.state = "Choose your state";
@@ -316,6 +336,25 @@ export function SiteCheckout() {
     if (!agreed) setAgreeError("Please agree to the shop's terms to continue.");
     setErrors(er);
     return Object.keys(er).length === 0 && agreed;
+  };
+
+  /** Lets the shop see (and, if the buyer agreed, remind) a checkout that isn't finished. Best effort. */
+  const noteCheckoutStarted = () => {
+    if (demo || editing) return;
+    const phone = cleanPhone(form.phone);
+    fetch("/api/checkout/started", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        store: store.subdomain,
+        name: form.name.trim(),
+        phone,
+        ...(form.email.trim() ? { email: form.email.trim() } : {}),
+        consent: remindOk && !!form.email.trim(),
+        items: t.lines.map((l) => ({ productId: l.productId, quantity: l.quantity, ...(l.variantName ? { variantName: l.variantName } : {}) })),
+      }),
+      keepalive: true,
+    }).catch(() => {});
   };
 
   const orderInput = () => {
@@ -332,10 +371,10 @@ export function SiteCheckout() {
     };
   };
 
-  /** Saves the order through the server (it sets prices and checks the UPI reference). */
-  const submitOrder = async (m: "upi" | "cod", utr?: string) => {
+  /** Saves a Cash on Delivery order through the server (it sets the prices). */
+  const submitOrder = async (m: "cod") => {
     const { phone, body } = orderInput();
-    const order = await storeService.createOrder(store.subdomain, { method: m, ...body, ...(utr ? { utr } : {}) });
+    const order = await storeService.createOrder(store.subdomain, { method: m, ...body });
     saveDetails({ ...form, phone });
     rememberOrder(order.token);
     clearBag();
@@ -353,9 +392,8 @@ export function SiteCheckout() {
       setError("Some items in your bag are no longer available. Go back to your bag to update it.");
       return;
     }
-    if (method === "upi") {
-      setUpiOpen(true);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+    if (minIssue) {
+      setError(minIssue);
       return;
     }
     setPlacing(true);
@@ -371,12 +409,12 @@ export function SiteCheckout() {
     }
   };
 
-  /** Starts the payment on the seller's Cashfree account; the order is saved once Cashfree confirms it. */
+  /** Starts online payment via Cashfree or Razorpay based on which the seller has configured. */
   const payOnline = async () => {
     try {
       const phone = cleanPhone(form.phone);
       const back = new URL(href("/order/"), window.location.origin);
-      const res = await createOnlinePayment({
+      const orderPayload = {
         store: store.subdomain,
         items: t.lines.map((l) => ({ productId: l.productId, quantity: l.quantity, ...(l.variantName ? { variantName: l.variantName } : {}) })),
         ...(coupon ? { couponCode: coupon } : {}),
@@ -384,15 +422,40 @@ export function SiteCheckout() {
         address: { street: form.street.trim(), city: form.city.trim(), state: form.state, pincode: form.pincode.trim() },
         ...(note.trim() ? { notes: note.trim() } : {}),
         returnBase: `${back.origin}${back.pathname}`,
-      });
-      if (res.total !== t.total) {
-        // prices changed since the page loaded; the server's amount is the one charged
-        console.info("[checkout] amount updated by the server", t.total, res.total);
+      };
+
+      if (onlineAvail.provider === "razorpay") {
+        const res = await createRazorpayPayment(orderPayload);
+        if (res.total !== t.total) console.info("[checkout] amount updated by the server", t.total, res.total);
+        saveDetails({ ...form, phone });
+        rememberOrder(res.token);
+        const payment = await openRazorpayCheckout({
+          keyId: res.keyId,
+          rzOrderId: res.rzOrderId,
+          amount: res.total,
+          storeName: store.name,
+          prefill: { name: form.name.trim(), contact: phone, email: form.email.trim() || undefined },
+        });
+        // Razorpay has taken the money by now. Whatever happens next, go to the order page (it re-checks
+        // with Razorpay) rather than staying here, where the buyer might pay a second time.
+        const orderPage = `${href("/order/")}${res.token}`;
+        const result = await verifyRazorpayPayment(
+          store.subdomain,
+          res.token,
+          payment.razorpay_payment_id,
+          payment.razorpay_order_id,
+          payment.razorpay_signature
+        ).catch(() => null);
+        if (result?.status === "paid") clearBag();
+        router.push(result?.status === "paid" ? `${orderPage}?placed=1` : orderPage);
+      } else {
+        const res = await createOnlinePayment(orderPayload);
+        if (res.total !== t.total) console.info("[checkout] amount updated by the server", t.total, res.total);
+        saveDetails({ ...form, phone });
+        rememberOrder(res.token);
+        await openCashfreeCheckout(res.paymentSessionId, res.mode);
+        // Cashfree now takes over this tab and returns the buyer to the order page
       }
-      saveDetails({ ...form, phone });
-      rememberOrder(res.token);
-      await openCashfreeCheckout(res.paymentSessionId, res.mode);
-      // Cashfree now takes over this tab and returns the buyer to the order page
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't start the payment. Please try again.");
       setPlacing(false);
@@ -426,25 +489,58 @@ export function SiteCheckout() {
       </ol>
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_420px]">
-        <div>
-          {step === "details" ? (
+        {/* delivery → payment → UPI screen fade into each other instead of jumping */}
+        <div key={step === "details" ? "details" : "payment"} className="swap-enter">
+          {step === "details" && loginNeeded ? (
+            /* the seller asks buyers to sign in before ordering (Settings → Customer accounts) */
+            <div className="grid gap-4">
+              <div className="m-soft rounded-2xl p-5 text-[length:calc(14px*var(--m-scale))]">
+                <p className="font-semibold">Sign in to place your order</p>
+                <p className="m-muted mt-1">{store.name} asks buyers to sign in first, so you can see your orders on any device.</p>
+              </div>
+              <BuyerAuth />
+            </div>
+          ) : step === "details" ? (
             <form
               noValidate
               onSubmit={(e) => {
                 e.preventDefault();
+                if (minIssue) return;
                 if (validate()) {
+                  noteCheckoutStarted();
                   setStep("payment");
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }
               }}
               className="grid gap-4"
             >
+              {minIssue && (
+                <div className="reveal-in rounded-2xl bg-amber-50 px-4 py-3 text-[length:calc(13px*var(--m-scale))] text-amber-900">
+                  {minIssue}{" "}
+                  <MLink to="/catalog" className="font-semibold underline underline-offset-2">
+                    Keep shopping
+                  </MLink>
+                </div>
+              )}
               <h2 className="m-h text-[length:calc(18px*var(--m-scale))]">Contact</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 {field("name", "Full name", { autoComplete: "name", maxLength: 80 })}
                 {field("phone", "Mobile number", { autoComplete: "tel-national", inputMode: "tel", placeholder: "10-digit number" })}
               </div>
-              {field("email", "Email (optional, for order updates)", { type: "email", autoComplete: "email", maxLength: 200 })}
+              {rules.email !== "hidden" &&
+                field("email", rules.email === "required" ? "Email (for order updates)" : "Email (optional, for order updates)", { type: "email", autoComplete: "email", maxLength: 200 })}
+              {rules.email !== "hidden" && form.email.trim() && (
+                <label className="reveal-in -mt-1 flex items-start gap-3 text-[length:calc(12.5px*var(--m-scale))]">
+                  <input
+                    type="checkbox"
+                    checked={remindOk}
+                    onChange={(e) => setRemindOk(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--m-text)]"
+                    style={{ minHeight: 0, minWidth: 0 }}
+                  />
+                  <span className="m-muted">Email me a reminder if I don&apos;t finish my order</span>
+                </label>
+              )}
               <h2 className="m-h mt-4 text-[length:calc(18px*var(--m-scale))]">Delivery address</h2>
               <div>
                 {field("pincode", pinBusy ? "PIN code · finding your city…" : "PIN code", { autoComplete: "postal-code", inputMode: "numeric", maxLength: 6, placeholder: "6-digit PIN code" })}
@@ -468,10 +564,12 @@ export function SiteCheckout() {
                   {errors.state && <span className="mt-1 block text-[length:calc(12px*var(--m-scale))] text-red-600">{errors.state}</span>}
                 </label>
               </div>
-              <label className="block">
-                <span className="mb-1.5 block text-[length:calc(13px*var(--m-scale))] font-medium">Note for the shop (optional)</span>
-                <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} className="m-field" placeholder="Landmark, gift message…" />
-              </label>
+              {rules.orderNotes && (
+                <label className="block">
+                  <span className="mb-1.5 block text-[length:calc(13px*var(--m-scale))] font-medium">Note for the shop (optional)</span>
+                  <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} className="m-field" placeholder="Landmark, gift message…" />
+                </label>
+              )}
               <label className="flex items-start gap-3 text-[length:calc(13px*var(--m-scale))]">
                 <input
                   type="checkbox"
@@ -489,22 +587,10 @@ export function SiteCheckout() {
                 </span>
               </label>
               {agreeError && <span className="-mt-2 block text-[length:calc(12px*var(--m-scale))] text-red-600">{agreeError}</span>}
-              <button type="submit" className="m-btn mt-4 h-12 w-full sm:w-auto sm:px-12">
+              <button type="submit" disabled={!!minIssue} className="m-btn mt-4 h-12 w-full disabled:opacity-50 sm:w-auto sm:px-12">
                 Continue to payment
               </button>
             </form>
-          ) : upiOpen && upiOn ? (
-            <UpiPayPanel
-              merchantName={store.name}
-              purpose={`Order · ${t.lines.reduce((n, l) => n + l.quantity, 0)} item${t.lines.reduce((n, l) => n + l.quantity, 0) === 1 ? "" : "s"} · ${form.name}`}
-              amount={t.total}
-              payeeUpiId={store.upiId}
-              payeeName={store.name}
-              note={`Order from ${store.name}`}
-              submitLabel="Place order"
-              onBack={() => setUpiOpen(false)}
-              onSubmit={(utr) => submitOrder("upi", utr)}
-            />
           ) : (
             <div className="grid gap-4">
               <div className="m-soft flex items-start justify-between gap-4 rounded-2xl p-5 text-[length:calc(14px*var(--m-scale))]">
@@ -522,7 +608,7 @@ export function SiteCheckout() {
               </div>
 
               <h2 className="m-h mt-4 text-[length:calc(18px*var(--m-scale))]">Payment</h2>
-              {!onlineOn && !upiOn && !codOn && (
+              {!onlineOn && !codUsable && (
                 <div className="m-soft rounded-2xl p-5 text-[length:calc(14px*var(--m-scale))]">
                   <p>Online payment isn't set up for this shop yet. Message the shop to complete your order.</p>
                   {whatsappLink(store.contactPhone) && (
@@ -544,28 +630,19 @@ export function SiteCheckout() {
                     <CreditCard className="h-5 w-5 shrink-0" />
                     <span className="min-w-0 flex-1">
                       <span className="block text-[length:calc(14px*var(--m-scale))] font-semibold">Pay online</span>
-                      <span className="m-muted block text-[length:calc(13px*var(--m-scale))]">UPI, cards, net banking and wallets · secured by Cashfree</span>
+                      <span className="m-muted block text-[length:calc(13px*var(--m-scale))]">
+                        UPI, cards, net banking and wallets · secured by {onlineAvail.provider === "cashfree" ? "Cashfree" : "Razorpay"}
+                      </span>
+                      {onlineAvail.testMode && (
+                        <span className="mt-1.5 block rounded-lg bg-amber-100 px-2 py-1 text-[length:calc(12px*var(--m-scale))] font-medium text-amber-900">
+                          Test mode: only you (the shop owner) can see this. Use Razorpay&apos;s test card; no real money moves.
+                        </span>
+                      )}
                     </span>
                     <span className={cn("h-5 w-5 rounded-full border-2", method === "online" ? "border-[6px] border-[var(--m-text)]" : "m-line")} />
                   </button>
                 )}
-                {upiOn && (
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={method === "upi"}
-                    onClick={() => setMethod("upi")}
-                    className={cn("m-line flex items-center gap-4 rounded-2xl border p-5 text-left", method === "upi" && "border-[var(--m-text)] ring-1 ring-[var(--m-text)]")}
-                  >
-                    <Smartphone className="h-5 w-5 shrink-0" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[length:calc(14px*var(--m-scale))] font-semibold">UPI</span>
-                      <span className="m-muted block text-[length:calc(13px*var(--m-scale))]">GPay, PhonePe, Paytm or any UPI app · shop confirms payment</span>
-                    </span>
-                    <span className={cn("h-5 w-5 rounded-full border-2", method === "upi" ? "border-[6px] border-[var(--m-text)]" : "m-line")} />
-                  </button>
-                )}
-                {codOn && (
+                {codUsable && (
                   <button
                     type="button"
                     role="radio"
@@ -583,8 +660,9 @@ export function SiteCheckout() {
                 )}
               </div>
 
+              {codOn && !codUsable && <p className="m-muted text-[length:calc(13px*var(--m-scale))]">{codLimitText(store)}</p>}
               {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-[length:calc(13px*var(--m-scale))] text-red-700">{error}</p>}
-              {(onlineOn || upiOn || codOn) && (
+              {(onlineOn || codUsable) && (
                 <button type="button" disabled={placing} onClick={place} className="m-btn mt-2 h-12 w-full">
                   <Lock className="h-4 w-4" />
                   {placing
@@ -593,9 +671,7 @@ export function SiteCheckout() {
                       : "Placing order…"
                     : method === "online"
                       ? `Pay ${rupees(t.total)} securely`
-                      : method === "upi"
-                        ? `Continue to pay ${rupees(t.total)}`
-                        : `Place order · ${rupees(t.total)}`}
+                      : `Place order · ${rupees(t.total)}`}
                 </button>
               )}
               <p className="m-faint text-center text-[length:calc(12px*var(--m-scale))]">Your details are sent securely and only shared with {store.name} to deliver your order.</p>

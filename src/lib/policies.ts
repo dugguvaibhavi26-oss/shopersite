@@ -48,6 +48,19 @@ export function missingPolicies(store: Pick<StoreData, "policies">): PolicyId[] 
 }
 
 /**
+ * A shop needs at least one real policy page before it can open to buyers. Without one it stays
+ * closed: the storefront shows the closed card, orders are refused, and the seller can't switch it on.
+ */
+export function hasAnyPolicy(store: Pick<StoreData, "policies">): boolean {
+  return missingPolicies(store).length < POLICY_IDS.length;
+}
+
+/** Closed to buyers: switched off by the seller, or no policy page yet. */
+export function isShopClosed(store: Pick<StoreData, "policies" | "isClosed">): boolean {
+  return !!store.isClosed || !hasAnyPolicy(store);
+}
+
+/**
  * A plain-language starting point, filled with the shop's details. The seller must read and change
  * it to match how they work; it is not legal advice.
  */
@@ -62,7 +75,7 @@ export function policyTemplate(id: PolicyId, store: Pick<StoreData, "name" | "co
         `These terms apply when you buy from ${name}${store.ownerName ? `, run by ${store.ownerName}` : ""}. By placing an order you agree to them.`,
         `Products and prices. We describe and photograph our products as accurately as we can. Colours may look slightly different on your screen. Prices are in Indian rupees and include applicable taxes unless stated otherwise. We may change prices at any time, but the price you pay is the one shown when you order.`,
         `Orders. An order is confirmed once we accept it and your payment is received${store.codEnabled ? " (or, for cash on delivery, once we confirm it)" : ""}. We may cancel an order if a product is out of stock, the price was shown wrongly, or we suspect fraud. If we cancel a paid order, we refund you in full.`,
-        `Payment. You pay ${name} directly by UPI${store.codEnabled ? " or cash on delivery" : ""}. For UPI orders, enter the correct 12-digit UPI reference number; orders with a wrong or reused reference are not confirmed.`,
+        `Payment. You pay ${name} by cash on delivery, or online through the secure payment page when the shop offers it. We never ask for your card, UPI PIN or bank password.`,
         `Delivery, returns and refunds are covered in our Shipping and Returns policies, which are part of these terms.`,
         `Your responsibilities. Give a correct name, phone number and address. Don't misuse the shop, place fake orders, or use someone else's payment details.`,
         `Liability. Our responsibility for any order is limited to the amount you paid for it. Nothing here limits your rights under the Consumer Protection Act, 2019.`,
@@ -77,7 +90,7 @@ export function policyTemplate(id: PolicyId, store: Pick<StoreData, "name" | "co
           ? `Returns. You can ask for a return within ${op.returnDays} days of delivery from your order page. Items must be unused, with tags and original packaging. We'll tell you how to send it back.`
           : `Returns. We accept returns only if the item arrived damaged, defective or wrong. Contact us at ${contact} within 48 hours of delivery with photos of the item and packaging.`,
         `Items that can't be returned: personalised or custom-made products, innerwear, perishables and items marked "non-returnable".`,
-        `Refunds. Once we receive and check the returned item (or cancel your order), we refund the amount you paid to your original UPI ID or bank account within 5–7 working days. Delivery charges are refunded only if the item was damaged, defective or wrong.`,
+        `Refunds. Once we receive and check the returned item (or cancel your order), we refund the amount you paid to your original payment method (or your bank account for cash orders) within 5–7 working days. Delivery charges are refunded only if the item was damaged, defective or wrong.`,
         `Cash on delivery orders are refunded by UPI or bank transfer to details you share with us.`,
         `Questions? Contact us at ${contact}.`,
       ].join("\n\n");

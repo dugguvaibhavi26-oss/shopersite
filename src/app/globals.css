@@ -392,8 +392,9 @@
   animation: enterSlideLeft 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* backwards: lets go when done, so pop-ups inside a dashboard section cover the whole screen */
 .animate-enter-blur {
-  animation: enterBlur 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: enterBlur 0.48s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 .animate-reveal-flip {
@@ -1173,10 +1174,59 @@ html.cap-ios body {
 
 /* Dashboard sections slide up as you switch to them. Ends at transform: none, so fixed
    modals inside a section position normally once it has settled. */
-.tab-enter { animation: tab-enter 340ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.tab-enter { animation: tab-enter 340ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 @keyframes tab-enter {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: none; }
+}
+
+/* Smaller switches inside a page (settings sections, setup steps, admin tabs): a quick, soft
+   fade-up. Put it on a wrapper with a changing `key` so it plays on every switch. */
+/* "backwards", not "both": once it ends the animation lets go, so pop-ups inside still cover the
+   whole screen (a held transform would trap fixed-position children inside this box). */
+.swap-enter { animation: swap-enter 260ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+@keyframes swap-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+/* Something that appears because of a choice (an extra field, a message): fades and unfolds. */
+.reveal-in { animation: reveal-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; transform-origin: top; }
+@keyframes reveal-in {
+  from { opacity: 0; transform: translateY(-4px) scaleY(0.98); }
+  to { opacity: 1; transform: none; }
+}
+/* The settings menu slides out from the main sidebar on the left when you open Settings. */
+@keyframes settings-nav-in {
+  from { opacity: 0; transform: translateX(-28px); }
+  to { opacity: 1; transform: none; }
+}
+@media (min-width: 64rem) {
+  .lg\:settings-nav-in { animation: settings-nav-in 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+}
+
+/* Pop-up panels grow in slightly instead of snapping open. */
+.dialog-pop { animation: dialog-pop 240ms cubic-bezier(0.2, 0.9, 0.25, 1) both; }
+@keyframes dialog-pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Colours, borders and shadows change smoothly on hover, focus and selection everywhere, instead
+   of snapping. Base layer, so any component's own transition utilities still win. */
+@layer base {
+  button,
+  a[href],
+  [role="tab"],
+  [role="radio"],
+  [role="switch"],
+  input,
+  select,
+  textarea,
+  label {
+    transition-property: color, background-color, border-color, box-shadow, opacity, outline-color;
+    transition-duration: 180ms;
+    transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
 }
 
 /* Loading bar at the top while the next page loads (components/nav-progress.tsx) */
@@ -1222,11 +1272,18 @@ html.cap-ios body {
   }
 }
 
+/* "Reduce motion" (also on when Windows animations are turned off): nothing slides or grows, but
+   switches still fade, so changes never feel like a hard cut. */
 @media (prefers-reduced-motion: reduce) {
   .page-enter,
-  .tab-enter { animation: none; }
+  .tab-enter,
+  .swap-enter,
+  .reveal-in,
+  .lg\:settings-nav-in,
+  .dialog-pop { animation: soft-fade 200ms ease-out backwards; }
   .nav-progress-bar.is-loading { animation: none; transform: scaleX(0.6); }
 }
+@keyframes soft-fade { from { opacity: 0; } to { opacity: 1; } }
 
 
 /* --- Mono Studio storefront theme (src/components/storefront/site) ------------------------- */
@@ -2469,3 +2526,55 @@ html.cap-ios body {
   .dash-rail-pulse { animation: none; }
 }
 .dash-panel-scroll { scrollbar-width: thin; scrollbar-color: rgba(0, 0, 0, 0.18) transparent; }
+
+
+
+/* Home banner: progress line under the active slide thumbnail */
+@keyframes grow {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+/* Roxy (the assistant): breathes, blinks and glances around, gently */
+.roxy-breathe { animation: roxy-breathe 4.2s ease-in-out infinite; }
+.roxy-blink { animation: roxy-blink 5.5s infinite; transform-box: view-box; }
+.roxy-look { animation: roxy-look 9s ease-in-out infinite; }
+@keyframes roxy-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-1.5px) scale(1.03); }
+}
+@keyframes roxy-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+@keyframes roxy-look {
+  0%, 30%, 100% { transform: translateX(0); }
+  38%, 52% { transform: translateX(2.5px); }
+  60%, 72% { transform: translateX(-2px); }
+  80% { transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .roxy-breathe, .roxy-blink, .roxy-look { animation: none; }
+}
+
+/* Roxy's ask box: a thin border that slowly flows around it */
+@property --roxy-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.roxy-border {
+  background: conic-gradient(from var(--roxy-angle), #d4d4d4 0deg, #9aa3f9 55deg, #b8a4fb 105deg, #f29bd0 155deg, #d4d4d4 220deg, #d4d4d4 360deg);
+  animation: roxy-border 6s linear infinite;
+}
+.roxy-border-glow {
+  background: conic-gradient(from var(--roxy-angle), transparent 0deg, rgba(129, 140, 248, 0.45) 55deg, rgba(167, 139, 250, 0.45) 105deg, rgba(244, 114, 182, 0.4) 155deg, transparent 220deg);
+  animation: roxy-border 6s linear infinite;
+  filter: blur(16px);
+}
+@keyframes roxy-border {
+  to { --roxy-angle: 360deg; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .roxy-border, .roxy-border-glow { animation: none; }
+}

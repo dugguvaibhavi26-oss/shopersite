@@ -14,6 +14,7 @@ import { SiteCart, SiteCheckout } from "./checkout";
 import { SiteAccount, SiteInfoPage, SiteOrder } from "./account";
 import { Container, EmptyState } from "./ui";
 import { FieldProbe } from "./field-probe";
+import { StoreTracking } from "./store-tracking";
 
 export type SiteView =
   | { name: "home" }
@@ -112,6 +113,28 @@ function Frame({ view, selectedId, previewBar }: { view: SiteView; selectedId?: 
     document.title = store.name;
   }, [store.name]);
 
+  // the shop's own logo as the browser-tab icon (instead of the Shopersite mark)
+  React.useEffect(() => {
+    if (!store.logoUrl) return;
+    const head = document.head;
+    // browsers use the last icon declared, so ours goes at the end; the default icons are muted meanwhile
+    const others = Array.from(head.querySelectorAll<HTMLLinkElement>('link[rel~="icon"], link[rel="apple-touch-icon"]')).filter((l) => !l.dataset.storeIcon);
+    const prevMedia = others.map((l) => l.getAttribute("media"));
+    others.forEach((l) => l.setAttribute("media", "not all"));
+    const made = (["icon", "apple-touch-icon"] as const).map((rel) => {
+      const l = document.createElement("link");
+      l.rel = rel;
+      l.href = store.logoUrl!;
+      l.dataset.storeIcon = "1";
+      head.appendChild(l);
+      return l;
+    });
+    return () => {
+      made.forEach((l) => l.remove());
+      others.forEach((l, i) => (prevMedia[i] === null ? l.removeAttribute("media") : l.setAttribute("media", prevMedia[i]!)));
+    };
+  }, [store.logoUrl]);
+
   React.useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [view]);
@@ -148,6 +171,7 @@ function Frame({ view, selectedId, previewBar }: { view: SiteView; selectedId?: 
       </main>
       <SiteFooter />
       <SiteToast />
+      <StoreTracking />
       {editing && <FieldProbe overHero={overHero} />}
     </div>
   );

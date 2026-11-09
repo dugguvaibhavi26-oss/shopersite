@@ -4,15 +4,14 @@ import { useState } from "react";
 import { ArrowLeft, Check, ImageIcon, PartyPopper, UploadCloud, X } from "lucide-react";
 import { storeService, type StoreData } from "@/lib/store-service";
 import { missingPolicies } from "@/lib/policies";
-import { checkPrices, checkUpiId } from "@/lib/validation";
+import { checkPrices } from "@/lib/validation";
 import { cropImage } from "@/components/ui/image-cropper";
 
-type StepId = "logo" | "products" | "upi" | "policies" | "discount" | "instagram";
+type StepId = "logo" | "products" | "policies" | "discount" | "instagram";
 
 export const SETUP_STEPS: { id: StepId; title: string; hint: string }[] = [
   { id: "logo", title: "Add your store logo", hint: "Shown at the top of your store and on order messages." },
   { id: "products", title: "Add 5 products", hint: "A photo, a name and a price is all you need to start." },
-  { id: "upi", title: "Set up UPI payments", hint: "Buyers pay straight to this UPI ID. We never hold the money." },
   { id: "policies", title: "Add your policy pages", hint: "Terms, returns, shipping and privacy. Required for online shops, and they protect you in disputes." },
   { id: "discount", title: "Create a discount code", hint: "Give first-time buyers a reason to order today." },
   { id: "instagram", title: "Link your Instagram", hint: "Buyers can find and follow you from your store." },
@@ -24,8 +23,6 @@ export function isSetupStepDone(store: StoreData, id: StepId): boolean {
       return Boolean(store.logoUrl);
     case "products":
       return store.products.length >= 5;
-    case "upi":
-      return Boolean(store.upiId?.trim());
     case "policies":
       return missingPolicies(store).length === 0;
     case "discount":
@@ -116,7 +113,6 @@ export function SetupWizard({
 
   // one value bag for the current step's fields
   const [logo, setLogo] = useState(store.logoUrl || "");
-  const [upi, setUpi] = useState(store.upiId || "");
   const [insta, setInsta] = useState((store.instagramHandle || "").replace(/^@/, ""));
   const [pImage, setPImage] = useState("");
   const [pName, setPName] = useState("");
@@ -156,12 +152,6 @@ export function SetupWizard({
         if (!logo) return setError("Upload your logo first."), false;
         storeService.updateStore(sub, { logoUrl: logo });
         break;
-      case "upi": {
-        const v = upi.trim();
-        if (checkUpiId(v)) return setError(checkUpiId(v)), false;
-        storeService.updateStore(sub, { upiId: v });
-        break;
-      }
       case "instagram": {
         const handle = insta.trim().replace(/^@/, "").replace(/^(https?:\/\/)?(www\.)?instagram\.com\//, "").replace(/\/.*$/, "");
         if (!/^[\w.]{1,30}$/.test(handle)) return setError("Enter your Instagram username, like roxtenn.store."), false;
@@ -292,8 +282,6 @@ export function SetupWizard({
                 </div>
               ) : step.id === "logo" ? (
                 <ImagePicker value={logo} onPick={pick(undefined, setLogo)} label={uploading ? "Uploading…" : "Upload logo"} />
-              ) : step.id === "upi" ? (
-                <Field label="UPI ID" value={upi} onChange={(e) => (setUpi(e.target.value), setError(""))} placeholder="yourname@okaxis" autoFocus />
               ) : step.id === "instagram" ? (
                 <Field label="Instagram username" prefix="@" value={insta} onChange={(e) => (setInsta(e.target.value), setError(""))} placeholder="roxtenn.store" autoFocus />
               ) : step.id === "products" ? (

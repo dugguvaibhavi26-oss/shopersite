@@ -127,6 +127,22 @@ await check("owner creates an empty private doc", "ALLOW", async () => {
   return setDoc(doc(owner(), "stores/lume/private/data"), { orders: [], customers: [], subscribers: [], subscriptionHistory: [], themePurchases: [], pendingSubscription: null, updatedAt: "x" });
 });
 
+// admins added from Admin → Admins (platform_admins/{email})
+const ADDED = "helper@example.com";
+const addedAdmin = () => env.authenticatedContext("helper1", { email: ADDED, email_verified: true }).firestore();
+const addedUnverified = () => env.authenticatedContext("helper2", { email: ADDED, email_verified: false }).firestore();
+const withAdded = async (fn) => {
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `platform_admins/${ADDED}`), { email: ADDED }));
+  return fn();
+};
+await check("added admin can read any shop's orders", "ALLOW", () => withAdded(() => getDoc(doc(addedAdmin(), "stores/lume/private/data"))));
+await check("added admin can suspend a shop", "ALLOW", () => withAdded(() => updateDoc(doc(addedAdmin(), "stores/lume"), { isPaused: true, status: "suspended" })));
+await check("added admin with unverified email gets nothing", "DENY", () => withAdded(() => getDoc(doc(addedUnverified(), "stores/lume/private/data"))));
+await check("removed admin loses access", "DENY", () => getDoc(doc(addedAdmin(), "stores/lume/private/data")));
+await check("seller can't make themselves an admin", "DENY", () => setDoc(doc(owner(), "platform_admins/seller@example.com"), { email: "seller@example.com" }));
+await check("admin can't add admins from a browser (server only)", "DENY", () => setDoc(doc(admin(), `platform_admins/${ADDED}`), { email: ADDED }));
+await check("nobody reads the admin list from a browser", "DENY", () => getDocs(collection(stranger(), "platform_admins")));
+
 // platform
 await check("anyone reads platform settings", "ALLOW", () => getDoc(doc(visitor(), "platform_settings/payment")));
 await check("seller can't change where plans are paid", "DENY", () => updateDoc(doc(owner(), "platform_settings/payment"), { activeUpiId: "attacker@ybl" }));

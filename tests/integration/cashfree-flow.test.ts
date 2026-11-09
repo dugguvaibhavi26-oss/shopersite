@@ -46,6 +46,7 @@ function seedStore() {
     name: "Lume",
     status: "published",
     planId: "pro",
+    policies: { terms: { body: "t".repeat(200), updatedAt: "2026-11-08" } },
     freeDeliveryThreshold: 100000,
     standardDeliveryFee: 5000,
     codFee: 4000,

@@ -4,8 +4,10 @@ import * as React from "react";
 import { useParams } from "next/navigation";
 import { MessageCircle, Store } from "lucide-react";
 import { storeService, type StoreData } from "@/lib/store-service";
+import { hasAnyPolicy, isShopClosed } from "@/lib/policies";
 
 export const DEFAULT_CLOSED_MESSAGE = "We're taking a short break and not taking orders right now. Please check back soon.";
+const NOT_OPEN_MESSAGE = "This shop is getting ready and isn't taking orders yet. Please check back soon.";
 
 /**
  * When the seller switches their shop off from the dashboard, every storefront page shows this
@@ -24,7 +26,15 @@ export function StoreClosedGate() {
     return storeService.subscribe(sync);
   }, [subdomain]);
 
-  const closed = !!store?.isClosed;
+  // the theme editor's preview frame and dashboard theme previews stay usable for the seller
+  const [previewing, setPreviewing] = React.useState(false);
+  React.useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    setPreviewing((p.get("editor") === "1" && window.parent !== window) || p.has("preview_theme"));
+  }, []);
+  // closed by the seller, or not open yet because the shop has no policy page
+  const notOpenYet = !!store && !store.isClosed && !hasAnyPolicy(store);
+  const closed = !!store && !previewing && isShopClosed(store);
 
   React.useEffect(() => {
     if (!closed) return;
@@ -58,14 +68,19 @@ export function StoreClosedGate() {
         )}
         <p className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-600">
           <span className="h-1.5 w-1.5 rounded-full bg-neutral-400" />
-          Closed
+          {notOpenYet ? "Opening soon" : "Closed"}
         </p>
         <h2 id="store-closed-title" className="mt-3 text-[1.5rem] font-semibold leading-tight tracking-[-0.02em]">
-          {store.name} is currently unavailable
+          {notOpenYet ? `${store.name} isn't open yet` : `${store.name} is currently unavailable`}
         </h2>
         <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-neutral-600">
-          {store.closedMessage?.trim() || DEFAULT_CLOSED_MESSAGE}
+          {notOpenYet ? NOT_OPEN_MESSAGE : store.closedMessage?.trim() || DEFAULT_CLOSED_MESSAGE}
         </p>
+        {notOpenYet && (
+          <p className="mt-3 rounded-xl bg-neutral-50 px-3 py-2 text-xs text-neutral-500">
+            Is this your shop? Add at least one policy page in Dashboard → Policies to open it.
+          </p>
+        )}
         {whatsapp && (
           <a
             href={whatsapp}

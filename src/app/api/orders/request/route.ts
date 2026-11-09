@@ -5,7 +5,7 @@ import { cleanSubdomain } from "@/lib/server/store-data";
 
 const Body = z.object({
   store: z.string().max(63),
-  token: z.string().regex(/^tok_sh_[a-z0-9]{6,40}$/),
+  token: z.string().regex(/^tok_(sh|rz)_[a-z0-9]{6,40}$/),
   kind: z.enum(["cancel", "return"]),
   reason: z.string().trim().min(5).max(500),
 });

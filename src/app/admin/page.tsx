@@ -25,7 +25,14 @@ import { PlatformBannersManager } from "@/components/admin/platform-banners-mana
 import { PlansManager } from "@/components/admin/plans-manager";
 import { PlatformPaymentSettings } from "@/components/admin/platform-payment-settings";
 import { ThemesManager } from "@/components/admin/themes-manager";
+import { SupportRequests, fetchOpenSupportCount } from "@/components/admin/support-requests";
+import { MaintenanceSettings } from "@/components/admin/maintenance-settings";
+import { AdminsManager } from "@/components/admin/admins-manager";
+import { CompanySettings } from "@/components/admin/company-settings";
+import { AssistantSettings } from "@/components/admin/assistant-settings";
+import { DiscoverSettings } from "@/components/admin/discover-settings";
 import {
+  LifeBuoy,
   ShieldAlert,
   Users,
   Store,
@@ -102,18 +109,40 @@ function AdminDashboardContent() {
 
   const urlSellerParam = searchParams.get("seller") || searchParams.get("store");
 
-  // Admin access: signed in with a verified email on the admin list. The database rules enforce the
-  // same list, so this screen only decides what to show; nobody else can change anything.
-  const isAuthenticated =
-    !!user && !!user.email && user.emailVerified && siteConfig.adminEmails.includes(user.email.toLowerCase());
+  // Admin access: a verified email that is an owner (NEXT_PUBLIC_ADMIN_EMAILS) or was added under
+  // Admin → Admins. The server and database rules enforce the same, so this only decides what to show.
+  const myEmail = (user?.email || "").toLowerCase();
+  const isOwner = !!user && !!myEmail && user.emailVerified && siteConfig.adminEmails.includes(myEmail);
+  const [addedAdmin, setAddedAdmin] = useState<{ email: string; admin: boolean } | null>(null);
+  useEffect(() => {
+    if (!user || !myEmail || !user.emailVerified || isOwner) return;
+    let cancelled = false;
+    user
+      .getIdToken()
+      .then((t) => fetch("/api/admin/me", { headers: { Authorization: `Bearer ${t}` }, cache: "no-store" }))
+      .then((r) => (r.ok ? r.json() : { admin: false }))
+      .catch(() => ({ admin: false }))
+      .then((b) => {
+        if (!cancelled) setAddedAdmin({ email: myEmail, admin: !!b.admin });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, myEmail, isOwner]);
+  const isAuthenticated = isOwner || (!!user && addedAdmin?.email === myEmail && addedAdmin.admin);
+  const checkingAdmin = !!user && !!myEmail && user.emailVerified && !isOwner && addedAdmin?.email !== myEmail;
   useEffect(() => {
     storeService.setAdminMode(isAuthenticated);
   }, [isAuthenticated]);
 
   // Active Tab: overview | users | subscriptions | broadcasts | banners | health
   const [activeTab, setActiveTab] = useState<
-    "overview" | "users" | "subscriptions" | "broadcasts" | "banners" | "themes" | "health"
+    "overview" | "users" | "subscriptions" | "broadcasts" | "banners" | "themes" | "requests" | "admins" | "company" | "assistant" | "discover" | "health"
   >("overview");
+  const [openRequests, setOpenRequests] = useState(0);
+  useEffect(() => {
+    if (isAuthenticated) fetchOpenSupportCount().then(setOpenRequests);
+  }, [isAuthenticated]);
   // Plans & payments is split into sections
   const [plansSection, setPlansSection] = useState<"payments" | "plans" | "stores" | "settings">("payments");
 
@@ -528,7 +557,7 @@ function AdminDashboardContent() {
             <p className="text-xs text-neutral-500">Only the Shopersite team can open this page.</p>
           </div>
 
-          {authLoading ? (
+          {authLoading || checkingAdmin ? (
             <p className="text-center text-sm text-neutral-500">Checking your account…</p>
           ) : user ? (
             <div className="space-y-4">
@@ -820,7 +849,7 @@ function AdminDashboardContent() {
 
           {/* TAB 1: FULL ORDER HISTORY */}
           {sellerProfileTab === "orders" && (
-            <div className="space-y-4">
+            <div className="swap-enter space-y-4">
               {/* Order Search & Status Filter + Expand All */}
               <div className="p-4 bg-white border border-neutral-200 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
                 <div className="relative w-full sm:w-80">
@@ -1057,7 +1086,7 @@ function AdminDashboardContent() {
 
           {/* TAB 2: STORE PRODUCT CATALOG */}
           {sellerProfileTab === "products" && (
-            <div className="space-y-4">
+            <div className="swap-enter space-y-4">
               <div className="p-4 bg-white border border-neutral-200 rounded-xl flex items-center justify-between gap-3 shadow-xs">
                 <div className="relative w-full sm:w-80">
                   <Input
@@ -1126,7 +1155,7 @@ function AdminDashboardContent() {
 
           {/* TAB 3: CUSTOMERS & SUBSCRIBERS */}
           {sellerProfileTab === "customers" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="swap-enter grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Customer Contacts */}
               <div className="bg-white border border-neutral-200 rounded-xl p-5 shadow-xs space-y-4">
                 <div className="flex items-center justify-between">
@@ -1195,7 +1224,7 @@ function AdminDashboardContent() {
 
           {/* TAB 4: STORE SETTINGS & BRAND SETUP */}
           {sellerProfileTab === "settings" && (
-            <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-xs space-y-6">
+            <div className="swap-enter bg-white border border-neutral-200 rounded-xl p-6 shadow-xs space-y-6">
               <h3 className="font-bold text-sm text-neutral-900">Store settings</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -1279,7 +1308,7 @@ function AdminDashboardContent() {
     stores.filter((s) => s.pendingSubscription).length +
     stores.reduce((n, s) => n + (s.themePurchases || []).filter((p) => p.status === "pending_verification").length, 0);
   const adminNav: {
-    id: "overview" | "users" | "subscriptions" | "broadcasts" | "banners" | "themes" | "health";
+    id: "overview" | "users" | "subscriptions" | "broadcasts" | "banners" | "themes" | "requests" | "admins" | "company" | "assistant" | "discover" | "health";
     label: string;
     /** shorter name for the phone grid */
     short?: string;
@@ -1293,6 +1322,11 @@ function AdminDashboardContent() {
     { id: "broadcasts", label: "Announcements", short: "Announce", icon: Send },
     { id: "banners", label: "App banners", icon: ImageIcon },
     { id: "themes", label: "Themes", icon: Layers, badge: Object.keys(PLATFORM_THEMES).length + storeService.getPlatformThemes().length },
+    { id: "requests", label: "Help requests", short: "Requests", icon: LifeBuoy, badge: openRequests || undefined, alert: openRequests > 0 },
+    { id: "admins", label: "Admins", icon: ShieldCheck },
+    { id: "company", label: "Company & legal", short: "Legal", icon: FileSpreadsheet },
+    { id: "assistant", label: "AI assistant", short: "AI", icon: Sparkles },
+    { id: "discover", label: "Discover cards", short: "Discover", icon: ImageIcon },
     { id: "health", label: "System status", short: "Status", icon: Activity },
   ];
 
@@ -1393,7 +1427,8 @@ function AdminDashboardContent() {
           </div>
         </div>
 
-      <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
+      {/* each section fades in when you switch to it (the key re-mounts the wrapper) */}
+      <main key={activeTab} className="swap-enter mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
         {/* 1. OVERVIEW (CLEAN LIGHT THEME - EXECUTIVE PLATFORM OPERATIONS & ANALYTICS) */}
         {activeTab === "overview" && (
           <div className="space-y-6">
@@ -2184,6 +2219,7 @@ function AdminDashboardContent() {
               ))}
             </div>
 
+            <div key={plansSection} className="swap-enter space-y-6">
             {plansSection === "payments" && (
             <>
             {/* Theme payments: a shop owns the theme once approved here */}
@@ -2393,6 +2429,7 @@ function AdminDashboardContent() {
             </div>
             </>
             )}
+            </div>
           </div>
         )}
 
@@ -2611,6 +2648,14 @@ function AdminDashboardContent() {
 
         {activeTab === "themes" && <ThemesManager stores={stores} />}
 
+        {activeTab === "requests" && <SupportRequests onOpenCount={setOpenRequests} />}
+
+        {activeTab === "admins" && <AdminsManager myEmail={myEmail} />}
+
+        {activeTab === "company" && <CompanySettings />}
+        {activeTab === "assistant" && <AssistantSettings />}
+        {activeTab === "discover" && <DiscoverSettings myEmail={myEmail} />}
+
 
         {activeTab === "health" && (
           <div className="space-y-6">
@@ -2618,6 +2663,8 @@ function AdminDashboardContent() {
               <h2 className="text-2xl font-semibold tracking-tight text-neutral-950">System status</h2>
               <p className="mt-1 text-sm text-neutral-500">Connection to the database and recent activity.</p>
             </div>
+
+            <MaintenanceSettings />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-4">

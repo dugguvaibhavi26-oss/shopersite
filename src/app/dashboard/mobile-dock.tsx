@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ArrowRight, CreditCard, LayoutDashboard, Menu, Package, Settings, ShoppingBag, X } from "lucide-react";
+import { IHome, IOrders, ISettings } from "@/components/icons";
 
 /** A notice from the dashboard's bell: an order, a stock alert or a plan payment update. */
 export type DockNotice = {
@@ -124,20 +125,20 @@ export function MobileDock({
 
       <div className="bg-black text-white rounded-[18px] px-3 py-2 shadow-[0_18px_40px_-12px_rgba(0,0,0,0.5)] flex items-center justify-around">
         <button onClick={() => onSelect("overview")} className={tab(active === "overview")}>
-          <LayoutDashboard className="w-4 h-4" />
+          <IHome className="w-4 h-4" />
           <span className="text-[10px]">Home</span>
         </button>
 
         <button data-tour="dock-orders" onClick={() => onSelect("orders")} className={tab(active === "orders")} aria-label={ordersDot ? "Orders, new" : undefined}>
           <span className="relative">
-            <ShoppingBag className="w-4 h-4" />
+            <IOrders className="w-4 h-4" />
             {ordersDot && <span className={dot} />}
           </span>
           <span className="text-[10px]">Orders</span>
         </button>
 
         <button onClick={() => onSelect("settings")} className={tab(active === "settings")}>
-          <Settings className="w-4 h-4" />
+          <ISettings className="w-4 h-4" />
           <span className="text-[10px]">Settings</span>
         </button>
 

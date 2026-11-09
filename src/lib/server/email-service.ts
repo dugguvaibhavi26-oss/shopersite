@@ -1,6 +1,6 @@
 import "server-only";
 import nodemailer from "nodemailer";
-import { canUseEmail } from "../plans";
+import { canUseEmail, cheapestPlanWith } from "../plans";
 import { emailLimitsFor } from "../email-limits";
 import type { StoreData } from "../store-service";
 import { ApiError } from "./api-error";
@@ -54,7 +54,7 @@ function gmailError(err: unknown): ApiError {
 }
 
 function requireEmailPlan(store: StoreData) {
-  if (!canUseEmail(store.planId)) throw new ApiError(403, "Email to subscribers is part of the Growth and Pro plans.");
+  if (!canUseEmail(store.planId)) throw new ApiError(403, `Email integration is part of the ${cheapestPlanWith("email")?.name || "Pro"} plan.`);
 }
 
 async function account(sub: string): Promise<Account | null> {
@@ -231,6 +231,33 @@ Your order: ${link}` });
   }
   await count(store.subdomain, 1);
   return { to };
+}
+
+/**
+ * A reminder to a buyer who started checkout and didn't finish (they agreed to it at checkout), from
+ * the shop's Gmail. Returns false when the shop can't send email right now (no Gmail, limits).
+ */
+export async function emailCartReminder(store: StoreData, to: string, name: string, items: string): Promise<boolean> {
+  if (!canUseEmail(store.planId)) return false;
+  const acc = await account(store.subdomain);
+  if (!acc) return false;
+  if (remaining(store, await usage(store.subdomain)) < 1) return false;
+  const t = transport(acc.email, open(acc.secret));
+  const subject = "You left something in your bag";
+  const message = `Hi ${name.split(/\s+/)[0] || "there"}, you were almost done ordering from ${store.name}:\n\n${items}\n\nYour bag is saved. Finish your order whenever you're ready.`;
+  try {
+    const link = shopUrl(store, "/cart");
+    const body = render(store, { subject, message, ctaText: "Finish my order", ctaUrl: link, unsubscribe: link });
+    const html = body.html.replace(/<p style="max-width:520px;margin:14px auto 0;[^]*?<\/p>/, "");
+    await t.sendMail({ from: { name: store.name, address: acc.email }, to, replyTo: acc.email, subject: `${subject} · ${store.name}`, html, text: `${message}\n\n${link}` });
+  } catch (err) {
+    console.error("[email] cart reminder failed", err);
+    return false;
+  } finally {
+    t.close();
+  }
+  await count(store.subdomain, 1);
+  return true;
 }
 
 /** Sends an email to every subscriber, within the plan's limits. */

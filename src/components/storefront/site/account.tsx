@@ -1,7 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Check, Loader2, Mail, MessageCircle, Package, Truck, X, ExternalLink } from "lucide-react";
+import { planHas } from "@/lib/plans";
+import { Check, Loader2, Mail, MapPin, MessageCircle, Package, Truck, X, ExternalLink, FileText } from "lucide-react";
+import { effectivePlan } from "@/lib/subscription";
+import { siteConfig } from "@/lib/config/site";
+
+/** The invoice lives on the main app address (it isn't part of the shop's own pages). */
+function invoiceHref(sub: string, token: string) {
+  const onApp = typeof window !== "undefined" && (window.location.pathname.startsWith("/s/") || window.location.hostname === "localhost");
+  return `${onApp ? "" : `https://www.${siteConfig.domain}`}/invoice/${encodeURIComponent(sub)}/${encodeURIComponent(token)}`;
+}
 import { orderPolicyOf } from "@/lib/policies";
 import { checkEmail, checkPersonName, checkPhone, checkPincode, cleanPhone } from "@/lib/validation";
 import { BuyerAuth, useAccountOrders } from "./buyer-auth";
@@ -62,7 +71,7 @@ function useOnlinePayment(token: string, known: boolean) {
   const [result, setResult] = React.useState<VerifyResponse | null>(null);
   const [checking, setChecking] = React.useState(false);
   const [error, setError] = React.useState("");
-  const online = /^tok_sh_[a-f0-9]{24}$/.test(token);
+  const online = /^tok_(sh|rz)_[a-f0-9]{24}$/.test(token);
 
   const check = React.useCallback(async () => {
     setChecking(true);
@@ -99,7 +108,7 @@ export function SiteOrder({ token }: { token: string }) {
     setPlaced(justPlaced);
     if (order) rememberOrder(order.token);
     // the bag is kept while an online payment is open, and emptied once it is paid
-    if (order && justPlaced && order.paymentMethod === "cashfree") clearBag();
+    if (order && justPlaced && (order.paymentMethod === "cashfree" || order.paymentMethod === "razorpay")) clearBag();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order?.token]);
 
@@ -197,7 +206,7 @@ export function SiteOrder({ token }: { token: string }) {
           </span>
           <h1 className="m-h mt-6 t-title">Thank you, {order.customer.name.split(" ")[0]}</h1>
           <p className="m-muted mx-auto mt-3 max-w-md text-[length:calc(15px*var(--m-scale))]">
-            Your order {order.number} is placed. {order.paymentMethod === "cashfree" ? "Your payment was received." : order.paymentMethod === "upi" ? "We've sent your UPI reference to the shop. They'll confirm your payment shortly." : "The shop will confirm it shortly."}
+            Your order {order.number} is placed. {order.paymentMethod === "cashfree" || order.paymentMethod === "razorpay" ? "Your payment was received." : order.paymentMethod === "upi" ? "We've sent your UPI reference to the shop. They'll confirm your payment shortly." : "The shop will confirm it shortly."}
           </p>
         </div>
       )}
@@ -324,6 +333,11 @@ export function SiteOrder({ token }: { token: string }) {
           {wa && (
             <a href={wa} target="_blank" rel="noopener noreferrer" className="m-btn w-full">
               <MessageCircle className="h-4 w-4" /> Message the shop
+            </a>
+          )}
+          {planHas(effectivePlan(store).planId, "invoices") && order.fulfilmentStatus !== "cancelled" && (
+            <a href={invoiceHref(store.subdomain, order.token)} target="_blank" rel="noopener noreferrer" className="m-btn m-btn-outline w-full">
+              <FileText className="h-4 w-4" /> Download invoice
             </a>
           )}
           <MLink to="/catalog" className="m-btn m-btn-outline w-full">
@@ -587,9 +601,25 @@ function ContactLinks() {
     store.contactEmail && { href: `mailto:${store.contactEmail}`, icon: <Mail className="h-5 w-5" />, label: "Email", value: store.contactEmail, external: false },
     handle && { href: `https://instagram.com/${handle}`, icon: <InstagramIcon className="h-5 w-5" />, label: "Instagram", value: `@${handle}`, external: true },
   ].filter(Boolean) as { href: string; icon: React.ReactNode; label: string; value: string; external: boolean }[];
-  if (!links.length) return null;
+  const address = (store.businessAddress || "").trim();
+  if (!links.length && !address) return null;
+  const dataRequest = store.contactEmail
+    ? `mailto:${store.contactEmail}?subject=${encodeURIComponent(`Data request – ${store.name}`)}&body=${encodeURIComponent("Hi, I'd like to see / correct / delete the personal details you hold about me.\n\nName:\nPhone:\n")}`
+    : "";
   return (
+    <>
     <div className="m-stagger mt-10 grid gap-3 sm:grid-cols-2">
+      {address && (
+        <div className="m-line m-card flex items-start gap-4 border bg-[var(--m-bg)] p-4 sm:col-span-2">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--m-accent)] text-[var(--m-accent-text)]">
+            <MapPin className="h-5 w-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="m-cap m-muted block text-[length:calc(11px*var(--m-scale))] font-semibold tracking-[0.1em]">Address</span>
+            <span className="block whitespace-pre-line text-[length:calc(14px*var(--m-scale))] font-medium">{address}</span>
+          </span>
+        </div>
+      )}
       {links.map((l) => (
         <a
           key={l.label}
@@ -606,6 +636,17 @@ function ContactLinks() {
         </a>
       ))}
     </div>
+    {(store.gstin || dataRequest) && (
+      <p className="m-muted mt-6 flex flex-wrap gap-x-5 gap-y-1 text-[length:calc(12px*var(--m-scale))]">
+        {store.gstin && <span>GSTIN {store.gstin}</span>}
+        {dataRequest && (
+          <a href={dataRequest} className="underline underline-offset-2 hover:text-[var(--m-text)]">
+            Request my data
+          </a>
+        )}
+      </p>
+    )}
+    </>
   );
 }
 

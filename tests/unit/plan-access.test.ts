@@ -22,7 +22,8 @@ describe("admin-controlled feature access per plan", () => {
     expect(canUseCoupons("free")).toBe(false);
     expect(canUseCoupons("starter")).toBe(true);
     expect(canUseEmail("free")).toBe(false);
-    expect(canUseEmail("starter")).toBe(true);
+    expect(canUseEmail("starter")).toBe(false);
+    expect(canUseEmail("pro")).toBe(true);
     expect(canUseEmail("pro")).toBe(true);
     expect(canUseCustomDomain("pro")).toBe(true);
   });
@@ -55,7 +56,7 @@ describe("admin-controlled feature access per plan", () => {
 
   it("names the cheapest plan that unlocks a feature", () => {
     expect(cheapestPlanWith("reviews")?.id).toBe("starter");
-    expect(cheapestPlanWith("email")?.id).toBe("starter");
+    expect(cheapestPlanWith("email")?.id).toBe("pro");
     applyPlanAccess({ free: { reviews: true } });
     expect(cheapestPlanWith("reviews")?.id).toBe("free");
     applyPlanAccess({ free: { email: false }, starter: { email: false }, pro: { email: false } });

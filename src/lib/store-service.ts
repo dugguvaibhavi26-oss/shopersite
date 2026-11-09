@@ -36,6 +36,8 @@ export interface ProductData {
   price: number; // in paise (e.g. 69900 = ₹699)
   compareAtPrice?: number; // in paise
   costPrice?: number; // in paise
+  /** GST % for invoices (0, 3, 5, 12, 18, 28); missing = the store's default in Settings → Taxes */
+  gstRate?: number;
   stock: number;
   category: string;
   gender?: "Men" | "Women" | "Unisex";
@@ -114,8 +116,8 @@ export interface OrderData {
   delivery: number; // paise
   codFee: number; // paise
   total: number; // paise
-  /** "cashfree": paid online through the seller's own Cashfree account (settled to the seller) */
-  paymentMethod: "upi" | "cod" | "bank_transfer" | "cashfree";
+  /** "cashfree"/"razorpay": paid online through the seller's own payment account (settled to the seller) */
+  paymentMethod: "upi" | "cod" | "bank_transfer" | "cashfree" | "razorpay";
   paymentStatus: "awaiting_verification" | "verified" | "cod_pending" | "paid" | "rejected";
   paymentUtr?: string;
   /** Cashfree order id (same as `id` for online orders) */
@@ -126,6 +128,18 @@ export interface OrderData {
   courierName?: string;
   trackingNumber?: string;
   trackingUrl?: string;
+  /** set by the Shiprocket plugin once the order is pushed to the seller's Shiprocket account */
+  shiprocket?: {
+    orderId: number;
+    shipmentId: number;
+    awb?: string;
+    courierId?: number;
+    labelUrl?: string;
+    pickupBooked?: boolean;
+    /** Shiprocket's latest status text, e.g. "IN TRANSIT" */
+    status?: string;
+    updatedAt: string;
+  };
   notes?: string;
   /** set when the order is marked delivered (starts the return window) */
   deliveredAt?: string;
@@ -204,6 +218,19 @@ export interface DiscountData {
   createdAt: string;
 }
 
+export interface CheckoutRules {
+  /** smallest order (after discount, before delivery) in paise; 0 = no minimum */
+  minOrder?: number;
+  /** largest order total allowed with cash on delivery, in paise; 0 = no limit */
+  codMax?: number;
+  /** show the "note for the shop" box at checkout (on unless switched off) */
+  orderNotes?: boolean;
+  /** buyer email at checkout */
+  email?: "optional" | "required" | "hidden";
+  /** buyers must sign in before ordering */
+  requireLogin?: boolean;
+}
+
 export interface StoreData {
   id: string;
   name: string;
@@ -218,6 +245,25 @@ export interface StoreData {
   contactPhone: string;
   contactEmail?: string;
   instagramHandle?: string;
+  /** the seller's business address, shown to buyers on the contact page (Settings → General) */
+  businessAddress?: string;
+  /** Settings → Checkout and Customer accounts (see lib/checkout-rules.ts) */
+  checkoutRules?: CheckoutRules;
+  /** Settings → Taxes: GST number shown to buyers, and whether prices include GST */
+  gstin?: string;
+  pricesIncludeTax?: boolean;
+  /** GST % used when a product has none of its own (default 18) */
+  defaultGstRate?: number;
+  /** the state the GSTIN is registered in (decides CGST+SGST or IGST on invoices) */
+  gstState?: string;
+  /** Settings → Notifications: email the seller when an order comes in (on unless switched off) */
+  notifyNewOrders?: boolean;
+  /** Settings → Tracking & ads */
+  tracking?: { metaPixelId?: string; gaId?: string };
+  /** Settings → Customer privacy: show a cookie notice before tracking runs */
+  cookieBanner?: boolean;
+  /** Settings → Domain (Pro): the seller's own domain, written only by the server once connected */
+  customDomain?: string;
   upiId: string; // Direct UPI ID for customer QR payments
   codEnabled: boolean;
   codFee: number; // paise
@@ -261,6 +307,8 @@ export interface StoreData {
   /** whether buyers can cancel / return orders themselves */
   orderPolicy?: OrderPolicy;
   pluginsConfig?: PluginsConfigData;
+  /** the seller's own wording for the one-tap WhatsApp buyer messages */
+  whatsappTemplates?: Partial<Record<"confirmed" | "shipped" | "delivered" | "payment", string>>;
   homepageSections?: string[];
   themeSectionOrders?: Record<string, string[]>;
   /** Text, photos and sections set in the theme editor, per theme slug (see src/lib/site-content.ts) */
@@ -1289,7 +1337,7 @@ class StoreService {
   }
 
   /**
-   * Brings in orders paid online through Cashfree. The server records them, but a browser holding an
+   * Brings in orders paid online (Cashfree or Razorpay). The server records them, but a browser holding an
    * older copy of the store can save over that list, so the dashboard re-applies them from the
    * server's payment records. Returns true if anything changed.
    */
@@ -1305,7 +1353,13 @@ class StoreService {
         orders.push(paid);
         changed = true;
       } else if (orders[i].paymentStatus !== "paid" && orders[i].paymentStatus !== "verified") {
-        orders[i] = { ...orders[i], paymentMethod: "cashfree", paymentStatus: "paid", cfPaymentId: paid.cfPaymentId, paymentUtr: paid.paymentUtr ?? orders[i].paymentUtr };
+        orders[i] = {
+          ...orders[i],
+          paymentMethod: paid.paymentMethod === "razorpay" ? "razorpay" : "cashfree",
+          paymentStatus: "paid",
+          ...(paid.cfPaymentId ? { cfPaymentId: paid.cfPaymentId } : {}),
+          paymentUtr: paid.paymentUtr ?? orders[i].paymentUtr,
+        };
         changed = true;
       }
     }
@@ -1853,6 +1907,12 @@ class StoreService {
     } catch (e) {
       console.warn("Failed to save platform banners locally", e);
     }
+  }
+
+  /** Admin: uploads an image for a platform setting (e.g. a Discover card) and returns its URL. */
+  public async uploadPlatformImage(file: File, name: string): Promise<string> {
+    const { url } = await hostPlatformImage(file, `platform_banners/${name.replace(/[^\w-]/g, "_")}`, 1400);
+    return url;
   }
 
   public async addPlatformBanner(file: File, link?: string): Promise<PlatformBanner> {

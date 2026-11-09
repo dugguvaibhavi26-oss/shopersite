@@ -30,7 +30,7 @@ describe("Subscription & UPI Payment Flow Unit Tests", () => {
     expect(req).toBeDefined();
     expect(req.planId).toBe("starter");
     expect(req.planName).toBe(PLATFORM_PLANS.starter.name);
-    expect(req.amount).toBe(29900); // ₹299.00 in paise
+    expect(req.amount).toBe(19900); // ₹299.00 in paise
     expect(req.status).toBe("pending_verification");
     expect(req.estimatedVerificationTime).toBe("1-2 hours");
     expect(req.paymentUtr).toBe("428910293841");
@@ -57,7 +57,7 @@ describe("Subscription & UPI Payment Flow Unit Tests", () => {
     )}&am=${fixedAmountStr}&cu=INR&tn=${encodeURIComponent(note)}&tr=${encodeURIComponent(refId)}`;
 
     expect(upiUrl).toContain("upi://pay?");
-    expect(upiUrl).toContain(`am=299.00`); // Strict fixed amount
+    expect(upiUrl).toContain(`am=199.00`); // Strict fixed amount
     expect(upiUrl).toContain("cu=INR");
     expect(upiUrl).toContain(`pa=${encodeURIComponent(platformUpi)}`);
   });
@@ -65,8 +65,8 @@ describe("Subscription & UPI Payment Flow Unit Tests", () => {
     it("supports quarterly billing option with 5% discount calculation", () => {
     const pricing = calculatePlanPrice("starter", "quarterly");
     expect(pricing.discountPercent).toBe(5);
-    expect(pricing.totalRupees).toBe(852); // Math.round(299 * 3 * 0.95)
-    expect(pricing.totalPaise).toBe(85200);
+    expect(pricing.totalRupees).toBe(567); // Math.round(299 * 3 * 0.95)
+    expect(pricing.totalPaise).toBe(56700);
 
     const req = seedPlanRequest(testSubdomain, {
       planId: "starter",
@@ -74,15 +74,15 @@ describe("Subscription & UPI Payment Flow Unit Tests", () => {
     });
 
     expect(req.billingCycle).toBe("quarterly");
-    expect(req.amount).toBe(85200);
+    expect(req.amount).toBe(56700);
     expect(req.status).toBe("pending_verification");
   });
 
   it("supports annual billing option with 10% discount calculation", () => {
     const pricing = calculatePlanPrice("starter", "yearly");
     expect(pricing.discountPercent).toBe(10);
-    expect(pricing.totalRupees).toBe(3229); // Math.round(299 * 12 * 0.90)
-    expect(pricing.totalPaise).toBe(322900);
+    expect(pricing.totalRupees).toBe(2149); // Math.round(299 * 12 * 0.90)
+    expect(pricing.totalPaise).toBe(214900);
 
     const req = seedPlanRequest(testSubdomain, {
       planId: "starter",
@@ -90,7 +90,7 @@ describe("Subscription & UPI Payment Flow Unit Tests", () => {
     });
 
     expect(req.billingCycle).toBe("yearly");
-    expect(req.amount).toBe(322900);
+    expect(req.amount).toBe(214900);
     expect(req.status).toBe("pending_verification");
   });
 

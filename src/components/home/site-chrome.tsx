@@ -240,10 +240,20 @@ const FOOTER_COLUMNS = [
     links: [
       { label: "FAQ", href: "/#faq" },
       { label: "How it works", href: "/#how-it-works" },
-      { label: "Seller terms", href: "/legal/terms" },
-      { label: "Privacy policy", href: "/legal/privacy" },
-      { label: "Refund policy", href: "/legal/refunds" },
-      { label: "Acceptable use", href: "/legal/acceptable-use" },
+      { label: "Contact us", href: "/legal/contact" },
+      { label: "Grievance redressal", href: "/legal/grievance" },
+      { label: "Report a shop", href: "/legal/acceptable-use#report" },
+    ],
+  },
+  {
+    title: "Legal",
+    links: [
+      { label: "Terms of Service", href: "/legal/terms" },
+      { label: "Privacy Policy", href: "/legal/privacy" },
+      { label: "Refunds & Cancellations", href: "/legal/refunds" },
+      { label: "Payments", href: "/legal/payments" },
+      { label: "Buyer Terms", href: "/legal/buyer-terms" },
+      { label: "All policies", href: "/legal" },
     ],
   },
 ];
@@ -252,7 +262,7 @@ export function SiteFooter() {
   return (
     <footer className="bg-neutral-950 text-neutral-400">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-20 pb-10">
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-10">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-10">
           <div className="col-span-2">
             <Link href="/" className="inline-flex items-center text-white">
               <ShopperLogo className="text-[22px]" />

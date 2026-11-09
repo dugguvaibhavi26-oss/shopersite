@@ -74,14 +74,24 @@ export async function requireStoreOwner(req: Request, subdomain: string): Promis
   const user = await requireUser(req);
   const store = await getStoreDoc(subdomain);
   if (!store) throw new ApiError(404, "Store not found.");
+  if (!ownsStore(user, store)) throw new ApiError(403, "You don't have access to this store.");
+  return { store, uid: user.uid };
+}
+
+function ownsStore(user: { uid: string; email?: string; emailVerified: boolean }, store: StoreData): boolean {
   const email = (user.email || "").toLowerCase().trim();
-  const owns =
+  return !!(
     (store.ownerId && store.ownerId === user.uid) ||
     // older stores were linked by email only; accept that only for a verified email
     (!store.ownerId && !!email && user.emailVerified &&
-      [store.ownerEmail, store.contactEmail].some((e) => (e || "").toLowerCase().trim() === email));
-  if (!owns) throw new ApiError(403, "You don't have access to this store.");
-  return { store, uid: user.uid };
+      [store.ownerEmail, store.contactEmail].some((e) => (e || "").toLowerCase().trim() === email))
+  );
+}
+
+/** True when the request carries a valid sign-in for this store's owner. Never throws. */
+export async function isStoreOwnerRequest(req: Request, store: StoreData): Promise<boolean> {
+  const user = await optionalUser(req);
+  return !!user && ownsStore(user, store);
 }
 
 export async function getStoreDoc(subdomain: string): Promise<StoreData | null> {

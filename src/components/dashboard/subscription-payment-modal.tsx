@@ -309,8 +309,7 @@ export function SubscriptionPaymentModal({
                   Continue to payment
                 </button>
                 <p className="px-1 text-xs leading-relaxed text-neutral-500">
-                  You&apos;ll pay by UPI on the next step. Your plan starts once we confirm the payment.
-                </p>
+                  You&apos;ll pay by UPI on the next step.   </p>
               </div>
             </aside>
 

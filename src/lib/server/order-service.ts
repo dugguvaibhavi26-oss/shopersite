@@ -1,8 +1,11 @@
 import "server-only";
+import { razorpayAvailability } from "./razorpay-service";
 import { randomBytes } from "node:crypto";
 import { applyNewOrder, quoteOrder, QuoteError, type BagItemInput } from "../payments/cashfree-core";
 import { canUseReviews } from "../plans";
-import { orderPolicyOf } from "../policies";
+import { isShopClosed, orderPolicyOf } from "../policies";
+import { buyerProblem, codAllowedFor, codLimitText } from "../checkout-rules";
+import { notifySellerOfOrder } from "./order-alerts";
 import { isValidUpiId, type OrderData, type ReviewData, type StoreData } from "../store-service";
 import { ApiError } from "./api-error";
 import { adminDb } from "./firebase-admin";
@@ -23,7 +26,7 @@ export const UTR_PATTERN = /^\d{12}$/;
 
 function shopIsOpen(store: StoreData | null): asserts store is StoreData {
   if (!store) throw new ApiError(404, "Store not found.");
-  if (store.isClosed || store.isPaused || store.status === "suspended") throw new ApiError(409, "This shop is currently unavailable.");
+  if (isShopClosed(store) || store.isPaused || store.status === "suspended") throw new ApiError(409, "This shop is currently unavailable.");
 }
 
 export interface PlaceOrderInput {
@@ -39,25 +42,20 @@ export interface PlaceOrderInput {
   customerUid?: string;
 }
 
-/** Places a UPI (buyer says they paid, shop checks) or cash-on-delivery order. */
+/** Places a cash-on-delivery order (online payments go through the payment gateway instead). */
 export async function placeOrder(input: PlaceOrderInput): Promise<OrderData> {
   const db = adminDb();
+  // shops no longer take manual UPI: buyers pay online (Growth and Pro) or on delivery
+  if (input.method === "upi") throw new ApiError(409, "UPI transfer isn't available. Choose Pay online or Cash on delivery.");
+  // without online payment, Cash on Delivery is the only way to pay, so it's always accepted then
+  const onlineAvailable = (await razorpayAvailability(input.subdomain).catch(() => ({ available: false }))).available;
 
-  // a shop taking online payments through Cashfree doesn't take unverified manual UPI
-  if (input.method === "upi") {
-    const merchant = await getMerchantRecord(input.subdomain).catch(() => null);
-    if (merchant && merchant.state === "active" && merchant.mode === cashfreeConfig().mode) {
-      throw new ApiError(409, "This shop takes UPI through secure online payment. Please choose Pay online.");
-    }
-    if (!input.utr || !UTR_PATTERN.test(input.utr)) {
-      throw new ApiError(400, "Enter the 12-digit UPI reference number (UTR) from your payment app.");
-    }
-  }
-
-  return db.runTransaction(async (tx) => {
+  const placed = await db.runTransaction(async (tx) => {
     const store = await readStoreTx(tx, input.subdomain);
     shopIsOpen(store);
-    if (input.method === "cod" && !store.codEnabled) throw new ApiError(409, "Cash on delivery isn't available at this shop.");
+    if (input.method === "cod" && !store.codEnabled && onlineAvailable) throw new ApiError(409, "Cash on delivery isn't available at this shop. Please pay online.");
+    const buyerIssue = buyerProblem(store, { email: input.customer.email, signedIn: !!input.customerUid });
+    if (buyerIssue) throw new ApiError(400, buyerIssue);
     if (input.method === "upi" && !isValidUpiId(store.upiId || "")) throw new ApiError(409, "UPI payment isn't set up at this shop.");
 
     // a UPI reference can pay for one order only
@@ -79,6 +77,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<OrderData> {
       if (err instanceof QuoteError) throw new ApiError(400, err.message);
       throw err;
     }
+    if (input.method === "cod" && !codAllowedFor(store, quote.total, onlineAvailable)) throw new ApiError(409, codLimitText(store) || "Cash on delivery isn't available for this order.");
 
     const now = new Date().toISOString();
     const id = `ord_${randomBytes(12).toString("hex")}`;
@@ -111,8 +110,11 @@ export async function placeOrder(input: PlaceOrderInput): Promise<OrderData> {
     writeStoreTx(tx, store.subdomain, { ...applied.changes });
     tx.set(db.collection("orders").doc(id), clean({ ...applied.order, storeSubdomain: store.subdomain }));
     if (claimRef) tx.set(claimRef, { kind: "order", store: store.subdomain, orderId: id, createdAt: now });
-    return applied.order;
+    return { order: applied.order, store };
   });
+  // the seller hears about it once the order is safely saved
+  await notifySellerOfOrder(placed.store, placed.order);
+  return placed.order;
 }
 
 const PAID = new Set(["paid", "verified"]);
@@ -186,7 +188,7 @@ export async function ordersForBuyer(subdomain: string, user: { uid: string; ema
 
 /** Orders for the buyer's own order tokens (the unguessable keys only the buyer has). */
 export async function trackOrders(subdomain: string, tokens: string[]): Promise<OrderData[]> {
-  const wanted = new Set(tokens.filter((t) => /^tok_sh_[a-z0-9]{6,40}$/.test(t)).slice(0, 50));
+  const wanted = new Set(tokens.filter((t) => /^tok_(sh|rz)_[a-z0-9]{6,40}$/.test(t)).slice(0, 50));
   if (!wanted.size) return [];
   const store = await readStore(subdomain);
   if (!store) return [];

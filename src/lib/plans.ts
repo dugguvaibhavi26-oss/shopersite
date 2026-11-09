@@ -12,6 +12,11 @@ export interface PlanFeature {
   originalPriceFormatted?: string;
   priceYearly?: number; // in paise
   priceYearlyFormatted?: string;
+  /** free trial before the first charge (Growth) */
+  trialDays?: number;
+  /** introductory monthly price in paise for the first `introMonths` months (Pro) */
+  introPriceMonthly?: number;
+  introMonths?: number;
   maxProducts: number;
   themesAllowed: string[];
   customDomain: boolean;
@@ -29,71 +34,50 @@ export const PLATFORM_PLANS: Record<string, PlanFeature> = {
     priceMonthly: 0,
     priceFormatted: "₹0 / month",
     maxProducts: 75,
-    themesAllowed: ["classic-bloom", "mono-studio", "theme03", "theme04", "theme05", "theme06", "f01", "f02", "theme07", "theme08", "theme09", "theme10", "theme11", "theme12", "theme13", "theme14", "theme15", "theme16", "theme17", "theme18", "theme19", "theme20", "theme21", "theme22", "theme23", "theme24", "theme25", "theme26", "theme27", "theme28", "theme29", "theme30", "theme31", "theme32", "theme33", "theme34", "theme35"],
+    themesAllowed: [],
     customDomain: false,
     maxBanners: 1,
-    description: "Everything you need to start selling online today.",
-    features: [
-      "Up to 75 products",
-      "Every theme, free",
-      "Cash on Delivery (COD)",
-      "Direct UPI payments",
-      "Free subdomain (yourshop.shopersite.in)",
-      "WhatsApp integration",
-    ],
+    description: "Everything you need to start selling.",
+    features: ["Up to 75 products", "1 ready-made theme", "Edit your theme's photos", "Cash on Delivery", "Order management and tracking", "Sales analytics and low-stock alerts", "AI product descriptions"],
   },
   starter: {
     id: "starter",
     name: "Growth",
     tier: "starter",
-    priceMonthly: 29900,
-    priceFormatted: "₹299 / month",
-    originalPriceMonthly: 49900,
-    originalPriceFormatted: "₹499 / month",
-    priceYearly: 299000,
-    priceYearlyFormatted: "₹2,990 / year",
+    priceMonthly: 19900,
+    priceFormatted: "₹199 / month",
+    trialDays: 10,
     maxProducts: 200,
-    themesAllowed: ["classic-bloom", "mono-studio", "theme03", "theme04", "theme05", "theme06", "f01", "f02", "theme07", "theme08", "theme09", "theme10", "theme11", "theme12", "theme13", "theme14", "theme15", "theme16", "theme17", "theme18", "theme19", "theme20", "theme21", "theme22", "theme23", "theme24", "theme25", "theme26", "theme27", "theme28", "theme29", "theme30", "theme31", "theme32", "theme33", "theme34", "theme35"],
+    themesAllowed: [],
     customDomain: false,
     maxBanners: 5,
     highlight: true,
-    description: "Sell more with coupons, reviews and online payments.",
-    features: [
-      "Everything in Free",
-      "Up to 200 products",
-      "Theme editor: your own text, photos and colours",
-      "Discount coupons",
-      "Customer reviews",
-      "Email your subscribers from your Gmail (1,000 a month)",
-      "Payment gateway",
-    ],
+    description: "Take online payments and sell more.",
+    features: ["Everything in Free", "Up to 200 products", "7 themes and the full theme editor", "Online payments (payment gateway)", "Coupons and promo codes", "Customer reviews", "Abandoned cart recovery", "Shipping integrations", "Bulk upload (CSV / Excel)"],
   },
   pro: {
     id: "pro",
     name: "Pro",
     tier: "pro",
-    priceMonthly: 99900,
-    priceFormatted: "₹999 / month",
-    originalPriceMonthly: 149900,
-    originalPriceFormatted: "₹1,499 / month",
-    priceYearly: 999000,
-    priceYearlyFormatted: "₹9,990 / year",
+    priceMonthly: 59900,
+    priceFormatted: "₹599 / month",
+    introPriceMonthly: 29900,
+    introMonths: 2,
     maxProducts: 999999,
-    themesAllowed: ["classic-bloom", "mono-studio", "theme03", "theme04", "theme05", "theme06", "f01", "f02", "theme07", "theme08", "theme09", "theme10", "theme11", "theme12", "theme13", "theme14", "theme15", "theme16", "theme17", "theme18", "theme19", "theme20", "theme21", "theme22", "theme23", "theme24", "theme25", "theme26", "theme27", "theme28", "theme29", "theme30", "theme31", "theme32", "theme33", "theme34", "theme35"],
+    themesAllowed: [],
     customDomain: true,
     maxBanners: 20,
-    description: "Run it like a business, on your own domain.",
-    features: [
-      "Everything in Growth",
-      "Unlimited products",
-      "Connect your own domain",
-      "Automatic invoices to generate and download",
-      "Unlimited emails to subscribers (within Gmail's daily limit)",
-      "Your store as an Android app (APK)",
-      "Priority WhatsApp support",
-    ],
+    description: "Run it like a brand, on your own domain.",
+    features: ["Everything in Growth", "Unlimited products", "All 30 themes", "Your own domain", "Remove Shopersite branding", "Automatic invoices", "Email integration and automatic emails", "AI business insights and the full AI agent", "Advanced SEO"],
   },
 };
+
+/** "₹299 for 2 months, then ₹599/month": the intro offer in words, or "" when there isn't one. */
+export function introOfferText(plan: PlanFeature): string {
+  if (!plan.introPriceMonthly || !plan.introMonths) return "";
+  const r = (p: number) => `₹${Math.round(p / 100).toLocaleString("en-IN")}`;
+  return `${r(plan.introPriceMonthly)}/month for the first ${plan.introMonths === 1 ? "month" : `${plan.introMonths} months`}, then ${r(plan.priceMonthly)}/month`;
+}
 
 /** Percentage saved against the original price, e.g. 40 for ₹499 → ₹299. */
 export function planDiscountPercent(plan: PlanFeature): number {
@@ -116,11 +100,14 @@ export function canAddProduct(currentCount: number, planId: string = "free"): {
   };
 }
 
-/** Both themes are open to every plan; what Growth and Pro add is the website editor. */
+/**
+ * Built-in themes are open to every plan for now; per-plan theme tiers (Free 1, Growth 7, Pro 30)
+ * come with the theme tiers work. Uploaded themes count when switched on.
+ */
 export function isThemeAllowed(themeSlug: string, planId: string = "free"): boolean {
-  if (getCustomTheme(themeSlug)?.enabled) return true;
-  const plan = PLATFORM_PLANS[planId] || PLATFORM_PLANS.free;
-  return plan.themesAllowed.includes(themeSlug);
+  void planId;
+  if (themeSlug.startsWith("custom-")) return !!getCustomTheme(themeSlug)?.enabled;
+  return true;
 }
 
 export function isPaidPlan(planId: string = "free"): boolean {
@@ -222,14 +209,54 @@ export interface PlanAccess {
   reviews: boolean;
   email: boolean;
   customDomain: boolean;
-  /** The theme editor: change the storefront's text, photos, sections and colours */
+  /** The full theme editor: text, photos, sections and colours. Without it, only the Media section (photos). */
   themeEditor: boolean;
+  /** how many ready-made themes the plan can use */
+  maxThemes: number;
+  /** a payment gateway (online payments) at checkout; without it, Cash on Delivery only */
+  paymentGateway: boolean;
+  /** CSV / Excel bulk product upload */
+  bulkUpload: boolean;
+  /** unfinished-checkout list and reminders */
+  abandonedCart: boolean;
+  /** automatic invoices */
+  invoices: boolean;
+  /** hide the "Powered by Shopersite" mark on the store */
+  removeBranding: boolean;
+  /** custom social sharing previews (title, text, image) */
+  socialPreviews: boolean;
+  /** advanced SEO settings (per-product titles and descriptions, etc.) */
+  seoAdvanced: boolean;
+  /** shipping integrations (Shiprocket) */
+  shipping: boolean;
+  /** AI business insights */
+  aiInsights: boolean;
 }
 
+/** The yes/no features, for loops (admin editor, pricing table). */
+export const PLAN_SWITCHES = ["paymentGateway", "coupons", "reviews", "abandonedCart", "bulkUpload", "shipping", "themeEditor", "socialPreviews", "email", "invoices", "customDomain", "removeBranding", "seoAdvanced", "aiInsights"] as const;
+export type PlanSwitch = (typeof PLAN_SWITCHES)[number];
+
+// From the plan sheet (Shoppersite_All_Plan_Feature_Blocks.xlsx)
 const DEFAULT_PLAN_ACCESS: Record<PlanId, PlanAccess> = {
-  free: { maxProducts: 75, maxBanners: 1, coupons: false, reviews: false, email: false, customDomain: false, themeEditor: false },
-  starter: { maxProducts: 200, maxBanners: 5, coupons: true, reviews: true, email: true, customDomain: false, themeEditor: true },
-  pro: { maxProducts: UNLIMITED, maxBanners: 20, coupons: true, reviews: true, email: true, customDomain: true, themeEditor: true },
+  free: {
+    maxProducts: 75, maxBanners: 1, maxThemes: 1,
+    coupons: false, reviews: false, email: false, customDomain: false, themeEditor: false,
+    paymentGateway: false, bulkUpload: false, abandonedCart: false, invoices: false, removeBranding: false,
+    socialPreviews: false, seoAdvanced: false, shipping: false, aiInsights: false,
+  },
+  starter: {
+    maxProducts: 200, maxBanners: 5, maxThemes: 7,
+    coupons: true, reviews: true, email: false, customDomain: false, themeEditor: true,
+    paymentGateway: true, bulkUpload: true, abandonedCart: true, invoices: false, removeBranding: false,
+    socialPreviews: true, seoAdvanced: false, shipping: true, aiInsights: false,
+  },
+  pro: {
+    maxProducts: UNLIMITED, maxBanners: 20, maxThemes: 30,
+    coupons: true, reviews: true, email: true, customDomain: true, themeEditor: true,
+    paymentGateway: true, bulkUpload: true, abandonedCart: true, invoices: true, removeBranding: true,
+    socialPreviews: true, seoAdvanced: true, shipping: true, aiInsights: true,
+  },
 };
 
 let planAccess: Record<PlanId, PlanAccess> = cloneAccess(DEFAULT_PLAN_ACCESS);
@@ -263,14 +290,14 @@ export function applyPlanAccess(saved?: Partial<Record<string, Partial<PlanAcces
     const num = (v: unknown, fallback: number) =>
       typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.min(Math.round(v), UNLIMITED) : fallback;
     const bool = (v: unknown, fallback: boolean) => (typeof v === "boolean" ? v : fallback);
+    const d = next[id];
+    const switches = Object.fromEntries(PLAN_SWITCHES.map((k) => [k, bool(s[k], d[k])])) as Pick<PlanAccess, PlanSwitch>;
     next[id] = {
-      maxProducts: num(s.maxProducts, next[id].maxProducts),
-      maxBanners: num(s.maxBanners, next[id].maxBanners),
-      coupons: bool(s.coupons, next[id].coupons),
-      reviews: bool(s.reviews, next[id].reviews),
-      email: bool(s.email, next[id].email),
-      customDomain: bool(s.customDomain, next[id].customDomain),
-      themeEditor: bool(s.themeEditor, next[id].themeEditor),
+      ...d,
+      ...switches,
+      maxProducts: num(s.maxProducts, d.maxProducts),
+      maxBanners: num(s.maxBanners, d.maxBanners),
+      maxThemes: Math.max(1, num(s.maxThemes, d.maxThemes)),
     };
   }
   planAccess = next;
@@ -397,9 +424,14 @@ export function canUseThemeEditor(planId: string = "free"): boolean {
 }
 
 /** The cheapest plan that unlocks a feature, for "Unlock with …" labels. */
-export function cheapestPlanWith(feature: "coupons" | "reviews" | "email" | "customDomain" | "themeEditor"): PlanFeature | undefined {
+export function cheapestPlanWith(feature: PlanSwitch): PlanFeature | undefined {
   const id = PLAN_IDS.find((p) => planAccess[p][feature]);
   return id ? PLATFORM_PLANS[id] : undefined;
+}
+
+/** Does this plan include a feature? */
+export function planHas(planId: string | undefined, feature: PlanSwitch): boolean {
+  return getPlanAccess(planId || "free")[feature];
 }
 
 export function canAddBanner(currentCount: number, planId: string = "free"): { allowed: boolean; limit: number } {

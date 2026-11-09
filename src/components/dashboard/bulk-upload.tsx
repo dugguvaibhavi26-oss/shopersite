@@ -160,7 +160,7 @@ export function BulkUploadPanel({ store, onClose, onDone }: { store: StoreData; 
         <div>
           <h2 className="text-base font-bold text-neutral-900">Upload products in bulk</h2>
           <p className="mt-1 text-xs text-neutral-500">
-            Fill the template in Excel or Google Sheets, save it as CSV and upload it. Categories that don&apos;t exist yet are created for you.
+            Fill the template in Excel or Google Sheets, save it as CSV and upload it.
           </p>
         </div>
         <button type="button" onClick={onClose} className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100" aria-label="Close bulk upload">

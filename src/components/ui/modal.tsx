@@ -53,7 +53,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         className={cn(
-          "relative z-50 w-full bg-white shadow-2xl transition-all duration-200 overflow-hidden pb-[env(safe-area-inset-bottom)] sm:pb-0",
+          "dialog-pop relative z-50 w-full bg-white shadow-2xl transition-all duration-200 overflow-hidden pb-[env(safe-area-inset-bottom)] sm:pb-0",
           variant === "sheet"
             ? "rounded-t-xl max-h-[90vh] flex flex-col slide-in-from-bottom"
             : "rounded-lg sm:max-w-lg max-h-[90vh] flex flex-col scale-in-95",

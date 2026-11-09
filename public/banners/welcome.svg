@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 600" width="1600" height="600">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F7F7F5"/>
+      <stop offset="1" stop-color="#E6E6E3"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.72" cy="0.35" r="0.55">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bag" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#262626"/>
+      <stop offset="1" stop-color="#0A0A0A"/>
+    </linearGradient>
+    <linearGradient id="box" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EDEDEA"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="600" fill="url(#bg)"/>
+  <rect width="1600" height="600" fill="url(#glow)"/>
+
+  <!-- floor line and shadows -->
+  <rect x="0" y="470" width="1600" height="130" fill="#DCDCD8" opacity="0.45"/>
+  <ellipse cx="1130" cy="478" rx="230" ry="22" fill="#000" opacity="0.18" filter="url(#soft)"/>
+  <ellipse cx="1380" cy="480" rx="120" ry="16" fill="#000" opacity="0.14" filter="url(#soft)"/>
+
+  <!-- plant -->
+  <g stroke="#3F3F3F" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M1505 470 C 1500 400, 1515 330, 1500 250"/>
+    <path d="M1503 400 C 1475 385, 1460 365, 1452 340"/>
+    <path d="M1506 360 C 1530 345, 1545 320, 1552 298"/>
+    <path d="M1501 300 C 1480 290, 1470 272, 1466 252"/>
+  </g>
+  <g fill="#4A4A4A">
+    <path d="M1452 340 c -8 -22 6 -40 22 -36 c 4 16 -6 32 -22 36z"/>
+    <path d="M1552 298 c 10 -20 -2 -40 -20 -38 c -4 18 6 34 20 38z"/>
+    <path d="M1466 252 c -6 -20 8 -36 22 -32 c 2 16 -8 30 -22 32z"/>
+    <path d="M1500 250 c -4 -22 10 -36 24 -30 c 0 16 -10 28 -24 30z"/>
+  </g>
+  <rect x="1478" y="452" width="56" height="26" rx="6" fill="#FAFAF8" stroke="#D4D4D0"/>
+
+  <!-- white box -->
+  <path d="M1290 330 L1400 300 L1480 330 L1370 362 Z" fill="#FFFFFF"/>
+  <path d="M1290 330 L1370 362 L1370 478 L1290 448 Z" fill="url(#box)"/>
+  <path d="M1370 362 L1480 330 L1480 446 L1370 478 Z" fill="#E4E4E0"/>
+  <path d="M1330 318 L1440 288" stroke="#D0D0CC" stroke-width="2"/>
+
+  <!-- shopping bag -->
+  <path d="M1040 230 C 1040 150, 1120 150, 1120 230" fill="none" stroke="#0A0A0A" stroke-width="12" stroke-linecap="round"/>
+  <path d="M1140 230 C 1140 150, 1220 150, 1220 230" fill="none" stroke="#0A0A0A" stroke-width="12" stroke-linecap="round" opacity="0.85"/>
+  <path d="M980 228 L1280 228 L1300 478 L960 478 Z" fill="url(#bag)"/>
+  <path d="M980 228 L1280 228 L1282 252 L978 252 Z" fill="#000" opacity="0.35"/>
+  <!-- logo mark on the bag -->
+  <g transform="translate(1100 330)" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 22 h44 l-4 46 h-36 z"/>
+    <path d="M20 22 c0 -16 20 -16 20 0"/>
+  </g>
+
+  <!-- small sphere -->
+  <circle cx="900" cy="448" r="30" fill="#FFFFFF"/>
+  <circle cx="890" cy="438" r="10" fill="#FFFFFF" opacity="0.9"/>
+  <ellipse cx="904" cy="478" rx="34" ry="6" fill="#000" opacity="0.12"/>
+
+  <!-- words -->
+  <g font-family="Inter, 'Helvetica Neue', Arial, sans-serif" fill="#0A0A0A">
+    <text x="120" y="180" font-size="20" font-weight="600" letter-spacing="6" fill="#737373">SHOPERSITE</text>
+    <text x="118" y="268" font-size="68" font-weight="700" letter-spacing="-2">Your shop,</text>
+    <text x="118" y="346" font-size="68" font-weight="700" letter-spacing="-2">beautifully simple.</text>
+    <text x="120" y="406" font-size="24" fill="#525252">Products, orders and payments in one calm place.</text>
+  </g>
+</svg>

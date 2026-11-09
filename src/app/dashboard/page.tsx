@@ -10,7 +10,7 @@ import { Tour, type TourStep } from "@/components/ui/tour";
 import { LiveShopFrame } from "@/components/dashboard/live-shop-frame";
 import { OrderActions } from "@/components/dashboard/order-actions";
 import { PoliciesPanel } from "@/components/dashboard/policies-panel";
-import { missingPolicies } from "@/lib/policies";
+import { hasAnyPolicy, isShopClosed, missingPolicies } from "@/lib/policies";
 import { BulkUploadPanel } from "@/components/dashboard/bulk-upload";
 import { ProductCategoryField, moneyInput, uniqueSlug } from "@/components/dashboard/product-fields";
 import { checkPrices, checkStock } from "@/lib/validation";
@@ -30,7 +30,7 @@ import {
   PlatformBroadcast,
   DiscountData,
 } from "@/lib/store-service";
-import { PLATFORM_PLANS, canAddProduct, canUseReviews, canUseCoupons, canUseEmail, planDiscountPercent, cheapestPlanWith, canAddBanner, canUseThemeEditor, isPaidPlan, calculatePlanPrice, BILLING_CYCLES, type BillingCycle } from "@/lib/plans";
+import { planHas, PLATFORM_PLANS, canAddProduct, canUseReviews, canUseCoupons, canUseEmail, planDiscountPercent, cheapestPlanWith, canAddBanner, canUseThemeEditor, isPaidPlan, calculatePlanPrice, BILLING_CYCLES, type BillingCycle } from "@/lib/plans";
 import { CountUp } from "@/components/home/reveal";
 import { ShopperLogo, ShopperMark } from "@/components/brand/shopper-logo";
 import { AnnouncementBanners } from "@/components/dashboard/announcement-banners";
@@ -38,8 +38,32 @@ import { HelpAndMore } from "@/components/dashboard/help-and-more";
 import { SetupWizard, SETUP_STEPS, isSetupStepDone } from "@/components/dashboard/setup-wizard";
 import { LockedFeature } from "@/components/dashboard/locked-feature";
 import { SubscriptionPaymentModal } from "@/components/dashboard/subscription-payment-modal";
-import { CashfreePaymentsCard } from "@/components/dashboard/cashfree-payments";
+import { RazorpayPaymentsCard } from "@/components/dashboard/razorpay-payments";
+import { GeneralSettings } from "@/components/dashboard/general-settings";
+import { DomainSettings } from "@/components/dashboard/domain-settings";
+import { PluginsHub, type PluginId } from "@/components/dashboard/plugins-hub";
+import { InvoiceButton, ShiprocketShip, WhatsAppUpdates } from "@/components/dashboard/order-tools";
+import { GST_RATES } from "@/lib/invoice";
+import { AbandonedCheckouts } from "@/components/dashboard/abandoned-checkouts";
+import { ReviewsPanel } from "@/components/dashboard/reviews-panel";
+import { IAnalytics, IHome, IOrders, IProducts, ICategories, ICustomers, IReviews, IDiscounts, IThemes, IPlugins, ISettings, INotifications, IProfile, IRupee, IRepeat, IStar, ITrend, ISparkle, IPercent, ITruck, ICard, ICollections, ICheck, IWarning, ISoldOut, IStore, IImage, IGlobe, ICart, IActivity, ILock, IPolicies, IMail, IEye } from "@/components/icons";
+import { EmptyState, Illustration, PageHero, SectionIcon, StatChips, StatStrip, dailyCounts, type Section } from "@/components/dashboard/ui-kit";
+import {
+  AccountSettings,
+  CheckoutSettings,
+  NotificationSettings,
+  PrivacySettings,
+  TaxSettings,
+  TrackingSettings,
+} from "@/components/dashboard/store-settings-sections";
 import { fetchPaidOnlineOrders } from "@/lib/payments/client";
+import { HomeFeed } from "@/components/dashboard/home-feed";
+import { PlansSection } from "@/components/dashboard/plans-page";
+import { FilterMenu } from "@/components/dashboard/filter-menu";
+import { useMaintenance } from "@/lib/maintenance";
+import { TutorialRunner, type Tutorial } from "@/components/dashboard/tutorials";
+import { AnalyticsPage } from "@/components/dashboard/analytics-page";
+import { ASSISTANT_WIDTH, AssistantButton, AssistantPanel, assistantFitsBeside } from "@/components/dashboard/assistant-panel";
 import { ThemePurchaseModal } from "@/components/dashboard/theme-purchase-modal";
 import { canEditTheme, canUseTheme, formatThemePrice, getThemePrice, ownsTheme, planIncludesTheme } from "@/lib/theme-pricing";
 import { getTheme, getAllThemes, themeThumb } from "@/lib/themes";
@@ -72,6 +96,7 @@ import {
   ArrowRight,
   ShieldCheck,
   AlertTriangle,
+  XCircle,
   X,
   Scale,
   HelpCircle,
@@ -121,6 +146,7 @@ import {
   ArrowUpRight,
   ArrowLeft,
   MapPin,
+  Wrench,
 } from "lucide-react";
 
 // On desktop the dashboard scrolls inside its rounded panel, on phones the page itself scrolls; this moves both.
@@ -159,7 +185,7 @@ function DashboardPageContent() {
   const [store, setStore] = useState<StoreData | null>(null);
   const [userStores, setUserStores] = useState<StoreData[]>([]);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "products" | "categories" | "orders" | "discounts" | "customers" | "reviews" | "banners" | "policies" | "themes" | "billing" | "settings" | "plugins" | "notifications" | "profile"
+    "overview" | "analytics" | "products" | "categories" | "orders" | "discounts" | "customers" | "reviews" | "banners" | "policies" | "themes" | "billing" | "settings" | "plugins" | "notifications" | "profile"
   >((urlTabParam as any) || "overview");
 
   // Remember the pages visited so each page's back button can return to the previous one
@@ -174,22 +200,25 @@ function DashboardPageContent() {
     }
   }, [activeTab]);
   const goBackTab = () => {
-    const previous = tabHistory.current.pop();
+    // settings pages are a branch of their own: back never steps into one you visited earlier
+    const isSettingsTab = (t: string) => t === "settings" || t === "billing" || t === "policies";
+    let previous = tabHistory.current.pop();
+    while (previous && (isSettingsTab(previous) || previous === activeTab)) previous = tabHistory.current.pop();
     goingBack.current = true;
-    setActiveTab(previous && previous !== activeTab ? previous : "overview");
+    setActiveTab(previous || "overview");
     scrollDashTop({ top: 0 });
   };
 
-  // Android back button in the mobile app: step back through dashboard pages before leaving
+  // One "back" for the page's arrow, the Android back button and the browser's back button.
+  // Returns false when there's nothing left to go back to (Home).
+  const goBackRef = React.useRef<() => boolean>(() => false);
   useEffect(() => {
     const onAppBack = (e: Event) => {
-      if (activeTab === "overview") return;
-      e.preventDefault();
-      goBackTab();
+      if (goBackRef.current()) e.preventDefault();
     };
     window.addEventListener("app:back", onAppBack);
     return () => window.removeEventListener("app:back", onAppBack);
-  });
+  }, []);
 
   useEffect(() => {
     if (urlTabParam && urlTabParam !== activeTab) {
@@ -325,13 +354,20 @@ function DashboardPageContent() {
   // list filters for the products, orders and customers pages
   const [productSearch, setProductSearch] = useState("");
   const [productFilter, setProductFilter] = useState<"all" | "in" | "low" | "out">("all");
-  const [orderFilter, setOrderFilter] = useState<"all" | "toship" | "shipped" | "delivered">("all");
+  const [productCategory, setProductCategory] = useState("");
+  const [productSort, setProductSort] = useState<"new" | "az" | "price-low" | "price-high" | "stock-low">("new");
+  const [orderFilter, setOrderFilter] = useState<"all" | "toship" | "shipped" | "delivered" | "abandoned">("all");
+  // unfinished checkouts (Orders → Abandoned); counted once the list has loaded
+  const [abandonedCount, setAbandonedCount] = useState<number | undefined>(undefined);
   const [customerSearch, setCustomerSearch] = useState("");
+  const [customerFilter, setCustomerFilter] = useState<"all" | "repeat" | "new">("all");
+  const [customerSort, setCustomerSort] = useState<"recent" | "orders" | "spent">("recent");
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [pTitle, setPTitle] = useState("");
   const [pCategory, setPCategory] = useState("");
   const [pPrice, setPPrice] = useState("");
   const [pComparePrice, setPComparePrice] = useState("");
+  const [pGst, setPGst] = useState("");
   const [pErrors, setPErrors] = useState<{ title?: string; category?: string; price?: string; mrp?: string; stock?: string; form?: string }>({});
   // "+ New category" inside the product form: created when the product is saved
   const [pNewCategory, setPNewCategory] = useState("");
@@ -399,9 +435,11 @@ function DashboardPageContent() {
 
   // Settings State
   const [announcementInput, setAnnouncementInput] = useState("");
-  const [upiIdInput, setUpiIdInput] = useState("");
   const [codEnabledInput, setCodEnabledInput] = useState(true);
   const [codFeeInput, setCodFeeInput] = useState("0");
+  const [deliveryMode, setDeliveryMode] = useState<"free" | "flat" | "free_above">("free_above");
+  const [deliveryFeeInput, setDeliveryFeeInput] = useState("");
+  const [freeAboveInput, setFreeAboveInput] = useState("");
 
   // Brand Theme State (3 Fields: Primary, Background, Surface)
   const [themeAppliedToast, setThemeAppliedToast] = useState<string | null>(null);
@@ -409,6 +447,89 @@ function DashboardPageContent() {
   const [themeToBuy, setThemeToBuy] = useState<string | null>(() => searchParams.get("buy"));
 
   const [copiedLink, setCopiedLink] = useState(false);
+  // Settings is split into three short pages; coming back from Razorpay opens Payments
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>(() => {
+    if (typeof window === "undefined") return "general";
+    const p = new URLSearchParams(window.location.search);
+    const s = p.get("section") as SettingsSection | null;
+    if (s && (SETTINGS_SECTIONS as readonly string[]).includes(s)) return s;
+    return p.has("razorpay") ? "payments" : "general";
+  });
+  // Phones show the settings list first; tapping a row opens that page (with a back arrow)
+  const [settingsListOpen, setSettingsListOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const p = new URLSearchParams(window.location.search);
+    return !(p.has("section") || p.has("razorpay"));
+  });
+  // Plugins opens on the list of plugins; leaving the tab goes back to it
+  const [pluginView, setPluginView] = useState<PluginId | null>(null);
+  useEffect(() => {
+    if (activeTab !== "plugins") setPluginView(null);
+  }, [activeTab]);
+  // the settings menu slides out of the main sidebar when you enter Settings (not when moving inside it)
+  const enteredSettings = activeTab === "settings" || activeTab === "billing" || activeTab === "policies";
+  const [settingsNavIntro, setSettingsNavIntro] = useState(false);
+  // Settings sections the Shopersite team marked "In maintenance" (Admin → System status)
+  const maintenance = useMaintenance();
+  useEffect(() => {
+    if (!enteredSettings) return;
+    setSettingsNavIntro(true);
+    const t = window.setTimeout(() => setSettingsNavIntro(false), 700);
+    return () => window.clearTimeout(t);
+  }, [enteredSettings]);
+  useEffect(() => {
+    // leaving Settings resets it to the list; links straight to Plan, Policies or Emails open that page
+    if (activeTab === "billing" || activeTab === "policies") setSettingsListOpen(false);
+    else if (activeTab !== "settings") setSettingsListOpen(true);
+    // computers show the menu beside the page, so a settings page is always open there
+    else if (window.matchMedia("(min-width: 1024px)").matches) setSettingsListOpen(false);
+  }, [activeTab]);
+  useEffect(() => {
+    // phones get the numbers on Home itself, so the separate Analytics page is for computers only
+    if (activeTab !== "analytics") return;
+    const phone = window.matchMedia("(max-width: 767px)");
+    const check = () => phone.matches && setActiveTab("overview");
+    check();
+    phone.addEventListener("change", check);
+    return () => phone.removeEventListener("change", check);
+  }, [activeTab]);
+
+  // Browser / phone back button: while you're away from Home, one extra history entry sits on top.
+  // Pressing back pops it and we step back inside the dashboard instead of leaving it; reaching
+  // Home with the in-app arrow removes that entry so the next back press leaves as expected.
+  const atDashRoot = activeTab === "overview";
+  const [backTick, setBackTick] = useState(0);
+  const skipPop = React.useRef(false);
+  useEffect(() => {
+    const guarded = !!(window.history.state && window.history.state.dashGuard);
+    if (!atDashRoot && !guarded) {
+      // the entry underneath always points at Home, so stepping back onto it never reopens a page
+      const home = new URL(window.location.href);
+      home.searchParams.delete("tab");
+      home.searchParams.delete("section");
+      const hereUrl = new URL(window.location.href);
+      hereUrl.searchParams.set("tab", activeTab);
+      const here = hereUrl.href;
+      window.history.replaceState(window.history.state, "", home.href);
+      window.history.pushState({ ...(window.history.state || {}), dashGuard: true }, "", here);
+    }
+    else if (atDashRoot && guarded) {
+      skipPop.current = true;
+      window.history.back();
+    }
+  }, [atDashRoot, backTick]);
+  useEffect(() => {
+    const onPop = () => {
+      if (skipPop.current) {
+        skipPop.current = false;
+        return;
+      }
+      goBackRef.current();
+      setBackTick((n) => n + 1);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   // Redirect to login if user is not authenticated
   useEffect(() => {
@@ -461,9 +582,11 @@ function DashboardPageContent() {
     const applyStore = (s: StoreData) => {
       setStore(s);
       setAnnouncementInput(s.announcementText || "");
-      setUpiIdInput(s.upiId || "");
       setCodEnabledInput(s.codEnabled);
       setCodFeeInput((s.codFee / 100).toString());
+      setDeliveryMode(!(s.standardDeliveryFee > 0) ? "free" : s.freeDeliveryThreshold > 0 ? "free_above" : "flat");
+      setDeliveryFeeInput(s.standardDeliveryFee > 0 ? (s.standardDeliveryFee / 100).toString() : "");
+      setFreeAboveInput(s.freeDeliveryThreshold > 0 ? (s.freeDeliveryThreshold / 100).toString() : "");
       setLogoUrlInput(s.logoUrl || "");
       if (s.pluginsConfig?.gmailIntegration) {
         setGmailEmailInput(s.pluginsConfig.gmailIntegration.connectedEmail || s.contactEmail || "");
@@ -532,6 +655,13 @@ function DashboardPageContent() {
   };
   const toggleShopOpen = () => {
     if (!store) return;
+    if (!hasAnyPolicy(store)) {
+      appAlert("Online shops in India must show their policies. Add at least one policy page (templates are ready to edit), then you can open your shop.", {
+        title: "Add a policy page first",
+        okLabel: "Add policies",
+      }).then(() => setActiveTab("policies"));
+      return;
+    }
     storeService.updateStore(store.subdomain, { isClosed: !store.isClosed, closedMessage: closedMsgDraft.trim() });
     refreshStore();
   };
@@ -709,6 +839,7 @@ function DashboardPageContent() {
         category: categoryName,
         price: pricePaise,
         compareAtPrice: comparePricePaise,
+        gstRate: pGst ? Number(pGst) : undefined,
         stock: stockNum,
         description: pDesc,
         images: pImageUrl ? [pImageUrl] : undefined,
@@ -720,6 +851,7 @@ function DashboardPageContent() {
         description: pDesc,
         price: pricePaise,
         compareAtPrice: comparePricePaise,
+        ...(pGst ? { gstRate: Number(pGst) } : {}),
         stock: stockNum,
         category: categoryName,
         images: [
@@ -757,6 +889,7 @@ function DashboardPageContent() {
     setPCategory("");
     setPPrice("");
     setPComparePrice("");
+    setPGst("");
     setPStock("10");
     setPDesc("");
     setPImageUrl("");
@@ -768,6 +901,7 @@ function DashboardPageContent() {
     setPCategory(prod.category);
     setPPrice((prod.price / 100).toString());
     setPComparePrice(prod.compareAtPrice ? (prod.compareAtPrice / 100).toString() : "");
+    setPGst(typeof prod.gstRate === "number" ? String(prod.gstRate) : "");
     setPStock(prod.stock.toString());
     setPDesc(prod.description);
     setPImageUrl(prod.images[0] || "");
@@ -1007,11 +1141,25 @@ function DashboardPageContent() {
     e.preventDefault();
     if (!store) return;
 
+    const toPaise = (v: string) => Math.round((parseFloat(v) || 0) * 100);
+    const fee = deliveryMode === "free" ? 0 : toPaise(deliveryFeeInput);
+    const freeAbove = deliveryMode === "free_above" ? toPaise(freeAboveInput) : 0;
+    if (deliveryMode !== "free" && (fee <= 0 || fee > 10_000_00)) {
+      appAlert("Enter a delivery charge between ₹1 and ₹10,000.", { title: "Check delivery charge", tone: "danger" });
+      return;
+    }
+    if (deliveryMode === "free_above" && freeAbove <= 0) {
+      appAlert("Enter the order amount above which delivery is free.", { title: "Check delivery charge", tone: "danger" });
+      return;
+    }
+
     storeService.updateStore(store.subdomain, {
       announcementText: announcementInput,
-      upiId: upiIdInput,
-      codEnabled: codEnabledInput,
+      // without online payments, Cash on Delivery is the only way to pay, so it stays on
+      codEnabled: planHas(store.planId, "paymentGateway") ? codEnabledInput : true,
       codFee: Math.round(parseFloat(codFeeInput || "0") * 100),
+      standardDeliveryFee: fee,
+      freeDeliveryThreshold: freeAbove,
     });
     appAlert("Your settings are saved.", { title: "Saved", tone: "success" });
     refreshStore();
@@ -1185,6 +1333,33 @@ function DashboardPageContent() {
   };
 
   // While the session or stores load, or while we're redirecting, show one calm on-brand screen
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  // beside the page when there's room for both, otherwise full screen (re-checked on resize and when the rail opens)
+  const [assistantSide, setAssistantSide] = useState(false);
+  const [assistantPrompt, setAssistantPrompt] = useState<{ id: number; text: string } | null>(null);
+  const [tutorial, setTutorial] = useState<Tutorial | null>(null);
+  const askAssistant = (text: string) => {
+    setAssistantPrompt({ id: Date.now(), text });
+    setAssistantOpen(true);
+  };
+  useEffect(() => {
+    const check = () => setAssistantSide(assistantFitsBeside());
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, [assistantOpen]);
+  useEffect(() => {
+    // Ctrl/Cmd + K opens the assistant
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setAssistantOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   if (authLoading) return <DashboardHold text="Opening your dashboard" />;
   if (!user) return <DashboardHold text="Taking you to log in" />;
   if (!store || userStores.length === 0) {
@@ -1206,57 +1381,189 @@ function DashboardPageContent() {
   // the Subscription page gets a red dot while the plan is ending or has ended
   const planNeedsAttention = (subNow.kind === "active" && subNow.endingSoon) || (subNow.kind === "free" && !!subNow.endedPlanId);
   const policiesMissing = missingPolicies(store);
+  const needsPolicy = !hasAnyPolicy(store);
+  const shopClosed = isShopClosed(store);
   type DashTab = typeof activeTab;
   const navGroups: {
     label: string;
     items: { id: DashTab; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number | "dot" | "lock" | "active" }[];
   }[] = [
     {
-      label: "Store",
+      label: "Sell",
       items: [
-        { id: "overview", label: "Overview", icon: LayoutDashboard },
-        { id: "orders", label: "Orders", icon: ShoppingBag, badge: unfulfilledOrders.length > 0 ? "dot" : undefined },
-        { id: "products", label: "Products", icon: Package, badge: totalProducts },
-        { id: "categories", label: "Categories", icon: FolderTree, badge: store.categories?.length || 0 },
-        { id: "customers", label: "Customers", icon: Users },
-        { id: "reviews", label: "Reviews", icon: Star, badge: canUseReviews(store.planId) ? undefined : "lock" },
+        { id: "overview", label: "Home", icon: IHome },
+        { id: "analytics", label: "Analytics", icon: IAnalytics },
+        { id: "orders", label: "Orders", icon: IOrders, badge: unfulfilledOrders.length > 0 ? "dot" : undefined },
+        { id: "products", label: "Products", icon: IProducts, badge: totalProducts },
+        { id: "categories", label: "Categories", icon: ICategories, badge: store.categories?.length || 0 },
+        { id: "customers", label: "Customers", icon: ICustomers },
+        { id: "reviews", label: "Reviews", icon: IReviews, badge: canUseReviews(store.planId) ? undefined : "lock" },
       ],
     },
     {
-      label: "Marketing",
+      label: "Promote",
       items: [
-        { id: "discounts", label: "Discounts", icon: Tag, badge: canUseCoupons(store.planId) ? store.discounts?.length || 0 : "lock" },
+        { id: "discounts", label: "Discounts", icon: IDiscounts, badge: canUseCoupons(store.planId) ? store.discounts?.length || 0 : "lock" },
       ],
     },
     {
-      label: "Setup",
+      label: "Your store",
       items: [
-        { id: "themes", label: "Themes", icon: Palette },
-        { id: "billing", label: "Subscription", icon: CreditCard, badge: planNeedsAttention ? "dot" : undefined },
-        { id: "policies", label: "Policies", icon: Scale, badge: policiesMissing.length ? "dot" : undefined },
-        { id: "settings", label: "Settings", icon: Settings },
-        { id: "plugins", label: "Plugins", icon: Plug, badge: canUseEmail(store.planId) ? "active" : "lock" },
+        { id: "themes", label: "Themes", icon: IThemes },
+        { id: "plugins", label: "Plugins", icon: IPlugins },
+        { id: "settings", label: "Settings", icon: ISettings, badge: policiesMissing.length || planNeedsAttention ? "dot" : undefined },
       ],
     },
   ];
 
   const pageTitles: Record<DashTab, { title: string; text: string }> = {
     overview: { title: "", text: "" },
-    products: { title: "Products", text: "Manage your products, pricing, and stock." },
-    categories: { title: "Categories", text: "Organize products into categories and homepage collections." },
-    orders: { title: "Orders", text: "Track customer orders and shipments." },
-    discounts: { title: "Discounts", text: "Create promo codes and discount coupons." },
-    customers: { title: "Customers", text: "View your customers and order history." },
-    reviews: { title: "Reviews", text: "Manage customer ratings and reviews." },
-    banners: { title: "Banners", text: "Upload storefront hero promotional banners." },
-    policies: { title: "Policies", text: "Your terms, refund, shipping and privacy pages, and what buyers can cancel or return." },
-    themes: { title: "Themes", text: "Customize your storefront theme and style." },
-    billing: { title: "Subscription", text: "Manage your subscription plan and limits." },
-    settings: { title: "Settings", text: "Configure payments, payouts, and store details." },
-    plugins: { title: "Plugins", text: "Email alerts and customer notifications." },
+    products: { title: "Products", text: "Add and edit what you sell: photos, prices and stock." },
+    categories: { title: "Categories", text: "Group your products so buyers find things faster." },
+    orders: { title: "Orders", text: "New orders, payments and deliveries." },
+    discounts: { title: "Discounts", text: "Coupon codes buyers can use at checkout." },
+    customers: { title: "Customers", text: "People who have ordered from you." },
+    analytics: { title: "Analytics", text: "Every number about your shop, for any period." },
+    reviews: { title: "Reviews", text: "Ratings buyers left on your products." },
+    banners: { title: "Banners", text: "Big promo images at the top of your store." },
+    policies: { title: "Settings", text: "Everything about how your store runs, in one place." },
+    themes: { title: "Themes", text: "Choose how your store looks, then edit its text and photos." },
+    billing: { title: "Settings", text: "Everything about how your store runs, in one place." },
+    settings: { title: "Settings", text: "Everything about how your store runs, in one place." },
+    plugins: { title: "Plugins", text: "Extra tools for your store: shipping, WhatsApp and email. More are coming." },
     notifications: { title: "Notifications", text: "Orders, stock alerts and updates from your store." },
     profile: { title: "Profile", text: "Your account, store and plan." },
   };
+
+  // ---- Settings: one menu for everything about how the store runs (like Shopify's) ----
+  type SettingsId = SettingsSection | "billing" | "plugins" | "policies";
+  const SETTINGS_TABS = ["billing", "policies"] as const;
+  const inSettings = activeTab === "settings" || (SETTINGS_TABS as readonly string[]).includes(activeTab);
+  const settingsCurrent: SettingsId = activeTab === "settings" ? settingsSection : (activeTab as SettingsId);
+  const SETTINGS_MENU_BASE: { id: SettingsId; label: string; icon: React.ComponentType<{ className?: string }>; dot?: boolean; tag?: string; maint?: boolean }[] = [
+    { id: "general", label: "General", icon: IStore },
+    { id: "billing", label: "Plan & billing", icon: ICard, dot: planNeedsAttention },
+    { id: "store", label: "Store link & logo", icon: IImage },
+    { id: "domain", label: "Domain", icon: IGlobe, tag: store.planId === "pro" ? undefined : "Pro" },
+    { id: "payments", label: "Payments", icon: IRupee },
+    { id: "checkout", label: "Checkout", icon: IOrders },
+    { id: "accounts", label: "Customer accounts", icon: ICustomers },
+    { id: "delivery", label: "Shipping & delivery", icon: ITruck },
+    { id: "taxes", label: "Taxes", icon: IPercent },
+    { id: "notifications", label: "Notifications", icon: INotifications },
+   { id: "events", label: "Tracking & ads", icon: IActivity },
+    { id: "privacy", label: "Customer privacy", icon: ILock },
+    { id: "policies", label: "Policies", icon: IPolicies, dot: policiesMissing.length > 0 },
+  ];
+  const SETTINGS_MENU = SETTINGS_MENU_BASE.map((s) => ({ ...s, maint: maintenance.includes(s.id) }));
+  const maintTag = (dark: boolean) => (
+    <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${dark ? "bg-amber-400/15 text-amber-300" : "bg-amber-50 text-amber-700"}`}>
+      <Wrench className="h-2.5 w-2.5" /> Maintenance
+    </span>
+  );
+  const SETTINGS_HEAD: Record<SettingsId, { title: string; text: string }> = {
+    general: { title: "General", text: "Your store's name, how buyers reach you, and whether you're open." },
+    billing: { title: "Plan & billing", text: "Your ShoperSite plan, its limits and your past payments." },
+    store: { title: "Store link & logo", text: "Your web address, logo and the message at the top of your store." },
+    domain: { title: "Domain", text: "Use your own web address, like www.yourbrand.com, for your store." },
+    payments: { title: "Payments", text: "Choose how buyers can pay. Money always goes straight to you." },
+    checkout: { title: "Checkout", text: "Rules for placing an order: minimum amount, cash-on-delivery limit and what buyers fill in." },
+    accounts: { title: "Customer accounts", text: "Whether buyers can order as guests or must sign in first." },
+    delivery: { title: "Shipping & delivery", text: "What buyers pay for delivery." },
+    taxes: { title: "Taxes", text: "Your GST number and how prices are shown." },
+    notifications: { title: "Notifications", text: "Emails ShoperSite sends you about your store." },
+    plugins: { title: "Emails to buyers", text: "Email your buyers about their orders and new products, from your own Gmail." },
+    events: { title: "Tracking & ads", text: "Connect Meta (Facebook & Instagram) and Google to measure visits and ads." },
+    privacy: { title: "Customer privacy", text: "Cookie notice and how buyers can ask about their data." },
+    policies: { title: "Policies", text: "Terms, returns, shipping and privacy pages for your buyers. Your store needs at least one to open." },
+  };
+  const openSettings = (id: SettingsId) => {
+    if ((SETTINGS_TABS as readonly string[]).includes(id)) setActiveTab(id as "billing" | "policies");
+    else {
+      setActiveTab("settings");
+      setSettingsSection(id as SettingsSection);
+    }
+    setSettingsListOpen(false);
+    scrollDashTop({ top: 0 });
+  };
+  const backToSettingsList = () => {
+    if (activeTab !== "settings") setActiveTab("settings");
+    setSettingsListOpen(true);
+    scrollDashTop({ top: 0 });
+  };
+  goBackRef.current = () => {
+    if (inEditor) return false;
+    if (activeTab === "orders" && selectedOrder) return setSelectedOrder(null), true;
+    if (activeTab === "products" && isProductModalOpen) return setIsProductModalOpen(false), true;
+    if (activeTab === "categories" && isCategoryModalOpen) return setIsCategoryModalOpen(false), true;
+    if (activeTab === "discounts" && isDiscountModalOpen) return setIsDiscountModalOpen(false), true;
+    if (activeTab === "plugins" && pluginView) return setPluginView(null), true;
+    if (activeTab === "overview") return false;
+    if (inSettings) {
+      // a settings page goes back to Settings, and Settings goes Home (phones: the list; computers: General)
+      const phone = window.matchMedia("(max-width: 1023px)").matches;
+      if (phone && !settingsListOpen) backToSettingsList();
+      else if (!phone && settingsCurrent !== "general") openSettings("general");
+      else {
+        goingBack.current = true;
+        setActiveTab("overview");
+        scrollDashTop({ top: 0 });
+      }
+      return true;
+    }
+    goBackTab();
+    return true;
+  };
+  /**
+   * Computers: the settings menu on the left with the chosen page on the right.
+   * Phones: the full list of settings first; tapping one opens that page on its own, with a back arrow.
+   */
+  const settingsFrame = (content: React.ReactNode) => (
+    <div className="mt-4 grid items-start gap-6 sm:mt-6">
+      <nav aria-label="Settings" className={`${settingsListOpen ? "block swap-enter" : "hidden"} lg:hidden`}>
+        <div className="divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200 bg-white lg:flex lg:flex-col lg:gap-0.5 lg:divide-y-0 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent">
+          {SETTINGS_MENU.map((s) => {
+            const on = settingsCurrent === s.id;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                data-tour={`set-${s.id}`}
+                aria-current={on ? "page" : undefined}
+                onClick={() => openSettings(s.id)}
+                style={{ minHeight: 0 }}
+                className={`relative flex w-full items-center gap-3 px-4 py-3.5 text-left text-[15px] transition-colors lg:rounded-xl lg:px-3 lg:py-2 lg:text-sm ${
+                  on
+                    ? "text-neutral-950 lg:bg-neutral-950 lg:font-semibold lg:text-white"
+                    : "text-neutral-800 active:bg-neutral-50 lg:text-neutral-600 lg:hover:bg-white lg:hover:text-neutral-950"
+                }`}
+              >
+                <s.icon className="h-[18px] w-[18px] shrink-0 lg:h-4 lg:w-4" />
+                <span className="flex-1 font-medium lg:font-[inherit]">{s.label}</span>
+                {s.maint && maintTag(false)}
+                {s.tag && (
+                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${on ? "lg:bg-white/15 lg:text-white bg-neutral-100 text-neutral-500" : "bg-neutral-100 text-neutral-500"}`}>{s.tag}</span>
+                )}
+                {s.dot && <span className="h-2 w-2 rounded-full bg-amber-500" />}
+                <ChevronRight className="h-4 w-4 shrink-0 text-neutral-400 lg:hidden" />
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+      <div key={settingsCurrent} className={`${settingsListOpen ? "hidden" : "block"} swap-enter min-w-0 max-w-3xl space-y-4 sm:space-y-6 lg:block`}>
+        {maintenance.includes(settingsCurrent) && (
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <Wrench className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <span>
+              <b className="font-semibold">In maintenance.</b> We&apos;re working on this section, so some options may not work yet. Your saved settings are safe.
+            </span>
+          </div>
+        )}
+        {content}
+      </div>
+    </div>
+  );
 
   // Approved / rejected subscription payments, newest first, shown in the bell with the rest
   const planNotices = (store.subscriptionHistory || [])
@@ -1401,7 +1708,10 @@ function DashboardPageContent() {
     (activeTab === "banners" && isBannerModalOpen) ||
     (activeTab === "orders" && !!selectedOrder);
   // phones: the top bar and bottom bar only show on the main pages; everything else is a sub page with a back button
-  const showPhoneChrome = !inEditor && (activeTab === "overview" || activeTab === "orders" || activeTab === "settings");
+  const showPhoneChrome = !inEditor && activeTab === "overview";
+  // the phone's bottom bar is only on the two main screens, Home and the Orders list; inner pages
+  // (an order's details, settings pages, products…) use their back arrow instead
+  const showDock = !inEditor && (activeTab === "overview" || (activeTab === "orders" && !selectedOrder));
 
   const activeTheme = getTheme(store.activeThemeSlug);
   const productThumbs = store.products.map((p) => p.images?.[0]).filter(Boolean).slice(0, 4) as string[];
@@ -1409,7 +1719,7 @@ function DashboardPageContent() {
   const liveBanners = store.banners.filter((b) => b.isActive).length;
 
   return (
-    <div className="dash home-sans min-h-screen w-full bg-[#FAFAFA] md:bg-[#0a0a0a] text-neutral-950">
+    <div className="dash home-sans min-h-screen w-full bg-[#F0F0F0] md:bg-[#0a0a0a] text-neutral-950">
       {/* Top bar on phones: profile · logo · notifications (desktop has them in the rail) */}
       <header className={`${showPhoneChrome ? "" : "hidden "}md:hidden fixed top-0 inset-x-0 z-40 h-16 bg-white/90 backdrop-blur-md border-b border-neutral-200`}>
         <div className="h-full px-3 sm:px-5 grid grid-cols-[1fr_auto_1fr] items-center">
@@ -1531,7 +1841,7 @@ function DashboardPageContent() {
           router.push(`/dashboard?store=${sub}`);
         }}
         groups={navGroups}
-        active={activeTab}
+        active={inSettings ? "settings" : activeTab}
         onSelect={setActiveTab}
         onHome={() => {
           setActiveTab("overview");
@@ -1553,11 +1863,48 @@ function DashboardPageContent() {
         onUpgrade={() => setActiveTab("billing")}
       />
 
+      {/* Settings menu on computers: slides out of the black sidebar like a branch of it */}
+      <aside
+        aria-label="Settings"
+        aria-hidden={!inSettings}
+        style={{ "--rail": `${RAIL_WIDTH}px` } as React.CSSProperties}
+        className={`fixed bottom-3 top-3 z-30 hidden w-[232px] flex-col rounded-[24px] border border-white/[0.08] bg-[#171717] px-3 pb-5 pt-6 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-[transform,opacity,left] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] lg:flex left-[var(--dash-rail,var(--rail))] ${
+          inSettings && !inEditor ? "translate-x-0 opacity-100" : "pointer-events-none -translate-x-full opacity-0"
+        }`}
+      >
+        <div className="mb-3 flex items-center gap-2 border-b border-white/[0.08] px-3 pb-4">
+          <ISettings className="h-4 w-4 text-white/70" />
+          <p className="text-sm font-semibold">Settings</p>
+        </div>
+        <nav className="flex-1 space-y-0.5 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
+          {SETTINGS_MENU.map((s) => {
+            const on = settingsCurrent === s.id;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                data-tour={`set-${s.id}`}
+                aria-current={on ? "page" : undefined}
+                onClick={() => openSettings(s.id)}
+                style={{ minHeight: 0 }}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${on ? "bg-white font-semibold text-neutral-950" : "text-white/60 hover:bg-white/[0.08] hover:text-white"}`}
+              >
+                <s.icon className="h-4 w-4 shrink-0" />
+                <span className="flex-1 truncate">{s.label}</span>
+                {s.maint && maintTag(!on)}
+                {s.tag && <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${on ? "bg-neutral-100 text-neutral-600" : "bg-white/10 text-white/70"}`}>{s.tag}</span>}
+                {s.dot && <span className="h-2 w-2 rounded-full bg-amber-400" />}
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
+
       {/* Main Content Area: under the top bar on phones; on desktop a rounded panel beside the black rail */}
-      <div className={`${showPhoneChrome ? "pt-16" : "pt-[env(safe-area-inset-top)]"} md:pt-3 md:pb-3 md:pl-[var(--dash-rail,var(--rail))] md:pr-3 md:transition-[padding-left] md:duration-500 md:ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col min-h-screen md:h-screen md:min-h-0 overflow-x-clip`} style={{ "--rail": `${RAIL_WIDTH}px` } as React.CSSProperties}>
-        <div id="dash-scroll" className="flex-1 flex flex-col md:min-h-0 md:overflow-y-auto md:overscroll-contain md:rounded-[28px] md:bg-[#FAFAFA] dash-panel-scroll">
+      <div className={`${showPhoneChrome ? "pt-16" : "pt-[env(safe-area-inset-top)]"} md:pt-3 md:pb-3 md:pl-[var(--dash-rail,var(--rail))] ${inSettings && !inEditor ? "lg:pl-[calc(var(--dash-rail,var(--rail))+244px)]" : ""} md:pr-3 ${assistantOpen && assistantSide ? "md:pr-[calc(var(--aw)+1.5rem)]" : ""} md:transition-[padding] md:duration-500 md:ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col min-h-screen md:h-screen md:min-h-0 overflow-x-clip`} style={{ "--rail": `${RAIL_WIDTH}px`, "--aw": `${ASSISTANT_WIDTH}px` } as React.CSSProperties}>
+        <div id="dash-scroll" className="flex-1 flex flex-col md:min-h-0 md:overflow-y-auto md:overscroll-contain md:rounded-[28px] md:bg-[#F0F0F0] dash-panel-scroll">
         {/* Main Workspace Area (Scrolls smoothly under the fixed top header) */}
-        <main className={`flex-1 min-w-0 p-4 sm:p-8 ${showPhoneChrome ? "pb-28" : "pb-10"} md:pb-12 max-w-7xl w-full mx-auto`}>
+        <main className={`flex-1 min-w-0 px-5 pt-5 sm:px-10 sm:pt-8 lg:px-16 lg:pt-10 ${showDock ? "pb-28" : "pb-10"} md:pb-14 max-w-6xl w-full mx-auto`}>
           {unseenPlanUpdate && (
             <div
               className={`mb-5 flex items-start gap-3 rounded-2xl p-4 ${
@@ -1597,28 +1944,56 @@ function DashboardPageContent() {
           )}
 
           {/* Each section slides in when you switch to it (key re-mounts the wrapper per section) */}
-          <div key={activeTab} className="tab-enter">
-          {/* Page title (overview greets you inside the hero card) */}
-          {activeTab !== "overview" && !inEditor && (
-            <div className="mb-5 sm:mb-8 hero-rise flex items-center sm:items-start gap-3 sm:gap-4">
-              <button
-                type="button"
-                onClick={goBackTab}
-                aria-label="Back"
-                className="group sm:mt-1 w-10 h-10 shrink-0 rounded-[12px] border border-neutral-200 bg-white flex items-center justify-center text-neutral-700 hover:border-neutral-900 hover:text-black transition-colors"
-              >
-                <ArrowLeft className="w-[18px] h-[18px] transition-transform duration-300 group-hover:-translate-x-0.5" />
-              </button>
-              <div className="min-w-0">
-                <h1 className="truncate text-[1.6rem] sm:text-[1.9rem] font-semibold tracking-tight leading-tight">{pageTitles[activeTab].title}</h1>
-                <p className="hidden sm:block mt-1 text-sm text-neutral-500">{pageTitles[activeTab].text}</p>
-              </div>
-            </div>
-          )}
+          {/* moving between settings pages keeps the frame still; only the page inside changes */}
+          <div key={inSettings ? "settings" : activeTab} className="tab-enter">
+          {/* Page title (overview greets you inside the hero card): a soft band in the section's own colour */}
+          {activeTab !== "overview" && !inEditor && (() => {
+            const look: Record<string, { section: Section; icon: React.ElementType }> = {
+              products: { section: "products", icon: IProducts },
+              categories: { section: "categories", icon: ICategories },
+              orders: { section: "orders", icon: IOrders },
+              discounts: { section: "discounts", icon: IDiscounts },
+              customers: { section: "customers", icon: ICustomers },
+              analytics: { section: "overview", icon: IAnalytics },
+              reviews: { section: "reviews", icon: IStar },
+              banners: { section: "themes", icon: IImage },
+              themes: { section: "themes", icon: IThemes },
+              plugins: { section: "plugins", icon: IPlugins },
+              notifications: { section: "notifications", icon: INotifications },
+              profile: { section: "profile", icon: IProfile },
+            };
+            const l = look[activeTab] || { section: "settings" as Section, icon: ISettings };
+            // Settings: one header naming the page you're on; its back arrow returns to the settings list on phones
+            const settingsPage = inSettings && !settingsListOpen;
+            return (
+              <PageHero
+                section={l.section}
+                icon={l.icon}
+                title={settingsPage ? SETTINGS_HEAD[settingsCurrent].title : pageTitles[activeTab].title}
+                onBack={() => goBackRef.current()}
+                actions={
+                  activeTab === "orders" && !selectedOrder ? (
+                    <button
+                      type="button"
+                      onClick={() => setOrderFilter(orderFilter === "abandoned" ? "all" : "abandoned")}
+                      aria-pressed={orderFilter === "abandoned"}
+                      className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold md:hidden ${
+                        orderFilter === "abandoned" ? "border-neutral-950 bg-neutral-950 text-white" : "border-neutral-200 bg-white text-neutral-700"
+                      }`}
+                    >
+                      Abandoned{abandonedCount ? ` ${abandonedCount}` : ""}
+                    </button>
+                  ) : undefined
+                }
+              />
+            );
+          })()}
 
           {/* TAB 1: OVERVIEW */}
           {activeTab === "overview" && (
-            <div className="space-y-6 animate-enter-blur">
+            <>
+            {/* Phones and the Android app: the analytics Home sellers know */}
+            <div className="space-y-6 md:hidden">
               {/* Row 1 — greeting + featured revenue tile and three stat tiles */}
               <div className="hero-rise flex items-end justify-between gap-4">
                 <div className="min-w-0">
@@ -1649,7 +2024,6 @@ function DashboardPageContent() {
                 </a>
                 </span>
               </div>
-              <Tour id="dashboard-overview" startRef={dashTour} steps={DASHBOARD_TOUR} />
 
               <section
                 data-tour="stats"
@@ -1687,14 +2061,14 @@ function DashboardPageContent() {
                     tab: "orders" as const,
                     value: <CountUp from={0} to={Number(analyticsData.ordersCount) || 0} />,
                     pill: analyticsData.ordersDelta,
-                    tone: { chip: "bg-indigo-50 text-indigo-600", pill: "bg-indigo-50 text-indigo-700", line: "bg-indigo-500" },
+                    tone: { chip: "text-neutral-900", pill: "bg-neutral-100 text-neutral-700", line: "bg-neutral-900" },
                   },
                   {
                     label: "Avg. order",
                     icon: ShoppingCart,
                     value: `₹${Math.round(analyticsData.avgOrderValue / 100).toLocaleString("en-IN")}`,
                     pill: `${analyticsData.buyers} ${analyticsData.buyers === 1 ? "buyer" : "buyers"}`,
-                    tone: { chip: "bg-amber-50 text-amber-600", pill: "bg-amber-50 text-amber-700", line: "bg-amber-500" },
+                    tone: { chip: "text-neutral-900", pill: "bg-neutral-100 text-neutral-700", line: "bg-neutral-900" },
                   },
                   {
                     label: "Products",
@@ -1702,7 +2076,7 @@ function DashboardPageContent() {
                     tab: "products" as const,
                     value: <CountUp from={0} to={totalProducts} />,
                     pill: currentPlan.maxProducts >= 9999 ? "∞" : `${Math.max(0, currentPlan.maxProducts - totalProducts)} left`,
-                    tone: { chip: "bg-violet-50 text-violet-600", pill: "bg-violet-50 text-violet-700", line: "bg-violet-500" },
+                    tone: { chip: "text-neutral-900", pill: "bg-neutral-100 text-neutral-700", line: "bg-neutral-900" },
                   },
                 ].map((m) => (
                   <button
@@ -1714,7 +2088,7 @@ function DashboardPageContent() {
                     }`}
                   >
                     <span className="flex items-center justify-between gap-2">
-                      <span className={`w-8 h-8 rounded-[10px] flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6 ${m.tone.chip}`}>
+                      <span className={`flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6 ${m.tone.chip}`}>
                         <m.icon className="w-4 h-4" />
                       </span>
                       <span className={`hidden sm:inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${m.tone.pill}`}>{m.pill}</span>
@@ -1947,7 +2321,7 @@ function DashboardPageContent() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-4">
-                        <div className="relative w-11 h-11 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                        <div className="relative flex shrink-0 items-center justify-center text-neutral-900">
                           <Check className="relative w-5 h-5" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1969,7 +2343,7 @@ function DashboardPageContent() {
                 <div style={{ animationDelay: "420ms" }} className="hero-rise space-y-6">
                   {/* Your store */}
                   <div className="relative overflow-hidden rounded-2xl bg-black text-white p-5">
-                    <span aria-hidden className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-indigo-500/40 blur-3xl animate-float-gentle" />
+                    <span aria-hidden className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-white/10 blur-3xl animate-float-gentle" />
                     <span aria-hidden className="absolute -bottom-20 -left-12 w-44 h-44 rounded-full bg-fuchsia-500/25 blur-3xl animate-float-gentle [animation-delay:1.5s]" />
                     <div className="relative flex items-center justify-between">
                       <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">Your store</span>
@@ -2059,7 +2433,7 @@ function DashboardPageContent() {
                     onClick={startAddProduct}
                     className="group relative overflow-hidden col-span-3 text-left rounded-2xl bg-neutral-950 text-white px-5 sm:px-7 flex items-center justify-between gap-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-24px_rgba(0,0,0,0.6)]"
                   >
-                    <span aria-hidden className="pointer-events-none absolute -left-16 -top-20 w-64 h-64 rounded-full bg-indigo-500/25 blur-3xl transition-opacity duration-500 group-hover:opacity-100 opacity-60" />
+                    <span aria-hidden className="pointer-events-none absolute -left-16 -top-20 w-64 h-64 rounded-full bg-white/10 blur-3xl transition-opacity duration-500 group-hover:opacity-100 opacity-60" />
                     <span className="relative min-w-0">
                       <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">Catalogue</span>
                       <span className="mt-1 block text-lg sm:text-xl font-semibold">Add product</span>
@@ -2088,7 +2462,7 @@ function DashboardPageContent() {
 
                   {/* Reviews — small */}
                   <button type="button" onClick={() => setActiveTab("reviews")} className={`group relative overflow-hidden text-left rounded-2xl bg-white border border-neutral-200 transition-all duration-300 hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-[0_20px_44px_-24px_rgba(0,0,0,0.3)] p-3 sm:p-4 flex flex-col justify-between`}>
-                    <span className="w-9 h-9 rounded-[10px] bg-amber-50 text-amber-500 flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
+                    <span className="flex items-center justify-center text-neutral-900 transition-transform duration-300 group-hover:scale-110">
                       <Star className="w-4 h-4 fill-current" />
                     </span>
                     <span>
@@ -2102,7 +2476,7 @@ function DashboardPageContent() {
                   {/* Categories — wide */}
                   <button type="button" onClick={() => setActiveTab("categories")} className={`group relative overflow-hidden text-left rounded-2xl bg-white border border-neutral-200 transition-all duration-300 hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-[0_20px_44px_-24px_rgba(0,0,0,0.3)] col-span-2 p-4 sm:p-5 flex flex-col justify-between`}>
                     <span className="flex items-center gap-3">
-                      <span className="w-9 h-9 rounded-[10px] bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110">
+                      <span className="flex shrink-0 items-center justify-center text-neutral-900 transition-transform duration-300 group-hover:scale-110">
                         <FolderTree className="w-4 h-4" />
                       </span>
                       <span className="min-w-0">
@@ -2178,7 +2552,7 @@ function DashboardPageContent() {
 
                   {/* Policies — small */}
                   <button type="button" data-tour="policies" onClick={() => setActiveTab("policies")} className={`group relative overflow-hidden text-left rounded-2xl bg-white border border-neutral-200 transition-all duration-300 hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-[0_20px_44px_-24px_rgba(0,0,0,0.3)] col-start-1 row-start-4 p-3 sm:p-4 flex flex-col justify-between`}>
-                    <span className={`w-9 h-9 rounded-[10px] flex items-center justify-center transition-transform duration-300 group-hover:scale-110 ${policiesMissing.length ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"}`}>
+                    <span className={`flex items-center justify-center transition-transform duration-300 group-hover:scale-110 ${policiesMissing.length ? "text-amber-600" : "text-neutral-900"}`}>
                       <Scale className="w-4 h-4" />
                     </span>
                     <span>
@@ -2273,6 +2647,106 @@ function DashboardPageContent() {
                 <HelpAndMore storeName={store.name} />
               </div>
             </div>
+            {/* Tablets and computers: the new Home */}
+            <div className="hidden space-y-10 sm:space-y-12 md:block">
+              {/* Home: start work here (numbers line, greeting, ask the assistant, what needs doing), then ideas */}
+              <HomeFeed
+                store={store}
+                storeLink={liveStoreUrl}
+                ownerName={ownerName}
+                greeting={greetingTime}
+                shopClosed={shopClosed}
+                closedMessage={closedMsgDraft}
+                onClosedMessage={setClosedMsgDraft}
+                onSaveClosedMessage={saveClosedMessage}
+                onToggleShop={toggleShopOpen}
+                onAsk={askAssistant}
+                onNavigate={(page) => {
+                  setActiveTab(page);
+                  scrollDashTop({ top: 0 });
+                }}
+                onTour={() => dashTour.current?.()}
+                onStartTutorial={(t) => {
+                  setAssistantOpen(false);
+                  setTutorial(t);
+                }}
+              />
+              <Tour id="dashboard-overview" startRef={dashTour} steps={DASHBOARD_TOUR} />
+
+              {/* Platform banners (uploaded from the admin dashboard) */}
+              <div className="hero-rise" style={{ animationDelay: "480ms" }}>
+                <AnnouncementBanners onOpenTab={(tab) => setActiveTab(tab as DashTab)} />
+              </div>
+
+              {/* Setup checklist */}
+              {(() => {
+                const steps = SETUP_STEPS.map((st, i) => ({
+                  label: st.id === "products" ? `${st.title} (${Math.min(totalProducts, 5)}/5)` : st.title,
+                  done: isSetupStepDone(store, st.id),
+                  run: () => setSetupStart(i),
+                }));
+                const doneCount = steps.filter((st) => st.done).length;
+                const allDone = doneCount === steps.length;
+                if (allDone) return null;
+                return (
+                  <section className="hero-rise rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6" style={{ animationDelay: "600ms" }}>
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h2 className="text-sm font-semibold">{allDone ? "Your store is fully set up" : "Finish setting up your store"}</h2>
+                        <p className="mt-0.5 text-xs text-neutral-500">
+                          {allDone ? "Nice work. Keep adding products to grow." : "Stores that finish these steps get more orders."}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-semibold tabular-nums">
+                        {doneCount} of {steps.length}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-6 gap-1.5">
+                      {steps.map((st, i) => (
+                        <span
+                          key={st.label}
+                          className={`h-1.5 rounded-full transition-colors duration-500 ${i < doneCount ? "bg-emerald-500" : "bg-neutral-200"}`}
+                          style={{ transitionDelay: `${i * 60}ms` }}
+                        />
+                      ))}
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                      {steps.map((st) => (
+                        <button
+                          key={st.label}
+                          type="button"
+                          disabled={st.done}
+                          onClick={st.run}
+                          className="group flex items-center gap-3 py-2.5 border-b border-neutral-100 md:[&:nth-last-child(-n+2)]:border-b-0 last:border-b-0 text-left disabled:cursor-default"
+                        >
+                          {st.done ? (
+                            <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                              <Check className="w-3 h-3" strokeWidth={3} />
+                            </span>
+                          ) : (
+                            <span className="w-5 h-5 rounded-full border-2 border-neutral-300 shrink-0 transition-colors group-hover:border-neutral-900" />
+                          )}
+                          <span className={`flex-1 text-sm ${st.done ? "text-neutral-400 line-through decoration-neutral-300" : "font-medium text-neutral-900"}`}>
+                            {st.label}
+                          </span>
+                          {!st.done && (
+                            <ChevronRight className="w-4 h-4 text-neutral-300 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-neutral-700" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })()}
+
+              {/* Help, legal and social links */}
+              <div className="hero-rise" style={{ animationDelay: "680ms" }}>
+                <HelpAndMore storeName={store.name} />
+              </div>
+            </div>
+            </>
           )}
 
         {/* NOTIFICATIONS PAGE */}
@@ -2344,7 +2818,7 @@ function DashboardPageContent() {
                   <div className="flex flex-col sm:flex-row sm:items-end gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">{ownerName}</h2>
+                      <h2 className="text-lg font-semibold tracking-tight">{ownerName}</h2>
                       <span className="rounded-full bg-neutral-950 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
                         {currentPlan.name}
                       </span>
@@ -2476,10 +2950,10 @@ function DashboardPageContent() {
                 {/* Shortcuts */}
                 <section style={{ animationDelay: "220ms" }} className="hero-rise grid grid-cols-2 gap-3">
                   {[
-                    { label: "Store settings", icon: Settings, tab: "settings" as const, tone: "bg-neutral-100 text-neutral-700" },
-                    { label: "Themes", icon: Palette, tab: "themes" as const, tone: "bg-fuchsia-50 text-fuchsia-600" },
-                    { label: "Notifications", icon: Bell, tab: "notifications" as const, tone: "bg-indigo-50 text-indigo-600" },
-                    { label: "Subscription", icon: CreditCard, tab: "billing" as const, tone: "bg-amber-50 text-amber-600" },
+                    { label: "Store settings", icon: ISettings, tab: "settings" as const, tone: "bg-neutral-100 text-neutral-700" },
+                    { label: "Themes", icon: IThemes, tab: "themes" as const, tone: "bg-fuchsia-50 text-fuchsia-600" },
+                    { label: "Notifications", icon: INotifications, tab: "notifications" as const, tone: "bg-indigo-50 text-indigo-600" },
+                    { label: "Plan & billing", icon: ICard, tab: "billing" as const, tone: "bg-amber-50 text-amber-600" },
                   ].map(({ label, icon: Icon, tab, tone }) => (
                     <button
                       key={label}
@@ -2545,13 +3019,13 @@ function DashboardPageContent() {
                       setIsProductModalOpen(false);
                       resetProductForm();
                     }}
-                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-100 text-neutral-700 transition-colors cursor-pointer"
+                    className="-ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900 transition-colors cursor-pointer"
                     title="Back to Catalog"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <div>
-                    <h2 className="text-base font-bold text-neutral-900">
+                    <h2 className="text-base font-semibold tracking-tight text-neutral-900">
                       {editingProductId ? "Edit Product" : "Add Product"}
                     </h2>
                     <p className="text-xs text-neutral-500 mt-0.5">
@@ -2605,13 +3079,15 @@ function DashboardPageContent() {
                 <div className="lg:col-span-7 space-y-6">
                   {/* Card 1: Product Basics */}
                   <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-4">
-                    <h3 className="font-bold text-sm text-neutral-900 border-b border-neutral-100 pb-3">
-                      Basic Information
+                    <h3 className="flex items-center gap-2 border-b border-neutral-100 pb-3 text-sm font-semibold text-neutral-900">
+                      <SectionIcon section="products" icon={IProducts} size="sm" />
+                      Basic information
                     </h3>
 
                     <div>
                       <label className="font-bold block mb-1 text-xs text-neutral-800">Product Title *</label>
                       <Input
+                        data-tour="p-title"
                         placeholder="e.g. Vintage Washed Oversized Heavyweight Tee"
                         value={pTitle}
                         maxLength={120}
@@ -2647,14 +3123,16 @@ function DashboardPageContent() {
 
                   {/* Card 2: Pricing & Inventory */}
                   <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-4">
-                    <h3 className="font-bold text-sm text-neutral-900 border-b border-neutral-100 pb-3">
-                      Pricing & Stock
+                    <h3 className="flex items-center gap-2 border-b border-neutral-100 pb-3 text-sm font-semibold text-neutral-900">
+                      <SectionIcon section="reviews" icon={IRupee} size="sm" />
+                      Price & stock
                     </h3>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="font-bold block mb-1 text-xs text-neutral-800">Selling Price (₹) *</label>
                         <Input
+                          data-tour="p-price"
                           type="text"
                           inputMode="decimal"
                           placeholder="699"
@@ -2695,10 +3173,30 @@ function DashboardPageContent() {
                       </div>
                     </div>
 
+                    {store.gstin && (
+                      <div className="pt-2 border-t border-neutral-100">
+                        <label className="font-bold block mb-1 text-xs text-neutral-800">GST rate (for invoices)</label>
+                        <select
+                          value={pGst}
+                          onChange={(e) => setPGst(e.target.value)}
+                          className="h-10 w-full rounded-lg border border-neutral-200 bg-white px-3 text-xs outline-none focus:border-neutral-900 sm:max-w-xs"
+                        >
+                          <option value="">Use my default ({store.defaultGstRate ?? 18}%)</option>
+                          {GST_RATES.map((r) => (
+                            <option key={r} value={String(r)}>
+                              {r}%
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-neutral-400 mt-1">Your price already includes this GST; the invoice shows the split.</p>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-neutral-100">
                       <div>
                         <label className="font-bold block mb-1 text-xs text-neutral-800">Stock Quantity *</label>
                         <Input
+                          data-tour="p-stock"
                           type="text"
                           inputMode="numeric"
                           placeholder="25"
@@ -2727,13 +3225,14 @@ function DashboardPageContent() {
                 <div className="lg:col-span-5 space-y-6">
                   {/* Card 3: Media Upload */}
                   <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-4">
-                    <h3 className="font-bold text-sm text-neutral-900 border-b border-neutral-100 pb-3">
-                      Product Images
+                    <h3 className="flex items-center gap-2 border-b border-neutral-100 pb-3 text-sm font-semibold text-neutral-900">
+                      <SectionIcon section="themes" icon={IImage} size="sm" />
+                      Photos
                     </h3>
 
                     <div className="space-y-2">
                       <label className="font-bold block text-xs text-neutral-800">Product Image URL</label>
-                      <div className="flex gap-2">
+                      <div data-tour="p-photo" className="flex gap-2">
                         <Input
                           placeholder="Paste high-res image URL..."
                           value={pImageUrl}
@@ -2844,6 +3343,7 @@ function DashboardPageContent() {
                       Cancel
                     </Button>
                     <Button
+                      data-tour="p-save"
                       type="submit"
                       className="bg-[#111111] text-white hover:bg-black rounded-lg text-xs font-semibold px-6 py-2.5 cursor-pointer"
                     >
@@ -2863,15 +3363,32 @@ function DashboardPageContent() {
                   low: store.products.filter((p) => p.stock > 0 && p.stock <= LOW).length,
                   out: store.products.filter((p) => p.stock <= 0).length,
                 };
-                const q = productSearch.trim().toLowerCase();
-                const list = store.products.filter((p) => {
-                  const stockOk =
-                    productFilter === "all" ||
-                    (productFilter === "in" && p.stock > LOW) ||
-                    (productFilter === "low" && p.stock > 0 && p.stock <= LOW) ||
-                    (productFilter === "out" && p.stock <= 0);
-                  return stockOk && (!q || p.title.toLowerCase().includes(q) || p.category.toLowerCase().includes(q));
-                });
+                const words = productSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+                const productCats = Array.from(new Set(store.products.map((p) => p.category).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+                const list = store.products
+                  .filter((p) => {
+                    const stockOk =
+                      productFilter === "all" ||
+                      (productFilter === "in" && p.stock > LOW) ||
+                      (productFilter === "low" && p.stock > 0 && p.stock <= LOW) ||
+                      (productFilter === "out" && p.stock <= 0);
+                    if (!stockOk || (productCategory && p.category !== productCategory)) return false;
+                    // keywords: every word must appear in the name, category or description
+                    const hay = `${p.title} ${p.category} ${p.description || ""}`.toLowerCase();
+                    return words.every((w) => hay.includes(w));
+                  })
+                  .sort((a, b) =>
+                    productSort === "az"
+                      ? a.title.localeCompare(b.title)
+                      : productSort === "price-low"
+                        ? a.price - b.price
+                        : productSort === "price-high"
+                          ? b.price - a.price
+                          : productSort === "stock-low"
+                            ? a.stock - b.stock
+                            : String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
+                  );
+                const filtersOn = !!(productCategory || words.length || productFilter !== "all");
                 const startAdd = () => {
                   if (!productQuota.allowed) {
                     setActiveTab("billing");
@@ -2880,57 +3397,123 @@ function DashboardPageContent() {
                   resetProductForm();
                   setIsProductModalOpen(true);
                 };
+                const chips = [
+                  { id: "all" as const, label: "All" },
+                  { id: "in" as const, label: "In stock" },
+                  { id: "low" as const, label: "Low" },
+                  { id: "out" as const, label: "Sold out" },
+                ];
                 return (
                   <>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="m-stagger hidden grid-cols-2 gap-3 md:grid lg:grid-cols-4">
                       {[
-                        { id: "all" as const, label: "All products", dot: "bg-neutral-900" },
-                        { id: "in" as const, label: "In stock", dot: "bg-emerald-500" },
-                        { id: "low" as const, label: "Low stock", dot: "bg-amber-500" },
-                        { id: "out" as const, label: "Sold out", dot: "bg-rose-500" },
+                        { id: "all" as const, label: "All products", icon: IProducts, tile: "bg-neutral-100 text-neutral-900", on: "border-neutral-900 ring-2 ring-neutral-100", hint: `₹${Math.round(store.products.reduce((n, p) => n + p.price * Math.max(0, p.stock), 0) / 100).toLocaleString("en-IN")} in stock value` },
+                        { id: "in" as const, label: "In stock", icon: ICheck, tile: "bg-neutral-100 text-neutral-900", on: "border-neutral-900 ring-2 ring-neutral-100", hint: "Ready to sell" },
+                        { id: "low" as const, label: "Low stock", icon: IWarning, tile: "bg-neutral-100 text-neutral-900", on: "border-neutral-900 ring-2 ring-neutral-100", hint: counts.low ? "Restock soon" : "Nothing running low" },
+                        { id: "out" as const, label: "Sold out", icon: ISoldOut, tile: "bg-neutral-100 text-neutral-900", on: "border-neutral-900 ring-2 ring-neutral-100", hint: counts.out ? "Buyers can't order these" : "None sold out" },
                       ].map((f) => (
                         <button
                           key={f.id}
                           type="button"
                           onClick={() => setProductFilter(f.id)}
-                          className={`rounded-2xl border bg-white p-4 text-left transition-all ${
-                            productFilter === f.id ? "border-neutral-900 shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)]" : "border-neutral-200 hover:border-neutral-300"
+                          className={`group rounded-2xl border bg-white p-4 text-left transition-all duration-300 hover:-translate-y-0.5 ${
+                            productFilter === f.id ? f.on : "border-neutral-200 hover:border-neutral-300"
                           }`}
                         >
-                          <span className="flex items-center gap-2 text-xs text-neutral-500">
-                            <span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />
-                            {f.label}
-                          </span>
-                          <span className="mt-1.5 block text-2xl font-semibold tracking-tight tabular-nums">{counts[f.id]}</span>
+                          <f.icon className="h-5 w-5 text-neutral-900" />
+                          <span className="mt-3 block text-xs font-medium text-neutral-500">{f.label}</span>
+                          <span className="mt-0.5 block text-[1.45rem] font-semibold leading-tight tracking-tight tabular-nums">{counts[f.id]}</span>
+                          <span className="mt-0.5 block truncate text-xs text-neutral-500">{f.hint}</span>
                         </button>
                       ))}
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <label className="flex-1 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors">
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:gap-3">
+                      {/* search with one Filters button beside it */}
+                      <div className="col-span-2 flex min-w-0 flex-1 gap-2">
+                      <label className="flex min-w-0 flex-1 items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors">
                         <Search className="w-4 h-4 text-neutral-400 shrink-0" />
                         <input
                           value={productSearch}
                           onChange={(e) => setProductSearch(e.target.value)}
-                          placeholder="Search products or categories"
+                          placeholder="Search by name or keyword"
                           className="w-full bg-transparent text-sm outline-none"
                         />
+                        {productSearch && (
+                          <button type="button" onClick={() => setProductSearch("")} aria-label="Clear search" className="text-neutral-400 hover:text-neutral-900">
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
                       </label>
+                      <FilterMenu
+                        activeCount={(productFilter !== "all" ? 1 : 0) + (productCategory ? 1 : 0) + (productSort !== "new" ? 1 : 0)}
+                        onClear={() => {
+                          setProductFilter("all");
+                          setProductCategory("");
+                          setProductSort("new");
+                        }}
+                        sections={[
+                          {
+                            id: "stock",
+                            title: "Stock",
+                            value: productFilter,
+                            onChange: (v) => setProductFilter(v as typeof productFilter),
+                            options: [
+                              { value: "all", label: "All", count: counts.all },
+                              { value: "in", label: "In stock", count: counts.in },
+                              { value: "low", label: "Low stock", count: counts.low },
+                              { value: "out", label: "Sold out", count: counts.out },
+                            ],
+                          },
+                          ...(productCats.length
+                            ? [
+                                {
+                                  id: "category",
+                                  title: "Category",
+                                  kind: (productCats.length > 6 ? "list" : "chips") as "list" | "chips",
+                                  value: productCategory,
+                                  onChange: setProductCategory,
+                                  options: [
+                                    { value: "", label: "All" },
+                                    ...productCats.map((c) => ({ value: c, label: c, count: store.products.filter((p) => p.category === c).length })),
+                                  ],
+                                },
+                              ]
+                            : []),
+                          {
+                            id: "sort",
+                            title: "Sort by",
+                            kind: "list",
+                            value: productSort,
+                            onChange: (v) => setProductSort(v as typeof productSort),
+                            options: [
+                              { value: "new", label: "Newest first" },
+                              { value: "az", label: "Name A–Z" },
+                              { value: "price-low", label: "Price: low to high" },
+                              { value: "price-high", label: "Price: high to low" },
+                              { value: "stock-low", label: "Stock: lowest first" },
+                            ],
+                          },
+                        ]}
+                      />
+                      </div>
                       <button
                         type="button"
                         onClick={startAdd}
-                        className="h-11 px-5 rounded-xl bg-neutral-950 text-white text-sm font-semibold inline-flex items-center justify-center gap-2 hover:bg-black transition-colors"
+                        className="h-11 px-4 sm:px-5 rounded-xl bg-neutral-950 text-white text-sm font-semibold inline-flex items-center justify-center gap-2 hover:bg-black transition-colors"
                       >
                         <Plus className="w-4 h-4" />
                         Add product
                       </button>
                       <button
                         type="button"
-                        onClick={() => (productQuota.allowed ? setBulkOpen(true) : setActiveTab("billing"))}
-                        className="h-11 px-5 rounded-xl border border-neutral-300 bg-white text-sm font-semibold inline-flex items-center justify-center gap-2 hover:border-neutral-900 transition-colors"
+                        onClick={() => (!planHas(store.planId, "bulkUpload") ? openSettings("billing") : productQuota.allowed ? setBulkOpen(true) : setActiveTab("billing"))}
+                        title={planHas(store.planId, "bulkUpload") ? undefined : "Bulk upload is part of Growth"}
+                        className="h-11 px-4 sm:px-5 rounded-xl border border-neutral-300 bg-white text-sm font-semibold inline-flex items-center justify-center gap-2 hover:border-neutral-900 transition-colors"
                       >
                         <Upload className="w-4 h-4" />
                         Bulk upload
+                        {!planHas(store.planId, "bulkUpload") && <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-500">Growth</span>}
                       </button>
                     </div>
                     {bulkOpen && (
@@ -2950,29 +3533,47 @@ function DashboardPageContent() {
                         <button type="button" onClick={() => setBulkNote("")} className="ml-auto text-emerald-700" aria-label="Dismiss"><X className="w-4 h-4" /></button>
                       </p>
                     )}
-                    <p className="-mt-2 text-xs text-neutral-500">
-                      {currentPlan.maxProducts >= 9999
-                        ? `${totalProducts} products · unlimited on your plan`
-                        : `${totalProducts} of ${currentPlan.maxProducts} product slots used`}
+                    <p className="-mt-2 flex flex-wrap items-center gap-x-2 text-xs text-neutral-500">
+                      {filtersOn && <span className="font-medium text-neutral-800">Showing {list.length} of {store.products.length}</span>}
+                      {filtersOn && <span>·</span>}
+                      <span>
+                        {currentPlan.maxProducts >= 9999
+                          ? `${totalProducts} products · unlimited on your plan`
+                          : `${totalProducts} of ${currentPlan.maxProducts} product slots used`}
+                      </span>
+                      {filtersOn && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProductSearch("");
+                            setProductCategory("");
+                            setProductFilter("all");
+                            setProductSort("new");
+                          }}
+                          className="font-semibold text-neutral-900 underline underline-offset-2"
+                        >
+                          Clear filters
+                        </button>
+                      )}
                     </p>
 
                     {list.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-neutral-300 bg-white px-6 py-14 text-center">
-                        <span className="mx-auto w-12 h-12 rounded-2xl bg-neutral-100 text-neutral-500 flex items-center justify-center">
-                          <Package className="w-5 h-5" />
-                        </span>
-                        <p className="mt-3 text-sm font-semibold">{store.products.length ? "No products match" : "No products yet"}</p>
-                        <p className="mt-1 text-xs text-neutral-500">
-                          {store.products.length ? "Try a different search or filter." : "Add your first product to start selling."}
-                        </p>
-                        {!store.products.length && (
-                          <button type="button" onClick={startAdd} className="mt-4 h-10 px-5 rounded-xl bg-neutral-950 text-white text-sm font-semibold">
-                            Add product
-                          </button>
-                        )}
-                      </div>
+                      store.products.length ? (
+                        <div className="rounded-2xl border border-dashed border-neutral-300 bg-white px-6 py-10 text-center text-sm text-neutral-500">
+                          No products match. Try a different search or filter.
+                        </div>
+                      ) : (
+                        <EmptyState
+                          section="products"
+                          icon={IProducts}
+                          title="Add your first product"
+                          text="A good photo, a clear name and a price is all it takes. You can add sizes, MRP and stock too, or upload many products at once from a spreadsheet."
+                          action={{ label: "Add product", onClick: startAdd, icon: Plus }}
+                          secondary={{ label: "Bulk upload", onClick: () => (productQuota.allowed ? setBulkOpen(true) : setActiveTab("billing")) }}
+                        />
+                      )
                     ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                         {list.map((prod, idx) => {
                           const stock =
                             prod.stock <= 0
@@ -2983,9 +3584,9 @@ function DashboardPageContent() {
                           return (
                             <div
                               key={prod.id}
-                              className={`group flex flex-col rounded-2xl border border-neutral-200 bg-white overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-24px_rgba(0,0,0,0.35)] animate-enter-slide-up stagger-${(idx % 6) + 1}`}
+                              className={`group flex flex-col rounded-xl border border-neutral-200 bg-white overflow-hidden transition-all duration-300 hover:border-neutral-300 hover:shadow-[0_14px_30px_-22px_rgba(0,0,0,0.35)] animate-enter-slide-up stagger-${(idx % 6) + 1}`}
                             >
-                              <div className="relative aspect-square bg-neutral-100 overflow-hidden">
+                              <div className="relative aspect-[4/3] bg-neutral-100 overflow-hidden">
                                 {prod.images[0] ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
@@ -3005,22 +3606,22 @@ function DashboardPageContent() {
                                   </span>
                                 )}
                               </div>
-                              <div className="flex-1 flex flex-col p-3">
+                              <div className="flex-1 flex flex-col p-2.5">
                                 <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 truncate">{prod.category}</span>
-                                <h4 className="mt-0.5 text-sm font-semibold leading-snug line-clamp-2">{prod.title}</h4>
-                                <span className="mt-1 flex items-baseline gap-1.5">
-                                  <span className="text-sm font-semibold">₹{(prod.price / 100).toLocaleString("en-IN")}</span>
+                                <h4 className="mt-0.5 text-[13px] font-semibold leading-snug truncate" title={prod.title}>{prod.title}</h4>
+                                <span className="mt-0.5 flex items-baseline gap-1.5">
+                                  <span className="text-[13px] font-semibold">₹{(prod.price / 100).toLocaleString("en-IN")}</span>
                                   {prod.compareAtPrice && prod.compareAtPrice > prod.price && (
                                     <span className="text-[11px] text-neutral-400 line-through">
                                       ₹{(prod.compareAtPrice / 100).toLocaleString("en-IN")}
                                     </span>
                                   )}
                                 </span>
-                                <div className="mt-auto pt-3 flex items-center gap-1.5">
+                                <div className="mt-auto pt-2.5 flex items-center gap-1.5">
                                   <button
                                     type="button"
                                     onClick={() => openEditProduct(prod)}
-                                    className="flex-1 h-9 rounded-[10px] bg-neutral-950 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-black transition-colors"
+                                    className="flex-1 h-8 rounded-[9px] bg-neutral-950 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-black transition-colors"
                                   >
                                     <Edit className="w-3.5 h-3.5" />
                                     Edit
@@ -3029,7 +3630,7 @@ function DashboardPageContent() {
                                     href={getStoreUrl(store.subdomain, `/products/${prod.slug}`)}
                                     target="_blank"
                                     aria-label={`View ${prod.title} in your store`}
-                                    className="w-9 h-9 shrink-0 rounded-[10px] border border-neutral-200 flex items-center justify-center text-neutral-600 hover:border-neutral-900 hover:text-black transition-colors"
+                                    className="w-8 h-8 shrink-0 rounded-[9px] border border-neutral-200 flex items-center justify-center text-neutral-600 hover:border-neutral-900 hover:text-black transition-colors"
                                   >
                                     <ExternalLink className="w-3.5 h-3.5" />
                                   </Link>
@@ -3042,7 +3643,7 @@ function DashboardPageContent() {
                                         refreshStore();
                                       }
                                     }}
-                                    className="w-9 h-9 shrink-0 rounded-[10px] border border-neutral-200 flex items-center justify-center text-neutral-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                    className="w-8 h-8 shrink-0 rounded-[9px] border border-neutral-200 flex items-center justify-center text-neutral-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition-colors"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -3070,12 +3671,12 @@ function DashboardPageContent() {
                   type="button"
                   onClick={closeCategoryEditor}
                   aria-label="Back"
-                  className="w-10 h-10 shrink-0 rounded-[12px] border border-neutral-200 bg-white flex items-center justify-center text-neutral-700 hover:border-neutral-900 hover:text-black transition-colors"
+                  className="-ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900 transition-colors cursor-pointer"
                 >
-                  <ArrowLeft className="w-[18px] h-[18px]" />
+                  <ArrowLeft className="h-4 w-4" />
                 </button>
                 <div className="min-w-0 flex-1">
-                  <h1 className="truncate text-[1.4rem] sm:text-[1.6rem] font-semibold tracking-tight leading-tight">
+                  <h1 className="truncate text-base sm:text-lg font-semibold tracking-tight leading-tight">
                     {editingCategoryId ? (cIsParent ? "Edit collection" : "Edit category") : cIsParent ? "New collection" : "New category"}
                   </h1>
                   <p className="truncate text-xs sm:text-sm text-neutral-500">
@@ -3288,8 +3889,7 @@ function DashboardPageContent() {
                     Banner for the category page <span className="font-normal text-neutral-400">(optional)</span>
                   </span>
                   <p className="mt-1 text-xs text-neutral-500">
-                    Your theme shows a wide photo across the top of this category&apos;s page. Without one, the picture above is used and cropped to fit.
-                  </p>
+             Your theme shows a wide photo across the top of this category&apos;s page.</p>
                   <div className="mt-3 aspect-[3/1] w-full overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 flex items-center justify-center">
                     {cBannerUrl || cImageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -3373,7 +3973,25 @@ function DashboardPageContent() {
               </div>
             </form>
           ) : (
-            <div className="mt-6 space-y-6 animate-enter-blur">
+            <div className="space-y-6 animate-enter-blur">
+              {(() => {
+                const cats = (store.categories || []).filter((c) => !c.isParent);
+                const counted = (name: string) => store.products.filter((p) => p.category === name).length;
+                const empty = cats.filter((c) => counted(c.name) === 0).length;
+                const biggest = [...cats].sort((x, y) => counted(y.name) - counted(x.name))[0];
+                const sorted = store.products.filter((p) => cats.some((c) => c.name === p.category)).length;
+                return (
+                  <StatStrip
+                    stats={[
+                      { label: "Categories", value: cats.length, icon: ICategories, section: "categories", hint: `${cats.filter((c) => c.isActive).length} showing on your store` },
+                      { label: "Collections", value: (store.categories || []).filter((c) => c.isParent).length, icon: ICollections, section: "themes", hint: "Groups on your home page" },
+                      { label: "Products sorted", value: `${store.products.length ? Math.round((sorted / store.products.length) * 100) : 0}%`, icon: IProducts, section: "products", progress: store.products.length ? sorted / store.products.length : 0 },
+                      { label: "Biggest category", value: biggest ? biggest.name : "—", icon: IStar, section: "reviews", hint: biggest ? `${counted(biggest.name)} products · ${empty} empty` : "Add one to start" },
+                    ]}
+                  />
+                );
+              })()}
+
               {/* Sub-navigation & add */}
               <div className="flex items-center gap-2">
                 <div className="grid flex-1 grid-cols-2 gap-1 rounded-2xl bg-neutral-100 p-1 sm:max-w-sm">
@@ -3422,23 +4040,13 @@ function DashboardPageContent() {
                   )}
 
                   {(store.categories || []).filter((c) => !c.isParent).length === 0 ? (
-                    <div className="rounded-2xl border border-neutral-200 bg-white px-6 py-12 text-center">
-                      <span className="mx-auto w-14 h-14 rounded-2xl bg-neutral-100 flex items-center justify-center">
-                        <FolderTree className="w-6 h-6 text-neutral-500" />
-                      </span>
-                      <p className="mt-4 text-base font-semibold">No categories yet</p>
-                      <p className="mt-1 text-sm text-neutral-500 max-w-xs mx-auto">Group your products so buyers can find them faster.</p>
-                      <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={openAddCategory}
-                          className="h-11 px-5 rounded-xl bg-neutral-950 text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-black"
-                        >
-                          <Plus className="w-4 h-4" />
-                          Add category
-                        </button>
-                      </div>
-                    </div>
+                    <EmptyState
+                      section="categories"
+                      icon={ICategories}
+                      title="Sort your products into categories"
+                      text="Categories like Sarees, Kurtis or Earrings help buyers find things fast, and each one gets its own page on your store."
+                      action={{ label: "Add category", onClick: openAddCategory, icon: Plus }}
+                    />
                   ) : (
                     <div className="rounded-2xl border border-neutral-200 bg-white divide-y divide-neutral-100">
                       {(() => {
@@ -3577,21 +4185,13 @@ function DashboardPageContent() {
                     const cols = (store.categories || []).filter((c) => c.isParent);
                     if (cols.length === 0) {
                       return (
-                        <div className="rounded-2xl border border-neutral-200 bg-white px-6 py-12 text-center">
-                          <span className="mx-auto w-14 h-14 rounded-2xl bg-neutral-100 flex items-center justify-center">
-                            <Layers className="w-6 h-6 text-neutral-500" />
-                          </span>
-                          <p className="mt-4 text-base font-semibold">No collections yet</p>
-                          <p className="mt-1 text-sm text-neutral-500 max-w-xs mx-auto">Group categories, like Men or Women, to show them together on your home page.</p>
-                          <button
-                            type="button"
-                            onClick={openAddParentCollection}
-                            className="mt-6 h-11 px-5 rounded-xl bg-neutral-950 text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-black"
-                          >
-                            <Plus className="w-4 h-4" />
-                            Add collection
-                          </button>
-                        </div>
+                        <EmptyState
+                          section="themes"
+                          icon={ICollections}
+                          title="Group categories into collections"
+                          text="A collection, like Men or Festive wear, shows several categories together on your home page, so buyers browse the way they think."
+                          action={{ label: "Add collection", onClick: openAddParentCollection, icon: Plus }}
+                        />
                       );
                     }
                     return (
@@ -3744,7 +4344,7 @@ function DashboardPageContent() {
                     type="button"
                     onClick={() => setSelectedOrder(null)}
                     aria-label="Back to orders"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-800 hover:border-neutral-900"
+                    className="-ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900 transition-colors cursor-pointer"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
@@ -3759,14 +4359,14 @@ function DashboardPageContent() {
                 <div className="flex flex-wrap gap-1.5">
                   {pill(STATUS[o.fulfilmentStatus])}
                   {pill(PAYMENT[o.paymentStatus])}
-                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-neutral-600">{o.paymentMethod === "cashfree" ? "online" : o.paymentMethod}</span>
+                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-neutral-600">{o.paymentMethod === "cashfree" || o.paymentMethod === "razorpay" ? "online" : o.paymentMethod}</span>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
                   <div className="min-w-0 space-y-4 lg:col-span-7">
                     {/* Progress */}
                     <div className={card}>
-                      <h3 className="text-sm font-semibold">Progress</h3>
+                      <h3 className="flex items-center gap-2 text-sm font-semibold"><SectionIcon section="orders" icon={IActivity} size="sm" />Progress</h3>
                       <p className="mt-0.5 text-xs text-neutral-500">Tap a step to update the buyer&apos;s tracking page.</p>
                       <div className="mt-4 grid grid-cols-4 gap-1">
                         {steps.map((s, i) => {
@@ -3802,7 +4402,7 @@ function DashboardPageContent() {
 
                     {/* Items */}
                     <div className={card}>
-                      <h3 className="text-sm font-semibold">Items ({itemCount(o)})</h3>
+                      <h3 className="flex items-center gap-2 text-sm font-semibold"><SectionIcon section="themes" icon={IProducts} size="sm" />Items ({itemCount(o)})</h3>
                       <ul className="mt-2 divide-y divide-neutral-100">
                         {o.items.map((item, idx) => (
                           <li key={idx} className="flex items-center gap-3 py-3">
@@ -3838,13 +4438,58 @@ function DashboardPageContent() {
                         </div>
                       </dl>
                     </div>
+
+                    {/* Shipping: courier, Shiprocket, WhatsApp updates and invoice sit in the wide column */}
+                    {/* Tracking */}
+                    <div className={card}>
+                      <h3 className="flex items-center gap-2 text-sm font-semibold"><SectionIcon section="products" icon={ITruck} size="sm" />Courier & tracking</h3>
+                      <div className="mt-3 space-y-2">
+                        <Input
+                          placeholder="Courier (e.g. Delhivery)"
+                          value={courierNameInput}
+                          onChange={(e) => setCourierNameInput(e.target.value)}
+                          className="h-10 rounded-xl text-sm"
+                        />
+                        <Input
+                          placeholder="Tracking (AWB) number"
+                          value={trackingNumberInput}
+                          onChange={(e) => setTrackingNumberInput(e.target.value)}
+                          className="h-10 rounded-xl font-mono text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateOrderStatus(o.id, toShipStatus(o.fulfilmentStatus))}
+                          className="h-10 w-full rounded-xl border border-neutral-200 text-sm font-semibold hover:border-neutral-900"
+                        >
+                          {toShipStatus(o.fulfilmentStatus) === "shipped" && o.fulfilmentStatus !== "shipped" ? "Save and mark shipped" : "Save tracking"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Plugins on the order: Shiprocket, WhatsApp updates, invoice */}
+                    <ShiprocketShip
+                      store={store}
+                      order={o}
+                      onUpdated={(next) => {
+                        setSelectedOrder(next);
+                        setCourierNameInput(next.courierName || "");
+                        setTrackingNumberInput(next.trackingNumber || "");
+                      }}
+                      onOpenPlugin={() => {
+                        setActiveTab("plugins");
+                        setPluginView("shiprocket");
+                        scrollDashTop({ top: 0 });
+                      }}
+                    />
+                    <WhatsAppUpdates store={store} order={o} />
+                    <InvoiceButton store={store} order={o} />
                   </div>
 
                   <div className="min-w-0 space-y-4 lg:col-span-5">
                     <OrderActions store={store} order={o} onChange={(next) => (setSelectedOrder(next), refreshStore())} />
                     {/* Customer */}
                     <div className={card}>
-                      <h3 className="text-sm font-semibold">Customer</h3>
+                      <h3 className="flex items-center gap-2 text-sm font-semibold"><SectionIcon section="customers" icon={ICustomers} size="sm" />Customer</h3>
                       <div className="mt-3 flex items-center gap-3">
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-sm font-semibold uppercase text-neutral-700">
                           {o.customer.name.charAt(0) || "?"}
@@ -3882,17 +4527,17 @@ function DashboardPageContent() {
                     {/* Payment */}
                     <div className={card}>
                       <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-semibold">Payment</h3>
+                        <h3 className="flex items-center gap-2 text-sm font-semibold"><SectionIcon section="reviews" icon={ICard} size="sm" />Payment</h3>
                         {pill(PAYMENT[o.paymentStatus])}
                       </div>
                       <dl className="mt-3 space-y-1.5 text-sm">
                         <div className="flex justify-between gap-3">
                           <dt className="text-neutral-500">Method</dt>
-                          <dd className="font-medium">{o.paymentMethod === "cashfree" ? "Online (Cashfree)" : o.paymentMethod === "upi" ? "UPI" : o.paymentMethod === "cod" ? "Cash on delivery" : "Bank transfer"}</dd>
+                          <dd className="font-medium">{o.paymentMethod === "cashfree" ? "Online (Cashfree)" : o.paymentMethod === "razorpay" ? "Online (Razorpay)" : o.paymentMethod === "upi" ? "UPI" : o.paymentMethod === "cod" ? "Cash on delivery" : "Bank transfer"}</dd>
                         </div>
                         {o.paymentMethod !== "cod" && (
                           <div className="flex justify-between gap-3">
-                            <dt className="shrink-0 text-neutral-500">{o.paymentMethod === "cashfree" ? "Cashfree payment ID" : "UTR / Ref"}</dt>
+                            <dt className="shrink-0 text-neutral-500">{o.paymentMethod === "cashfree" ? "Cashfree payment ID" : o.paymentMethod === "razorpay" ? "Razorpay payment ID" : "UTR / Ref"}</dt>
                             <dd className="min-w-0 truncate font-mono text-xs leading-5">{o.paymentUtr || "Not shared yet"}</dd>
                           </div>
                         )}
@@ -3908,31 +4553,6 @@ function DashboardPageContent() {
                       )}
                     </div>
 
-                    {/* Tracking */}
-                    <div className={card}>
-                      <h3 className="text-sm font-semibold">Courier & tracking</h3>
-                      <div className="mt-3 space-y-2">
-                        <Input
-                          placeholder="Courier (e.g. Delhivery)"
-                          value={courierNameInput}
-                          onChange={(e) => setCourierNameInput(e.target.value)}
-                          className="h-10 rounded-xl text-sm"
-                        />
-                        <Input
-                          placeholder="Tracking (AWB) number"
-                          value={trackingNumberInput}
-                          onChange={(e) => setTrackingNumberInput(e.target.value)}
-                          className="h-10 rounded-xl font-mono text-sm"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateOrderStatus(o.id, toShipStatus(o.fulfilmentStatus))}
-                          className="h-10 w-full rounded-xl border border-neutral-200 text-sm font-semibold hover:border-neutral-900"
-                        >
-                          {toShipStatus(o.fulfilmentStatus) === "shipped" && o.fulfilmentStatus !== "shipped" ? "Save and mark shipped" : "Save tracking"}
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -3945,6 +4565,7 @@ function DashboardPageContent() {
             { id: "toship" as const, label: "To ship", count: store.orders.filter(toShip).length },
             { id: "shipped" as const, label: "Shipped", count: store.orders.filter((x) => x.fulfilmentStatus === "shipped").length },
             { id: "delivered" as const, label: "Delivered", count: store.orders.filter((x) => x.fulfilmentStatus === "delivered").length },
+            { id: "abandoned" as const, label: "Abandoned", count: abandonedCount },
           ];
           const list = [...store.orders]
             .filter(
@@ -3958,15 +4579,44 @@ function DashboardPageContent() {
 
           return (
             <div className="w-full min-w-0 space-y-4">
-              <div>
-                <h2 className="text-xl font-semibold tracking-tight">Orders</h2>
-                <p className="text-xs text-neutral-500">
-                  {filters[1].count > 0 ? `${filters[1].count} waiting to ship` : store.orders.length ? "Everything is shipped" : "Your orders will appear here"}
-                </p>
+
+              {store.orders.length > 0 && (() => {
+                const os = store.orders.filter((x) => x.fulfilmentStatus !== "cancelled");
+                const sales = os.reduce((n, x) => n + x.total, 0);
+                const online = os.filter((x) => x.paymentMethod === "razorpay" || x.paymentMethod === "cashfree").length;
+                return (
+                  <StatStrip
+                    phone={0}
+                    stats={[
+                      { label: "Sales", value: `₹${Math.round(sales / 100).toLocaleString("en-IN")}`, icon: IRupee, section: "orders", spark: dailyCounts(os, (x) => x.createdAt, 14, (x) => x.total), hint: "last 14 days in the chart" },
+                      { label: "To ship", value: filters[1].count ?? 0, icon: ITruck, section: "reviews", hint: (filters[1].count ?? 0) ? "Pack these next" : "All caught up" },
+                      { label: "Average order", value: `₹${os.length ? Math.round(sales / os.length / 100).toLocaleString("en-IN") : 0}`, icon: IOrders, section: "products" },
+                      { label: "Paid online", value: `${os.length ? Math.round((online / os.length) * 100) : 0}%`, icon: ICard, section: "customers", progress: os.length ? online / os.length : 0 },
+                    ]}
+                  />
+                );
+              })()}
+
+              {/* phones: four tabs on one line (label and count side by side); abandoned checkouts sit in the page header */}
+              <div className="grid grid-cols-4 gap-1 rounded-xl bg-neutral-100 p-1 md:hidden">
+                {filters.slice(0, 4).map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setOrderFilter(f.id)}
+                    aria-pressed={orderFilter === f.id}
+                    className={`flex h-9 min-w-0 items-center justify-center gap-1 rounded-lg px-1 text-[12.5px] font-medium transition-all !min-h-0 ${
+                      orderFilter === f.id ? "bg-white text-neutral-950 shadow-sm" : "text-neutral-500"
+                    }`}
+                  >
+                    <span className="truncate">{f.label}</span>
+                    <span className={`shrink-0 tabular-nums ${orderFilter === f.id ? "text-neutral-400" : "text-neutral-400"}`}>{f.count ?? ""}</span>
+                  </button>
+                ))}
               </div>
 
-              {/* Filter: four equal segments, always fits the screen */}
-              <div className="grid grid-cols-4 gap-1 rounded-2xl bg-neutral-100 p-1">
+              {/* Filter: equal segments, always fits the screen */}
+              <div className="hidden grid-cols-5 gap-1 rounded-2xl bg-neutral-100 p-1 md:grid">
                 {filters.map((f) => (
                   <button
                     key={f.id}
@@ -3977,20 +4627,36 @@ function DashboardPageContent() {
                       orderFilter === f.id ? "bg-white text-neutral-950 shadow-sm" : "text-neutral-500 hover:text-neutral-800"
                     }`}
                   >
-                    <span className="text-base font-semibold tabular-nums leading-tight">{f.count}</span>
+                    <span className="text-base font-semibold tabular-nums leading-tight">{f.count ?? "–"}</span>
                     <span className="w-full truncate text-center text-[11px]">{f.label}</span>
                   </button>
                 ))}
               </div>
 
-              {store.orders.length === 0 ? (
+              {orderFilter === "abandoned" ? (
+                <div key="abandoned" className="swap-enter">
+                  {planHas(store.planId, "abandonedCart") ? (
+                    <AbandonedCheckouts store={store} onCount={setAbandonedCount} />
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+                      <div className="min-w-0">
+                        <p className="text-base font-semibold">Win back unfinished checkouts</p>
+                        <p className="mt-0.5 text-sm text-neutral-500">See who left before paying and remind them on WhatsApp. Part of Growth.</p>
+                      </div>
+                      <button type="button" onClick={() => openSettings("billing")} className="h-10 shrink-0 rounded-xl bg-neutral-950 px-4 text-sm font-semibold text-white hover:bg-black">
+                        Try Growth free
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : store.orders.length === 0 ? (
                 <div className="rounded-2xl border border-neutral-200 bg-white px-5 py-12 text-center">
                   <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-700">
                     <ShoppingBag className="h-6 w-6" />
                   </span>
                   <p className="mt-4 text-base font-semibold">No orders yet</p>
                   <p className="mx-auto mt-1 max-w-sm text-sm text-neutral-500">
-                    Share your store link with buyers. New orders show up here the moment they&apos;re placed.
+                    Share your store link with buyers.
                   </p>
                   <div className="mt-5 grid grid-cols-1 gap-2 sm:mx-auto sm:max-w-sm sm:grid-cols-2">
                     <button
@@ -4042,7 +4708,7 @@ function DashboardPageContent() {
                         </span>
                         <span className="flex shrink-0 flex-col items-end">
                           <span className="text-sm font-semibold tabular-nums">{rupees(order.total)}</span>
-                          <span className="text-[10px] font-semibold uppercase text-neutral-400">{order.paymentMethod === "cashfree" ? "online" : order.paymentMethod}</span>
+                          <span className="text-[10px] font-semibold uppercase text-neutral-400">{order.paymentMethod === "cashfree" || order.paymentMethod === "razorpay" ? "online" : order.paymentMethod}</span>
                         </span>
                         <ChevronRight className="h-4 w-4 shrink-0 text-neutral-300" />
                       </button>
@@ -4093,18 +4759,17 @@ function DashboardPageContent() {
                   <button
                     type="button"
                     onClick={() => setIsDiscountModalOpen(false)}
-                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-100 text-neutral-700 transition-colors cursor-pointer"
+                    className="-ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900 transition-colors cursor-pointer"
                     title="Back to Discounts"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <div>
-                    <h2 className="text-base font-bold text-neutral-900">
+                    <h2 className="text-base font-semibold tracking-tight text-neutral-900">
                       Create Discount Coupon
                     </h2>
                     <p className="text-xs text-neutral-500 mt-0.5">
-                      Promotional codes entered by buyers at checkout to deduct percentage or flat discounts
-                    </p>
+                      Promotional codes entered by buyers at checkout to deduct percentage or flat discounts       </p>
                   </div>
                 </div>
 
@@ -4133,7 +4798,7 @@ function DashboardPageContent() {
               <form onSubmit={handleCreateDiscount} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <div className="lg:col-span-7 space-y-6">
                   <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-4 text-xs">
-                    <h3 className="font-bold text-sm text-neutral-900 border-b border-neutral-100 pb-3">Coupon Parameters</h3>
+                    <h3 className="flex items-center gap-2 border-b border-neutral-100 pb-3 text-sm font-semibold text-neutral-900"><SectionIcon section="discounts" icon={IDiscounts} size="sm" /> Coupon details</h3>
 
                     <div>
                       <label className="font-bold block mb-1">Coupon Code *</label>
@@ -4145,8 +4810,7 @@ function DashboardPageContent() {
                         required
                       />
                       <p className="text-[11px] text-neutral-500 mt-1">
-                        Code typed by buyers at checkout to unlock savings.
-                      </p>
+        Code typed by buyers at checkout to unlock savings.</p>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -4223,7 +4887,7 @@ function DashboardPageContent() {
                 <div className="lg:col-span-5 space-y-6">
                   {/* Live Coupon Badge Preview */}
                   <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-4 text-xs">
-                    <h3 className="font-bold text-sm text-neutral-900 border-b border-neutral-100 pb-3">Checkout Badge Preview</h3>
+                    <h3 className="flex items-center gap-2 border-b border-neutral-100 pb-3 text-sm font-semibold text-neutral-900"><SectionIcon section="customers" icon={IEye} size="sm" /> What buyers will see</h3>
                     <p className="text-neutral-500 text-[11px]">How buyers will see this discount tag at checkout:</p>
 
                     <div className="p-5 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/50 space-y-3">
@@ -4268,29 +4932,26 @@ function DashboardPageContent() {
                 };
                 return (
                   <>
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { label: "Active", value: all.filter((d) => d.isActive).length, dot: "bg-emerald-500" },
-                        { label: "Paused", value: all.filter((d) => !d.isActive).length, dot: "bg-neutral-400" },
-                        { label: "Times used", value: all.reduce((n, d) => n + (d.timesUsed || 0), 0), dot: "bg-amber-500" },
-                      ].map((t) => (
-                        <div key={t.label} className="rounded-2xl border border-neutral-200 bg-white p-4">
-                          <span className="flex items-center gap-2 text-xs text-neutral-500">
-                            <span className={`w-1.5 h-1.5 rounded-full ${t.dot}`} />
-                            {t.label}
-                          </span>
-                          <span className="mt-1.5 block text-2xl font-semibold tracking-tight tabular-nums">{t.value}</span>
-                        </div>
-                      ))}
-                    </div>
+                    <StatStrip
+                      stats={[
+                        { label: "Active coupons", value: all.filter((d) => d.isActive).length, icon: IDiscounts, section: "discounts", hint: `${all.filter((d) => !d.isActive).length} paused` },
+                        { label: "Times used", value: all.reduce((n, d) => n + (d.timesUsed || 0), 0), icon: ITrend, section: "orders" },
+                        {
+                          label: "Most used",
+                          value: [...all].sort((x, y) => (y.timesUsed || 0) - (x.timesUsed || 0))[0]?.code || "—",
+                          icon: Sparkles,
+                          section: "reviews",
+                          hint: all.length ? `${[...all].sort((x, y) => (y.timesUsed || 0) - (x.timesUsed || 0))[0]?.timesUsed || 0} uses` : "No coupons yet",
+                        },
+                        { label: "Orders with a coupon", value: `${store.orders.length ? Math.round((store.orders.filter((o) => (o.discount || 0) > 0).length / store.orders.length) * 100) : 0}%`, icon: IPercent, section: "customers", progress: store.orders.length ? store.orders.filter((o) => (o.discount || 0) > 0).length / store.orders.length : 0 },
+                      ]}
+                    />
 
                     {all.length === 0 ? (
-                      <div className="rounded-2xl border border-neutral-200 bg-white px-6 py-12 text-center">
-                        <span className="mx-auto w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                          <Percent className="w-6 h-6" />
-                        </span>
-                        <p className="mt-4 text-base font-semibold">Create your first coupon</p>
-                        <p className="mt-1 text-sm text-neutral-500 max-w-sm mx-auto">Pick a ready-made one or make your own. Buyers enter the code at checkout.</p>
+                      <div className="hero-rise rounded-[24px] border border-dashed border-neutral-200 bg-white px-6 py-10 text-center">
+                        <Illustration section="discounts" icon={IPercent} />
+                        <p className="mt-4 text-lg font-semibold tracking-tight">Turn visitors into buyers with a coupon</p>
+                        <p className="mt-1 text-sm text-neutral-500 max-w-md mx-auto">A small discount is often the nudge someone needs.</p>
                         <div className="mt-6 grid gap-3 sm:grid-cols-2 max-w-lg mx-auto text-left">
                           {[
                             { code: "WELCOME10", line: "10% off orders over ₹500", type: "percentage" as const, value: "10", min: "500" },
@@ -4300,16 +4961,16 @@ function DashboardPageContent() {
                               key={p.code}
                               type="button"
                               onClick={() => openNew(p)}
-                              className="group flex items-center gap-3 rounded-2xl border border-dashed border-amber-300 bg-amber-50/50 p-3 hover:bg-amber-50 transition-colors"
+                              className="group flex items-center gap-3 rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-3 hover:bg-neutral-100 transition-colors"
                             >
-                              <span className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
+                              <span className="w-10 h-10 rounded-xl bg-neutral-950 text-white flex items-center justify-center shrink-0">
                                 <Tag className="w-4 h-4" />
                               </span>
                               <span className="min-w-0 flex-1">
                                 <span className="block font-mono text-sm font-bold tracking-wider">{p.code}</span>
                                 <span className="block text-xs text-neutral-600">{p.line}</span>
                               </span>
-                              <Plus className="w-4 h-4 text-amber-700 transition-transform group-hover:rotate-90" />
+                              <Plus className="w-4 h-4 text-neutral-700 transition-transform group-hover:rotate-90" />
                             </button>
                           ))}
                         </div>
@@ -4322,6 +4983,7 @@ function DashboardPageContent() {
                         <div className="flex justify-end">
                           <button
                             type="button"
+                            data-tour="add-coupon"
                             onClick={() => openNew()}
                             className="h-11 px-5 rounded-xl bg-neutral-950 text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-black"
                           >
@@ -4336,7 +4998,7 @@ function DashboardPageContent() {
                               className={`relative flex overflow-hidden rounded-2xl border bg-white transition-opacity ${discount.isActive ? "border-neutral-200" : "border-neutral-200 opacity-70"}`}
                             >
                               {/* value stub */}
-                              <div className={`w-28 shrink-0 flex flex-col items-center justify-center text-center px-2 py-4 ${discount.isActive ? "bg-amber-500 text-white" : "bg-neutral-200 text-neutral-600"}`}>
+                              <div className={`w-28 shrink-0 flex flex-col items-center justify-center text-center px-2 py-4 ${discount.isActive ? "bg-neutral-950 text-white" : "bg-neutral-200 text-neutral-600"}`}>
                                 <span className="text-2xl font-bold leading-none">
                                   {discount.type === "percentage" ? `${discount.value}%` : `₹${(discount.value / 100).toLocaleString("en-IN")}`}
                                 </span>
@@ -4344,8 +5006,8 @@ function DashboardPageContent() {
                               </div>
                               {/* perforation */}
                               <span aria-hidden className="relative w-0 border-l-2 border-dashed border-neutral-200">
-                                <span className="absolute -top-2 -left-[9px] w-4 h-4 rounded-full bg-[#FAFAFA] border border-neutral-200" />
-                                <span className="absolute -bottom-2 -left-[9px] w-4 h-4 rounded-full bg-[#FAFAFA] border border-neutral-200" />
+                                <span className="absolute -top-2 -left-[9px] w-4 h-4 rounded-full bg-[#F0F0F0] border border-neutral-200" />
+                                <span className="absolute -bottom-2 -left-[9px] w-4 h-4 rounded-full bg-[#F0F0F0] border border-neutral-200" />
                               </span>
                               <div className="min-w-0 flex-1 p-4">
                                 <div className="flex items-start justify-between gap-2">
@@ -4394,113 +5056,165 @@ function DashboardPageContent() {
         )
       )}
 
+        {/* ANALYTICS */}
+        {activeTab === "analytics" && (
+          <div className="animate-enter-blur">
+            <AnalyticsPage store={store} />
+          </div>
+        )}
+
         {/* TAB 4: CUSTOMERS */}
         {activeTab === "customers" && (
-          <div className="space-y-5 animate-enter-blur">
+          <div className="space-y-4 animate-enter-blur">
             {(() => {
               const all = store.customers || [];
               const q = customerSearch.trim().toLowerCase();
-              const list = all.filter((c) => !q || c.name.toLowerCase().includes(q) || c.phone.includes(q) || (c.email || "").toLowerCase().includes(q));
-              const tones = ["bg-indigo-100 text-indigo-700", "bg-emerald-100 text-emerald-700", "bg-amber-100 text-amber-800", "bg-rose-100 text-rose-700", "bg-sky-100 text-sky-700", "bg-violet-100 text-violet-700"];
+              const monthAgo = Date.now() - 30 * 86400000;
+              const isNew = (c: (typeof all)[number]) => c.totalOrders <= 1;
+              const repeatCount = all.filter((c) => !isNew(c)).length;
+              const recentCount = all.filter((c) => new Date(c.lastOrderAt).getTime() > monthAgo).length;
+              const list = all
+                .filter((c) => customerFilter === "all" || (customerFilter === "repeat" ? !isNew(c) : isNew(c)))
+                .filter((c) => !q || c.name.toLowerCase().includes(q) || c.phone.includes(q) || (c.email || "").toLowerCase().includes(q))
+                .sort((x, y) => (customerSort === "orders" ? y.totalOrders - x.totalOrders : customerSort === "spent" ? (y.totalSpent || 0) - (x.totalSpent || 0) : (y.lastOrderAt || "").localeCompare(x.lastOrderAt || "")));
               const initials = (n: string) => n.split(" ").map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
+              const when = (iso?: string) => {
+                if (!iso) return "";
+                const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+                return d <= 0 ? "today" : d === 1 ? "yesterday" : d < 7 ? `${d} days ago` : new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+              };
+              if (all.length === 0)
+                return (
+                  <EmptyState
+                    section="customers"
+                    icon={ICustomers}
+                    title="Your first customer is one share away"
+                    text="Everyone who orders from your store shows up here with their contact details and orders. Share your store link on WhatsApp or Instagram to get started."
+                    action={{ label: copiedLink ? "Link copied" : "Copy store link", onClick: copyStoreLink, icon: copiedLink ? CheckCircle : Copy }}
+                  />
+                );
               return (
                 <>
-                  <div className="grid grid-cols-3 gap-3">
+                  {/* phones: a slim row of chips; tablets and computers: three numbers in one card */}
+                  <StatChips
+                    items={[
+                      { label: "Customers", value: all.length },
+                      { label: "Came back", value: repeatCount, tone: "text-violet-700" },
+                      { label: "This month", value: recentCount, tone: "text-emerald-700" },
+                    ]}
+                  />
+                  <div className="hidden grid-cols-3 divide-x divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200 bg-white md:grid">
                     {[
-                      { label: "Customers", value: all.length.toLocaleString("en-IN"), dot: "bg-indigo-500" },
-                      { label: "Repeat", value: all.filter((c) => c.totalOrders > 1).length.toLocaleString("en-IN"), dot: "bg-emerald-500" },
-                      { label: "Total spent", value: `₹${Math.round(all.reduce((n, c) => n + c.totalSpent, 0) / 100).toLocaleString("en-IN")}`, dot: "bg-amber-500" },
-                    ].map((t) => (
-                      <div key={t.label} className="rounded-2xl border border-neutral-200 bg-white p-4 min-w-0">
-                        <span className="flex items-center gap-2 text-xs text-neutral-500">
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.dot}`} />
-                          <span className="truncate">{t.label}</span>
-                        </span>
-                        <span className="mt-1.5 block text-xl sm:text-2xl font-semibold tracking-tight tabular-nums truncate">{t.value}</span>
+                      { label: "Customers", value: all.length, tone: "text-neutral-950" },
+                      { label: "Came back", value: repeatCount, tone: "text-violet-700" },
+                      { label: "This month", value: recentCount, tone: "text-emerald-700" },
+                    ].map((s) => (
+                      <div key={s.label} className="min-w-0 px-3 py-3 sm:px-5 sm:py-4">
+                        <p className="truncate text-[11px] font-medium text-neutral-500 sm:text-xs">{s.label}</p>
+                        <p className={`mt-0.5 text-lg font-semibold tabular-nums sm:text-xl ${s.tone}`}>{s.value}</p>
                       </div>
                     ))}
                   </div>
 
-                  {all.length === 0 ? (
-                    <div className="rounded-2xl border border-neutral-200 bg-white px-6 py-14 text-center">
-                      <span className="mx-auto w-14 h-14 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
-                        <Users className="w-6 h-6" />
-                      </span>
-                      <p className="mt-4 text-base font-semibold">No customers yet</p>
-                      <p className="mt-1 text-sm text-neutral-500 max-w-sm mx-auto">
-                        Everyone who orders from your store is added here, with their contact details and what they&apos;ve spent.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={copyStoreLink}
-                        className="mt-5 h-10 px-4 rounded-xl bg-neutral-950 text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-black"
-                      >
-                        {copiedLink ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                        {copiedLink ? "Link copied" : "Copy store link"}
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <label className="flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors">
-                        <Search className="w-4 h-4 text-neutral-400 shrink-0" />
-                        <input
-                          value={customerSearch}
-                          onChange={(e) => setCustomerSearch(e.target.value)}
-                          placeholder="Search by name, phone or email"
-                          className="w-full bg-transparent text-sm outline-none"
-                        />
-                      </label>
-                      {list.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-neutral-300 bg-white px-6 py-12 text-center text-sm text-neutral-500">
-                          No customers match &ldquo;{customerSearch}&rdquo;.
-                        </div>
-                      ) : (
-                        <div className="rounded-2xl border border-neutral-200 bg-white divide-y divide-neutral-100 overflow-hidden">
-                          {list.map((cust, i) => (
-                            <div key={cust.id} className="p-4 sm:px-5 flex items-center gap-3 hover:bg-neutral-50/70 transition-colors">
-                              <span className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${tones[i % tones.length]}`}>
-                                {initials(cust.name)}
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-semibold truncate">{cust.name}</span>
-                                  {cust.totalOrders > 1 && (
-                                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 shrink-0">Repeat</span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-neutral-500 truncate">
-                                  {cust.phone}
-                                  {cust.email ? ` · ${cust.email}` : ""}
-                                </p>
-                                <p className="text-[11px] text-neutral-400">
-                                  {cust.totalOrders} order{cust.totalOrders === 1 ? "" : "s"}
-                                  {cust.lastOrderAt ? ` · last on ${new Date(cust.lastOrderAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}
-                                </p>
-                              </div>
-                              <span className="text-sm font-semibold tabular-nums shrink-0">₹{(cust.totalSpent / 100).toLocaleString("en-IN")}</span>
-                              <div className="hidden sm:flex items-center gap-1.5">
-                                <a
-                                  href={`https://wa.me/${cust.phone.replace(/[^0-9]/g, "")}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  aria-label={`WhatsApp ${cust.name}`}
-                                  className="w-9 h-9 rounded-[10px] border border-neutral-200 flex items-center justify-center text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50"
-                                >
-                                  <MessageCircle className="w-4 h-4" />
-                                </a>
-                                <a
-                                  href={`tel:${cust.phone}`}
-                                  aria-label={`Call ${cust.name}`}
-                                  className="w-9 h-9 rounded-[10px] border border-neutral-200 flex items-center justify-center text-neutral-600 hover:border-neutral-900"
-                                >
-                                  <Phone className="w-4 h-4" />
-                                </a>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <label className="flex h-11 flex-1 items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3.5 transition-colors focus-within:border-neutral-900">
+                      <Search className="h-4 w-4 shrink-0 text-neutral-400" />
+                      <input value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} placeholder="Search name, phone or email" className="w-full bg-transparent text-sm outline-none" />
+                      {customerSearch && (
+                        <button type="button" onClick={() => setCustomerSearch("")} aria-label="Clear search" className="text-neutral-400 hover:text-neutral-900">
+                          <X className="h-4 w-4" />
+                        </button>
                       )}
-                    </>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div className="grid flex-1 grid-cols-3 rounded-xl bg-neutral-100 p-1 text-sm sm:inline-flex sm:flex-none">
+                        {(
+                          [
+                            ["all", "All"],
+                            ["repeat", "Repeat"],
+                            ["new", "New"],
+                          ] as const
+                        ).map(([id, label]) => (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => setCustomerFilter(id)}
+                            style={{ minHeight: 0 }}
+                            className={`h-9 rounded-lg px-3 font-medium transition-colors ${customerFilter === id ? "bg-white text-neutral-950 shadow-sm" : "text-neutral-500 hover:text-neutral-900"}`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <select
+                        value={customerSort}
+                        onChange={(e) => setCustomerSort(e.target.value as "recent" | "orders" | "spent")}
+                        aria-label="Sort customers"
+                        className="h-11 w-36 shrink-0 rounded-xl border border-neutral-200 bg-white px-3 text-sm font-medium outline-none focus:border-neutral-900"
+                      >
+                        <option value="recent">Latest first</option>
+                        <option value="orders">Most orders</option>
+                        <option value="spent">Most spent</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {list.length === 0 ? (
+                    <p className="rounded-2xl border border-dashed border-neutral-200 bg-white px-6 py-12 text-center text-sm text-neutral-500">No customers here{customerSearch ? ` for “${customerSearch}”` : ""}.</p>
+                  ) : (
+                    <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+                      {/* column titles (computers) */}
+                      <div className="hidden grid-cols-[minmax(0,2fr)_minmax(0,1.6fr)_90px_110px_110px_76px] items-center gap-4 border-b border-neutral-100 bg-neutral-50/70 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 md:grid">
+                        <span>Customer</span>
+                        <span>Contact</span>
+                        <span className="text-right">Orders</span>
+                        <span className="text-right">Spent</span>
+                        <span>Last order</span>
+                        <span />
+                      </div>
+                      <ul className="divide-y divide-neutral-100">
+                        {list.map((cust) => {
+                          const digits = cust.phone.replace(/[^0-9]/g, "");
+                          const wa = digits.length === 10 ? `91${digits}` : digits;
+                          return (
+                            <li
+                              key={cust.id}
+                              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 px-4 py-3 transition-colors hover:bg-neutral-50/70 md:grid-cols-[minmax(0,2fr)_minmax(0,1.6fr)_90px_110px_110px_76px] md:gap-4 md:px-5"
+                            >
+                              <div className="flex min-w-0 items-center gap-3">
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-950 text-[12px] font-semibold text-white">{initials(cust.name)}</span>
+                                <span className="min-w-0">
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="truncate text-sm font-semibold">{cust.name}</span>
+                                    {!isNew(cust) && <span className="shrink-0 rounded-full bg-violet-50 px-1.5 py-px text-[10px] font-semibold text-violet-700">Repeat</span>}
+                                  </span>
+                                  {/* phones: one quiet line under the name */}
+                                  <span className="mt-0.5 block truncate text-xs text-neutral-500 md:hidden">
+                                    {cust.phone} · {cust.totalOrders} order{cust.totalOrders === 1 ? "" : "s"}
+                                    {cust.lastOrderAt ? ` · ${when(cust.lastOrderAt)}` : ""}
+                                  </span>
+                                </span>
+                              </div>
+                              <span className="hidden min-w-0 md:block">
+                                <span className="block truncate text-[13px] text-neutral-800">{cust.phone}</span>
+                                <span className={`block truncate text-[11px] ${cust.email ? "text-neutral-500" : "text-neutral-300"}`}>{cust.email || "No email"}</span>
+                              </span>
+                              <span className="hidden text-right text-[13px] font-semibold tabular-nums md:block">{cust.totalOrders}</span>
+                              <span className="hidden text-right text-[13px] tabular-nums text-neutral-800 md:block">₹{Math.round((cust.totalSpent || 0) / 100).toLocaleString("en-IN")}</span>
+                              <span className="hidden text-[13px] text-neutral-500 md:block">{when(cust.lastOrderAt) || "—"}</span>
+                              <span className="flex items-center justify-end gap-1.5">
+                                <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" aria-label={`WhatsApp ${cust.name}`} className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+                                  <MessageCircle className="h-4 w-4" />
+                                </a>
+                                <a href={`tel:${cust.phone}`} aria-label={`Call ${cust.name}`} className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-neutral-700 hover:bg-neutral-200">
+                                  <Phone className="h-4 w-4" />
+                                </a>
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
                   )}
                 </>
               );
@@ -4510,7 +5224,7 @@ function DashboardPageContent() {
 
         {/* TAB 5: REVIEWS */}
         {activeTab === "reviews" && (
-          <div className="mt-6 space-y-6 animate-enter-blur">
+          <div className="space-y-6 animate-enter-blur">
             {!canUseReviews(store.planId) ? (
               <LockedFeature
                 title="Customer reviews"
@@ -4543,98 +5257,13 @@ function DashboardPageContent() {
                 }
               />
             ) : (
-              <div className="p-6 rounded-lg bg-white border border-neutral-200">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-sm font-bold text-neutral-900">
-                      Customer Reviews Moderation ({store.reviews.length})
-                    </h3>
-                    <p className="text-xs text-neutral-500 mt-0.5">
-                      Verified reviews and ratings displayed on product detail pages and product cards.
-                    </p>
-                  </div>
-                  <Badge variant="success" className="text-[10px]">
-                    Paid Plan Active
-                  </Badge>
-                </div>
-
-                {store.reviews.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-neutral-500">
-                    No customer reviews yet.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {store.reviews.map((rev) => (
-                      <div
-                        key={rev.id}
-                        className="p-4 rounded-md bg-neutral-50 border border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                      >
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-xs text-neutral-900">{rev.customerName}</span>
-                            <div className="flex text-amber-500">
-                              {Array.from({ length: rev.rating }).map((_, i) => (
-                                <Star key={i} className="w-3 h-3 fill-amber-500" />
-                              ))}
-                            </div>
-                            <Badge variant="neutral" className="text-[10px] uppercase">
-                              {rev.status}
-                            </Badge>
-                          </div>
-                          {rev.title && <p className="text-xs font-semibold text-neutral-900 mt-1">{rev.title}</p>}
-                          <p className="text-xs text-neutral-600 mt-0.5">{rev.comment}</p>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {rev.status !== "approved" ? (
-                            <Button
-                              size="sm"
-                              className="text-xs h-7 bg-[#111111] text-white hover:bg-black rounded-md"
-                              onClick={() => {
-                                storeService.updateReviewStatus(store.subdomain, rev.id, "approved");
-                                refreshStore();
-                              }}
-                            >
-                              Approve
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs h-7 rounded-md"
-                              onClick={() => {
-                                storeService.updateReviewStatus(store.subdomain, rev.id, "pending");
-                                refreshStore();
-                              }}
-                            >
-                              Hide
-                            </Button>
-                          )}
-                          <button
-                            onClick={() => {
-                              storeService.deleteReview(store.subdomain, rev.id);
-                              refreshStore();
-                            }}
-                            className="p-1.5 text-neutral-400 hover:text-red-600 rounded-md"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <ReviewsPanel store={store} onChanged={refreshStore} onShare={copyStoreLink} shareLabel={copiedLink ? "Link copied" : "Copy store link"} />
             )}
           </div>
         )}
 
         {/* TAB 6: BANNERS */}
-        {activeTab === "policies" && (
-          <div className="mt-6 animate-enter-blur">
-            <PoliciesPanel store={store} onSaved={refreshStore} />
-          </div>
-        )}
+        {activeTab === "policies" && settingsFrame(<PoliciesPanel store={store} onSaved={refreshStore} />)}
 
         {/* TAB 7: THEMES & STOREFRONT DESIGN */}
         {activeTab === "themes" && (() => {
@@ -4718,7 +5347,15 @@ function DashboardPageContent() {
                         onClick={() => router.push(editHref(activeSlug))}
                         className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-neutral-950 px-4 text-[13px] font-semibold text-white hover:bg-black"
                       >
-                        {canEditTheme(store, activeSlug) ? <SlidersHorizontal className="h-4 w-4" /> : <Lock className="h-4 w-4" />} Edit website
+                        {canEditTheme(store, activeSlug) ? (
+                          <>
+                            <SlidersHorizontal className="h-4 w-4" /> Edit website
+                          </>
+                        ) : (
+                          <>
+                            <ImageIcon className="h-4 w-4" /> Edit photos
+                          </>
+                        )}
                       </button>
                       <a href={liveStoreUrl} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-neutral-300 px-4 text-[13px] font-semibold hover:border-black">
                         View shop <ExternalLink className="h-3.5 w-3.5" />
@@ -4785,29 +5422,33 @@ function DashboardPageContent() {
                     All themes
                   </Link>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+                {/* one theme per row: a wide landscape preview, then name, description and actions */}
+                <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
                   {picks.map((t) => (
                     <div key={t.slug} className="group flex flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white">
-                      <a href={previewHref(t.slug)} className="relative block aspect-[4/3] overflow-hidden bg-neutral-100" aria-label={`Preview ${t.name}`}>
+                      <a href={previewHref(t.slug)} className="relative block aspect-[16/9] overflow-hidden bg-neutral-100" aria-label={`Preview ${t.name}`}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={themeThumb(t)} alt="" className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04]" />
-                        <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white opacity-0 backdrop-blur transition-opacity group-hover:opacity-100">
-                          <Eye className="h-3 w-3" /> Preview
+                        <img src={themeThumb(t)} alt="" className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.03]" />
+                        <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-neutral-800 backdrop-blur">
+                          {getThemePrice(t.slug) === 0 ? "Free" : "With your plan"}
                         </span>
                       </a>
-                      <div className="flex items-center justify-between gap-2 p-3">
-                        <span className="min-w-0">
-                          <span className="block truncate text-[13px] font-semibold text-neutral-950">{t.name}</span>
-                          <span className="block text-[11px] text-neutral-400">{getThemePrice(t.slug) === 0 ? "Free" : "With your plan"}</span>
-                        </span>
-                        <button type="button" onClick={() => handleActivateTheme(t.slug)} className="h-8 shrink-0 rounded-lg bg-neutral-100 px-3 text-xs font-semibold hover:bg-neutral-950 hover:text-white">
-                          Use
-                        </button>
+                      <div className="flex flex-1 flex-col p-4">
+                        <p className="text-[15px] font-semibold text-neutral-950">{t.name}</p>
+                        <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-neutral-500">{t.description}</p>
+                        <div className="mt-4 grid grid-cols-2 gap-2">
+                          <a href={previewHref(t.slug)} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-neutral-200 text-[13px] font-semibold text-neutral-800 hover:border-neutral-900">
+                            <Eye className="h-4 w-4" /> Preview
+                          </a>
+                          <button type="button" onClick={() => handleActivateTheme(t.slug)} className="h-10 rounded-xl bg-neutral-950 text-[13px] font-semibold text-white hover:bg-black">
+                            Use this theme
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
                   {/* marketplace */}
-                  <Link href="/themes" className="group relative flex min-h-[200px] flex-col justify-between overflow-hidden rounded-2xl bg-neutral-950 p-4 text-white sm:p-5">
+                  <Link href="/themes" className="group relative flex min-h-[180px] flex-col justify-between overflow-hidden rounded-2xl bg-neutral-950 p-5 text-white">
                     <span className="relative flex -space-x-6">
                       {moreThumbs.map((t, i) => (
                         <span key={t.slug} className="relative h-16 w-14 overflow-hidden rounded-lg border-2 border-neutral-950 bg-neutral-800 transition-transform duration-500 group-hover:-translate-y-1" style={{ rotate: `${(i - 1) * 6}deg`, transitionDelay: `${i * 60}ms` }}>
@@ -4879,8 +5520,8 @@ function DashboardPageContent() {
                 : h.rejectedAt
                   ? { label: "Not verified", dot: "bg-red-500", text: "text-red-700" }
                   : { label: "Cancelled", dot: "bg-neutral-300", text: "text-neutral-500" };
-          return (
-            <div className="mt-6 space-y-4 animate-enter-blur">
+          return settingsFrame(
+            <div className="space-y-4">
               {upgradeSuccess && (
                 <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
@@ -4929,7 +5570,7 @@ function DashboardPageContent() {
                 <div className="flex items-start justify-between gap-4 p-5 sm:p-6">
                   <div className="min-w-0">
                     <p className="text-xs text-neutral-500">Current plan</p>
-                    <p className="mt-0.5 text-xl font-semibold tracking-tight">{currentPlan.name}</p>
+                    <p className={`mt-0.5 text-xl font-semibold tracking-tight ${currentPlan.id === "pro" ? "text-violet-700" : currentPlan.id === "starter" ? "text-indigo-700" : ""}`}>{currentPlan.name}</p>
                   </div>
                   {sub.kind === "active" ? (
                     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${sub.renewing ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-600"}`}>
@@ -4958,7 +5599,7 @@ function DashboardPageContent() {
                     <dd className="mt-0.5 font-medium tabular-nums">{unlimited ? `${used} · no limit` : `${used} of ${limit}`}</dd>
                     {!unlimited && (
                       <div className="mt-1.5 h-1 rounded-full bg-neutral-100 overflow-hidden">
-                        <div className={`h-full rounded-full ${pct >= 90 ? "bg-amber-500" : "bg-neutral-900"}`} style={{ width: `${Math.max(2, pct)}%` }} />
+                        <div className={`h-full rounded-full ${pct >= 90 ? "bg-amber-500" : "bg-indigo-500"}`} style={{ width: `${Math.max(2, pct)}%` }} />
                       </div>
                     )}
                   </div>
@@ -5007,79 +5648,15 @@ function DashboardPageContent() {
                 )}
               </div>
 
-              {/* plans: upgrade only while a paid plan runs */}
-              <h3 className="pt-2 text-base font-semibold">Plans</h3>
-              <div className="grid gap-3 md:grid-cols-3">
-                {Object.values(PLATFORM_PLANS).sort((a, b) => a.priceMonthly - b.priceMonthly).map((plan) => {
-                  const move = planMove(store.planId, plan.id, sub);
-                  const lower = move === "downgrade";
-                  const isCurrent = move === "current" || move === "renew";
-                  return (
-                    <div
-                      key={plan.id}
-                      aria-disabled={lower}
-                      className={`flex flex-col rounded-2xl border bg-white p-5 transition-opacity ${
-                        isCurrent ? "border-neutral-900 shadow-[0_0_0_1px_#171717]" : "border-neutral-200"
-                      } ${lower ? "opacity-50" : ""}`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[15px] font-semibold">{plan.name}</span>
-                        {isCurrent ? (
-                          <span className="rounded-md bg-neutral-900 px-2 py-0.5 text-[11px] font-medium text-white">Current</span>
-                        ) : plan.highlight && !lower ? (
-                          <span className="rounded-md border border-neutral-200 px-2 py-0.5 text-[11px] text-neutral-600">Popular</span>
-                        ) : null}
-                      </div>
-                      <p className="mt-3 flex flex-wrap items-baseline gap-x-1.5">
-                        <span className="text-[28px] font-semibold tracking-tight tabular-nums">{plan.priceFormatted.split(" ")[0]}</span>
-                        {plan.originalPriceFormatted && !lower && (
-                          <span className="text-sm text-neutral-400 line-through">{plan.originalPriceFormatted.split(" ")[0]}</span>
-                        )}
-                        <span className="text-sm text-neutral-500">/ month</span>
-                      </p>
-                      <p className="mt-1 text-[13px] text-neutral-500">{plan.description}</p>
-                      <ul className="mt-4 space-y-2 border-t border-neutral-100 pt-4 text-[13px] text-neutral-700">
-                        {plan.features.map((feat, i) => (
-                          <li key={i} className="flex gap-2">
-                            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-900" />
-                            <span>{feat}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <div className="mt-auto pt-5">
-                        {move === "upgrade" ? (
-                          <button
-                            type="button"
-                            disabled={!!pending}
-                            onClick={() => handleUpgradePlan(plan.id as "starter" | "pro")}
-                            className="h-11 w-full rounded-xl bg-neutral-950 text-sm font-semibold text-white hover:bg-black disabled:opacity-50"
-                          >
-                            Upgrade to {plan.name}
-                          </button>
-                        ) : move === "renew" ? (
-                          <button
-                            type="button"
-                            disabled={!!pending}
-                            onClick={() => renew(plan.id)}
-                            className="h-11 w-full rounded-xl bg-neutral-950 text-sm font-semibold text-white hover:bg-black disabled:opacity-50"
-                          >
-                            Renew {plan.name}
-                          </button>
-                        ) : (
-                          <div className="flex h-11 items-center justify-center rounded-xl bg-neutral-100 text-sm font-medium text-neutral-500">
-                            {isCurrent ? "Your current plan" : `Included in ${currentPlan.name}`}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {sub.kind === "active" && rankOf(store.planId) > 0 && (
-                <p className="px-1 text-xs text-neutral-500">
-                  Lower plans can be chosen after your {currentPlan.name} plan ends{sub.endsAt ? ` on ${fmtDate(sub.endsAt)}` : ""}.
-                </p>
-              )}
+              {/* plans: cards, full comparison and connected-app note */}
+              <PlansSection
+                currentPlanId={store.planId || "free"}
+                moveFor={(id) => planMove(store.planId, id, sub)}
+                pending={!!pending}
+                onUpgrade={handleUpgradePlan}
+                onRenew={renew}
+                lowerNote={sub.kind === "active" && rankOf(store.planId) > 0 ? `Lower plans can be chosen after your ${currentPlan.name} plan ends${sub.endsAt ? ` on ${fmtDate(sub.endsAt)}` : ""}.` : undefined}
+              />
 
               {/* payment history */}
               <div className="rounded-2xl border border-neutral-200 bg-white">
@@ -5122,14 +5699,27 @@ function DashboardPageContent() {
         })()}
 
         {/* TAB 9: SETTINGS */}
-        {activeTab === "settings" && (
-          <div className="mt-6 space-y-4 animate-enter-blur">
+        {activeTab === "settings" && settingsFrame(
+            <>
+            {settingsSection === "general" && (
+              <GeneralSettings store={store} onChanged={refreshStore} onOpenPolicies={() => setActiveTab("policies")} />
+            )}
+            {settingsSection === "domain" && <DomainSettings store={store} onUpgrade={() => openSettings("billing")} />}
+            {settingsSection === "checkout" && <CheckoutSettings store={store} onChanged={refreshStore} />}
+            {settingsSection === "accounts" && <AccountSettings store={store} onChanged={refreshStore} />}
+            {settingsSection === "taxes" && <TaxSettings store={store} onChanged={refreshStore} />}
+            {settingsSection === "notifications" && <NotificationSettings store={store} onChanged={refreshStore} onOpenEmails={() => { setActiveTab("plugins"); setPluginView("gmail"); scrollDashTop({ top: 0 }); }} />}
+            {settingsSection === "events" && <TrackingSettings store={store} onChanged={refreshStore} />}
+            {settingsSection === "privacy" && <PrivacySettings store={store} onChanged={refreshStore} onOpenPolicies={() => openSettings("policies")} />}
+
+            {settingsSection === "store" && (
+            <>
             {/* Store address */}
             <div className="relative overflow-hidden rounded-2xl bg-neutral-950 text-white p-5 sm:p-6">
               <div aria-hidden className="pointer-events-none absolute -right-14 -top-14 w-44 h-44 rounded-full bg-white/[0.04]" />
               <span className="relative flex items-center gap-2 text-xs text-neutral-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                Your store is live at
+                Your store&apos;s web address
               </span>
               <p className="relative mt-2 text-xl sm:text-2xl font-semibold tracking-tight break-all">
                 <span className="text-neutral-500">https://</span>
@@ -5164,7 +5754,7 @@ function DashboardPageContent() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-base font-semibold">Store logo</h3>
-                  <p className="mt-0.5 text-sm text-neutral-500">Shown in your store&apos;s header. Without one, your store name is used.</p>
+                  <p className="mt-0.5 text-sm text-neutral-500">Shown at the top of your store. No logo? Your store name is shown instead.</p>
                 </div>
                 {logoSavedToast && (
                   <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
@@ -5213,13 +5803,13 @@ function DashboardPageContent() {
                 </span>
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold">Upload a logo</span>
-                  <span className="block text-xs text-neutral-500">PNG or SVG, about 240×60px</span>
+                  <span className="block text-xs text-neutral-500">A wide image works best (PNG or JPG)</span>
                 </span>
               </label>
 
               <div className="mt-4 flex items-center gap-3 text-xs text-neutral-400">
                 <span className="h-px flex-1 bg-neutral-200" />
-                or paste an image link
+                or use an image link
                 <span className="h-px flex-1 bg-neutral-200" />
               </div>
               <label className="mt-3 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors">
@@ -5232,35 +5822,19 @@ function DashboardPageContent() {
                 />
               </label>
 
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="text-xs text-neutral-400">Try:</span>
-                <button
-                  type="button"
-                  onClick={() => setLogoUrlInput("https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=400&q=80")}
-                  style={{ minHeight: 0 }} className="h-8 px-3 rounded-full border border-neutral-200 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
-                >
-                  Minimal geometric
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLogoUrlInput("https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80")}
-                  style={{ minHeight: 0 }} className="h-8 px-3 rounded-full border border-neutral-200 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
-                >
-                  Modern monogram
-                </button>
-                {logoUrlInput && (
+              <div className="mt-5 flex items-center justify-between gap-3">
+                {logoUrlInput ? (
                   <button
                     type="button"
                     onClick={() => setLogoUrlInput("")}
                     style={{ minHeight: 0 }}
-                    className="ml-auto h-8 px-3 rounded-full text-xs font-medium text-red-600 hover:bg-red-50"
+                    className="h-9 px-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50"
                   >
                     Remove logo
                   </button>
+                ) : (
+                  <span />
                 )}
-              </div>
-
-              <div className="mt-5 flex justify-end">
                 <button
                   type="button"
                   onClick={handleSaveBrandLogo}
@@ -5271,27 +5845,52 @@ function DashboardPageContent() {
               </div>
             </div>
 
-            {/* Online payments through the seller's own Cashfree account */}
-            <CashfreePaymentsCard store={store} />
+            {/* Announcement bar */}
+            <form onSubmit={handleSaveSettings} className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+              <h3 className="text-base font-semibold">Top bar message</h3>
+              <p className="mt-0.5 text-sm text-neutral-500">One short line shown above your store, like an offer. Leave empty to hide it.</p>
+              <label className="mt-4 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors">
+                <Bell className="w-4 h-4 text-neutral-400 shrink-0" />
+                <input
+                  value={announcementInput}
+                  onChange={(e) => setAnnouncementInput(e.target.value)}
+                  placeholder="Free shipping over ₹999 · Use code SAVE10"
+                  className="w-full bg-transparent text-sm outline-none"
+                />
+              </label>
+              {announcementInput && (
+                <div className="mt-3 truncate rounded-xl bg-neutral-950 px-3 py-2 text-center text-xs font-medium text-white reveal-in">{announcementInput}</div>
+              )}
+              <div className="mt-5 flex justify-end">
+                <button type="submit" className="h-11 px-5 rounded-xl bg-neutral-950 text-white text-sm font-semibold hover:bg-black">
+                  Save
+                </button>
+              </div>
+            </form>
+            </>
+            )}
 
-            {/* Payments & announcement */}
+            {settingsSection === "payments" && (
+            <>
+            {/* Online payments: Growth and Pro connect their own payment gateway */}
+            {planHas(store.planId, "paymentGateway") ? (
+              <RazorpayPaymentsCard store={store} />
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-neutral-950 p-5 text-white sm:p-6">
+                <div className="min-w-0">
+                  <p className="text-base font-semibold">Take online payments</p>
+                  <p className="mt-0.5 text-sm text-white/60">Cards, UPI and net banking with your own payment gateway. Part of Growth.</p>
+                </div>
+                <button type="button" onClick={() => openSettings("billing")} className="h-10 shrink-0 rounded-xl bg-white px-4 text-sm font-semibold text-neutral-950 hover:bg-neutral-100">
+                  Try Growth free for 10 days
+                </button>
+              </div>
+            )}
+
+            {/* Cash on delivery */}
             <form onSubmit={handleSaveSettings} className="rounded-2xl border border-neutral-200 bg-white">
               <div className="p-5 sm:p-6">
-                <h3 className="text-base font-semibold">Payments</h3>
-                <p className="mt-0.5 text-sm text-neutral-500">Money goes straight to you, with no middleman fees.</p>
-
-                <label htmlFor="settings-upi" className="mt-5 block text-sm font-medium">UPI ID</label>
-                <label className="mt-1.5 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors">
-                  <IndianRupee className="w-4 h-4 text-neutral-400 shrink-0" />
-                  <input
-                    id="settings-upi"
-                    value={upiIdInput}
-                    onChange={(e) => setUpiIdInput(e.target.value)}
-                    placeholder="yourstore@upi"
-                    required
-                    className="w-full bg-transparent text-sm outline-none"
-                  />
-                </label>
+                <h3 className="text-base font-semibold">Cash on delivery</h3>
 
                 <div className="mt-4 flex items-center justify-between gap-4 rounded-xl bg-neutral-50 p-4">
                   <span className="flex min-w-0 items-center gap-3">
@@ -5301,7 +5900,7 @@ function DashboardPageContent() {
                     <span className="min-w-0">
                       <span className="block text-sm font-semibold">Cash on delivery</span>
                       <span className="block text-xs text-neutral-500">
-                        {codEnabledInput ? "Buyers can pay when the order arrives" : "Prepaid orders only"}
+                        {!planHas(store.planId, "paymentGateway") ? "Your payment option on Free" : codEnabledInput ? "Buyers can pay when the order arrives" : "Online payments only"}
                       </span>
                     </span>
                   </span>
@@ -5310,6 +5909,7 @@ function DashboardPageContent() {
                     role="switch"
                     aria-checked={codEnabledInput}
                     aria-label="Cash on delivery"
+                    disabled={!planHas(store.planId, "paymentGateway")}
                     onClick={() => setCodEnabledInput(!codEnabledInput)}
                     style={{ minHeight: 0, height: 24 }}
                     className={`relative w-11 shrink-0 rounded-full transition-colors ${codEnabledInput ? "bg-emerald-500" : "bg-neutral-300"}`}
@@ -5319,8 +5919,9 @@ function DashboardPageContent() {
                 </div>
 
                 {codEnabledInput && (
-                  <div className="mt-4">
-                    <label htmlFor="settings-cod-fee" className="block text-sm font-medium">COD handling fee</label>
+                  <div className="mt-4 reveal-in">
+                    <label htmlFor="settings-cod-fee" className="block text-sm font-medium">Extra charge for cash on delivery</label>
+                    <span className="mt-0.5 block text-xs text-neutral-500">Optional. Leave 0 for no extra charge.</span>
                     <label className="mt-1.5 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors sm:max-w-[200px]">
                       <span className="text-sm text-neutral-400">₹</span>
                       <input
@@ -5335,38 +5936,119 @@ function DashboardPageContent() {
                   </div>
                 )}
               </div>
+              <div className="flex justify-end border-t border-neutral-100 p-5 sm:p-6">
+                <button type="submit" className="h-11 px-5 rounded-xl bg-neutral-950 text-white text-sm font-semibold hover:bg-black">
+                  Save
+                </button>
+              </div>
+            </form>
+            </>
+            )}
 
-              <div className="border-t border-neutral-100 p-5 sm:p-6">
-                <h3 className="text-base font-semibold">Announcement bar</h3>
-                <p className="mt-0.5 text-sm text-neutral-500">A short line shown at the very top of your store.</p>
-                <label className="mt-4 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors">
-                  <Bell className="w-4 h-4 text-neutral-400 shrink-0" />
-                  <input
-                    value={announcementInput}
-                    onChange={(e) => setAnnouncementInput(e.target.value)}
-                    placeholder="Free shipping over ₹999 · Use code SAVE10"
-                    className="w-full bg-transparent text-sm outline-none"
-                  />
-                </label>
-                {announcementInput && (
-                  <div className="mt-3 truncate rounded-xl bg-neutral-950 px-3 py-2 text-center text-xs font-medium text-white">
-                    {announcementInput}
+            {settingsSection === "delivery" && (
+            <form onSubmit={handleSaveSettings} className="rounded-2xl border border-neutral-200 bg-white">
+              <div className="p-5 sm:p-6">
+                <h3 className="text-base font-semibold">Delivery charges</h3>
+                <p className="mt-0.5 text-sm text-neutral-500">How much buyers pay for delivery. It&apos;s added at checkout.</p>
+
+                <div role="radiogroup" aria-label="Delivery charges" className="mt-4 grid gap-2 sm:grid-cols-3">
+                  {(
+                    [
+                      { id: "free", title: "Always free", text: "Buyers never pay for delivery" },
+                      { id: "flat", title: "Same charge", text: "One fixed charge on every order" },
+                      { id: "free_above", title: "Free on big orders", text: "Charge only on smaller orders" },
+                    ] as const
+                  ).map((o) => {
+                    const on = deliveryMode === o.id;
+                    return (
+                      <button
+                        key={o.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        onClick={() => setDeliveryMode(o.id)}
+                        style={{ minHeight: 0 }}
+                        className={`rounded-xl border p-3.5 text-left transition-colors ${
+                          on ? "border-neutral-950 bg-neutral-950 text-white" : "border-neutral-200 bg-white hover:border-neutral-400"
+                        }`}
+                      >
+                        <span className="block text-sm font-semibold">{o.title}</span>
+                        <span className={`block text-xs ${on ? "text-white/70" : "text-neutral-500"}`}>{o.text}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {deliveryMode !== "free" && (
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2 reveal-in">
+                    <div>
+                      <label htmlFor="settings-delivery-fee" className="block text-sm font-medium">Delivery charge</label>
+                      <label className="mt-1.5 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors">
+                        <span className="text-sm text-neutral-400">₹</span>
+                        <input
+                          id="settings-delivery-fee"
+                          inputMode="decimal"
+                          value={deliveryFeeInput}
+                          onChange={(e) => setDeliveryFeeInput(e.target.value.replace(/[^\d.]/g, ""))}
+                          placeholder="50"
+                          className="w-full bg-transparent text-sm outline-none"
+                        />
+                      </label>
+                    </div>
+                    {deliveryMode === "free_above" && (
+                      <div className="reveal-in">
+                        <label htmlFor="settings-free-above" className="block text-sm font-medium">Free when the order is</label>
+                        <label className="mt-1.5 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors">
+                          <span className="text-sm text-neutral-400">₹</span>
+                          <input
+                            id="settings-free-above"
+                            inputMode="decimal"
+                            value={freeAboveInput}
+                            onChange={(e) => setFreeAboveInput(e.target.value.replace(/[^\d.]/g, ""))}
+                            placeholder="500"
+                            className="w-full bg-transparent text-sm outline-none"
+                          />
+                          <span className="shrink-0 text-xs text-neutral-400">or more</span>
+                        </label>
+                      </div>
+                    )}
                   </div>
                 )}
+
+                <p className="mt-4 flex items-center gap-2 rounded-xl bg-neutral-50 px-3.5 py-3 text-sm text-neutral-700">
+                  <Truck className="h-4 w-4 shrink-0 text-neutral-500" />
+                  {deliveryMode === "free"
+                    ? "Buyers see: Free delivery on every order"
+                    : deliveryMode === "flat"
+                      ? `Buyers see: Delivery ₹${deliveryFeeInput || "0"} on every order`
+                      : `Buyers see: Free delivery on orders of ₹${freeAboveInput || "0"} or more, otherwise ₹${deliveryFeeInput || "0"}`}
+                </p>
               </div>
 
               <div className="flex justify-end border-t border-neutral-100 p-5 sm:p-6">
                 <button type="submit" className="h-11 px-5 rounded-xl bg-neutral-950 text-white text-sm font-semibold hover:bg-black">
-                  Save changes
+                  Save
                 </button>
               </div>
             </form>
-          </div>
+            )}
+            </>
         )}
 
-        {/* TAB 11: PLUGINS & GMAIL AUTOMATION */}
+        {/* TAB 11: PLUGINS (Shiprocket, WhatsApp, Gmail) */}
         {activeTab === "plugins" && (
-          <div className="mt-6 space-y-6 animate-enter-blur">
+          <div className="mt-6">
+          <PluginsHub
+            store={store}
+            view={pluginView}
+            onOpen={(v) => {
+              setPluginView(v);
+              scrollDashTop({ top: 0 });
+            }}
+            onUpgrade={() => openSettings("billing")}
+            onChanged={refreshStore}
+            gmail={
+          <div className="space-y-6">
             {!canUseEmail(store.planId) ? (
               /* Email integration is a Pro feature */
               <LockedFeature
@@ -5397,6 +6079,9 @@ function DashboardPageContent() {
               <EmailPanel store={store} storeWebDomain={storeWebDomain} onRemoveSubscriber={handleRemoveSubscriber} />
             )}
           </div>
+            }
+          />
+          </div>
         )}
 
         {/* App footer — overview only; links point at real homepage sections, dashboard tabs or support */}
@@ -5411,7 +6096,7 @@ function DashboardPageContent() {
               {[
                 { label: "Online store builder", href: "/#storefront" },
                 { label: "Store themes", href: "/#themes" },
-                { label: "UPI payments", href: "/#platform" },
+                { label: "Payments", href: "/#platform" },
                 { label: "Pricing", href: "/#pricing" },
                 { label: "FAQs", href: "/#faq" },
                 { label: "Contact support", href: `mailto:${siteConfig.supportEmail}` },
@@ -5456,9 +6141,9 @@ function DashboardPageContent() {
 
       {/* Phone bottom bar: red dots on sections with something unseen, and a chip that springs up for new events */}
       <MobileDock
-        hidden={!showPhoneChrome && !isMobileMenuOpen}
+        hidden={!showDock && !isMobileMenuOpen}
         storeKey={store.subdomain}
-        active={activeTab}
+        active={inSettings ? "settings" : activeTab}
         onSelect={(tab) => {
           setIsMobileMenuOpen(false);
           setActiveTab(tab);
@@ -5468,6 +6153,45 @@ function DashboardPageContent() {
         notices={notifications}
         onSeen={rememberRead}
       />
+
+      {/* Assistant: ask or command, every change confirmed first */}
+      {!inEditor && !assistantOpen && <AssistantButton onClick={() => setAssistantOpen(true)} raised={showDock} />}
+      <AssistantPanel
+        store={store}
+        ownerName={ownerName}
+        open={assistantOpen}
+        side={assistantSide}
+        prompt={assistantPrompt}
+        onClose={() => setAssistantOpen(false)}
+        onNavigate={(page, opts) => {
+          setIsMobileMenuOpen(false);
+          if (opts?.action === "add-product") startAddProduct();
+          else setActiveTab(page);
+          const order = opts?.orderId ? (store.orders || []).find((o) => o.id === opts.orderId) : null;
+          setSelectedOrder(order || null);
+          scrollDashTop({ top: 0 });
+          // full screen covers the page, so step aside to show where we went
+          if (!assistantFitsBeside()) setAssistantOpen(false);
+        }}
+      />
+
+      {/* Interactive tutorial: opens the right page and points at each step */}
+      {tutorial && (
+        <TutorialRunner
+          tutorial={tutorial}
+          onClose={() => setTutorial(null)}
+          onPrepare={(step) => {
+            setIsMobileMenuOpen(false);
+            if (step.action === "add-product") {
+              if (!isProductModalOpen) startAddProduct();
+              return;
+            }
+            if (isProductModalOpen) setIsProductModalOpen(false);
+            if (step.settings) openSettings(step.settings);
+            else if (step.tab) setActiveTab(step.tab);
+          }}
+        />
+      )}
 
       {/* Setup checklist: one step at a time, in a card in the middle of the screen */}
       {setupStart !== null && (
@@ -5493,21 +6217,18 @@ function DashboardPageContent() {
               </span>
             </div>
 
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-4 gap-x-1.5 gap-y-3">
               {(
                 [
-                  { id: "overview", label: "Overview", icon: LayoutDashboard },
-                  { id: "products", label: "Products", icon: Package, dot: notifications.some((n) => n.unread && n.type === "stock") },
-                  { id: "categories", label: "Categories", icon: FolderTree },
-                  { id: "orders", label: "Orders", icon: ShoppingBag, dot: notifications.some((n) => n.unread && n.type === "order") },
-                  { id: "discounts", label: "Discounts", icon: Tag, locked: !canUseCoupons(store.planId) },
-                  { id: "customers", label: "Customers", icon: Users },
-                  { id: "reviews", label: "Reviews", icon: Star, locked: !canUseReviews(store.planId) },
-                  { id: "policies", label: "Policies", icon: Scale, dot: policiesMissing.length > 0 },
-                  { id: "themes", label: "Themes", icon: Palette },
-                  { id: "billing", label: "Plan", icon: CreditCard, dot: planNeedsAttention || notifications.some((n) => n.unread && n.type === "plan") },
-                  { id: "settings", label: "Settings", icon: Settings },
-                  { id: "plugins", label: "Plugins", icon: Plug, locked: !canUseEmail(store.planId) },
+                  // Home, Orders and Settings live in the bottom bar, so the menu holds the rest (two even rows)
+                  { id: "products", label: "Products", icon: IProducts, dot: notifications.some((n) => n.unread && n.type === "stock") },
+                  { id: "categories", label: "Categories", icon: ICategories },
+                  { id: "customers", label: "Customers", icon: ICustomers },
+                  { id: "reviews", label: "Reviews", icon: IReviews, locked: !canUseReviews(store.planId) },
+                  { id: "discounts", label: "Discounts", icon: IDiscounts, locked: !canUseCoupons(store.planId) },
+                  { id: "themes", label: "Themes", icon: IThemes },
+                  { id: "plugins", label: "Plugins", icon: IPlugins },
+                  { id: "notifications", label: "Alerts", icon: INotifications, dot: notifications.some((n) => n.unread) },
                 ] as { id: DashTab; label: string; icon: React.ElementType; dot?: boolean; locked?: boolean }[]
               ).map((item, i) => {
                 const Icon = item.icon;
@@ -5621,6 +6342,10 @@ function DashboardPageContent() {
     </div>
   );
 }
+
+/** Settings pages that live inside the Settings tab (Policies, Plan & billing and Emails to buyers are their own tabs, shown in the same frame). */
+const SETTINGS_SECTIONS = ["general", "store", "domain", "payments", "checkout", "accounts", "delivery", "taxes", "notifications", "events", "privacy"] as const;
+type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 /** Full-screen holding state for the dashboard (loading, or about to redirect), in the app's style. */
 const DASHBOARD_TOUR: TourStep[] = [
