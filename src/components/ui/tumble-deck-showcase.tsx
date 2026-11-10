@@ -268,7 +268,34 @@ export function TumbleDeckShowcase({
       push(bias > 0 ? Math.floor(target + 0.7) : bias < 0 ? Math.ceil(target - 0.7) : Math.round(target))
     api.current.step = (dir) => push(Math.round(target) + dir)
 
+    const isOverCardsArea = (clientX: number, clientY: number, hitTarget: HTMLElement | null): boolean => {
+      // 1. Direct hit on any card element or image inside a card
+      if (hitTarget?.closest?.(".td-card")) return true
+
+      // 2. Geometric check over the centered 3D card deck footprint
+      const root = rootRef.current
+      if (!root) return false
+      const rect = root.getBoundingClientRect()
+      const { h } = geo.current
+      const w = h * aspect
+      const top = rect.height / 2 - 0.58 * h
+
+      const cardLeft = rect.left + (rect.width - w) / 2
+      const cardRight = cardLeft + w
+      // Include the upright stack behind and the fallen card on the floor in front
+      const cardTop = rect.top + top - 0.25 * h
+      const cardBottom = rect.top + top + h + 0.45 * h
+
+      return clientX >= cardLeft && clientX <= cardRight && clientY >= cardTop && clientY <= cardBottom
+    }
+
     const onWheel = (e: WheelEvent) => {
+      const hitTarget = e.target as HTMLElement | null
+      if (!isOverCardsArea(e.clientX, e.clientY, hitTarget)) {
+        // Cursor is outside the cards area (e.g. left/right sides, whitespace) — allow normal page scroll!
+        return
+      }
+
       e.preventDefault()
       const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? root.clientHeight : 1
       const d = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * scale
@@ -290,6 +317,10 @@ export function TumbleDeckShowcase({
     let drag: { id: number; y: number; travel: number; last: number } | null = null
     const onDown = (e: PointerEvent) => {
       if (e.button !== 0) return
+      const hitTarget = e.target as HTMLElement | null
+      if (!isOverCardsArea(e.clientX, e.clientY, hitTarget)) {
+        return
+      }
       drag = { id: e.pointerId, y: e.clientY, travel: 0, last: 0 }
       dragged.current = false
       clearTimeout(idle)
@@ -351,16 +382,22 @@ export function TumbleDeckShowcase({
       aria-label={ariaLabel}
       tabIndex={0}
       onKeyDown={onKey}
-      onClick={() => {
-        if (!dragged.current) api.current.step(1)
+      onClick={(e) => {
+        if (!dragged.current) {
+          const hitTarget = e.target as HTMLElement | null
+          if (hitTarget?.closest?.(".td-card")) {
+            api.current.step(1)
+          }
+        }
       }}
-      className={["td-root relative w-full touch-none overflow-hidden outline-none select-none", className]
+      className={["td-root relative w-full overflow-hidden outline-none select-none", className]
         .filter(Boolean)
         .join(" ")}
       style={{ height, background, ...style }}
     >
       <style>{`
-        .td-scene { position: absolute; inset: 0; transform-style: preserve-3d; z-index: 1; }
+        .td-root { touch-action: pan-y; }
+        .td-scene { position: absolute; inset: 0; transform-style: preserve-3d; z-index: 1; pointer-events: none; }
         .td-backside-watermark {
           position: absolute;
           inset: 0;
@@ -404,9 +441,14 @@ export function TumbleDeckShowcase({
           width: var(--td-w); height: var(--td-h); margin-left: calc(var(--td-w) / -2);
           transform-origin: 50% 100%; transform-style: preserve-3d;
           backface-visibility: visible; will-change: transform;
-          border-radius: 8px; overflow: hidden; cursor: pointer;
+          border-radius: 8px; overflow: hidden; cursor: grab;
+          pointer-events: auto;
+          touch-action: none;
           background: #ffffff;
           box-shadow: 0 22px 50px -15px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.06);
+        }
+        .td-card:active {
+          cursor: grabbing;
         }
         .td-card img {
           display: block; width: 100%; height: 100%; max-width: none;
