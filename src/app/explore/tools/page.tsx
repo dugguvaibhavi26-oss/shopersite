@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ogImage } from "@/lib/seo";
 import { LegalShell } from "@/components/legal/legal-shell";
 import { JsonLd } from "@/components/resources/blocks";
 import { Breadcrumbs, StartBand } from "@/components/resources/parts";
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
     "Free calculators for Indian online sellers: find the right selling price and profit margin, split or add GST, see what COD returns cost you, and check a sale discount.",
   keywords: ["profit margin calculator", "gst calculator india", "selling price calculator", "rto cost calculator", "discount calculator"],
   alternates: { canonical: "/explore/tools" },
-  openGraph: { title: "Free calculators for online sellers", description: "Profit, GST, COD returns and discount calculators.", url: `${SITE_URL}/explore/tools`, type: "website" },
+  openGraph: { title: "Free calculators for online sellers", description: "Profit, GST, COD returns and discount calculators.", url: `${SITE_URL}/explore/tools`, type: "website", images: [{ url: ogImage("Free calculators for online sellers", "Seller tools"), width: 1200, height: 630 }] },
 };
 
 const TOOLS = [

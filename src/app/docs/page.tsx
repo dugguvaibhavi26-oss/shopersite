@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ogImage } from "@/lib/seo";
 import { ArrowRight, Clock, LifeBuoy, Mail } from "lucide-react";
 import { LegalShell } from "@/components/legal/legal-shell";
 import { DocsSearch } from "@/components/resources/docs-search";
@@ -19,6 +20,7 @@ export const metadata: Metadata = {
     description: "Everything you need to set up and run your online shop, step by step.",
     url: `${SITE_URL}/docs`,
     type: "website",
+    images: [{ url: ogImage("Help Center: set up and run your online shop", "Help Center"), width: 1200, height: 630 }],
   },
 };
 

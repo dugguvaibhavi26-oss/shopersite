@@ -7,7 +7,10 @@ import { useAuth } from "@/lib/auth-context";
 import { siteConfig } from "@/lib/config/site";
 import { usePlatformSettings } from "@/lib/use-platform-settings";
 import { PLATFORM_PLANS, planDiscountPercent, calculatePlanPrice, BILLING_CYCLES, type BillingCycle } from "@/lib/plans";
-import { PLATFORM_THEMES, themeThumb } from "@/lib/themes";
+import { PLATFORM_THEMES, getTheme, themeThumb, type ThemeDefinition } from "@/lib/themes";
+import { useLandingConfig } from "@/lib/landing-client";
+import { DEFAULT_FEATURED_THEME_SLUGS } from "@/lib/landing-config";
+import { TumbleDeckShowcase, type TumbleCard } from "@/components/ui/tumble-deck-showcase";
 import { InstallAndroidApp } from "@/components/home/install-app";
 import { cn } from "@/lib/utils";
 import {
@@ -32,6 +35,16 @@ import {
   Store,
   Megaphone,
   ShieldCheck,
+  ExternalLink,
+  Lock,
+  Monitor,
+  Smartphone,
+  Sparkles,
+  Palette,
+  Layers,
+  Eye,
+  Search,
+  ShoppingBag,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -134,7 +147,6 @@ export default function HomePage() {
           <ThemesCarousel />
           <HowItWorks />
           <Statement />
-          <Pricing />
           <Faq />
           <FinalCta onClaim={claimStore} />
           <SiteFooter />
@@ -827,192 +839,150 @@ function PlatformTabs() {
 /* ------------------------------------------------------------------ */
 
 function ThemesCarousel() {
-  const themes = Object.values(PLATFORM_THEMES);
-  const n = themes.length;
-  // Three copies so there is always a card on both sides; the index stays in the middle copy
-  const slides = [...themes, ...themes, ...themes];
-  const [index, setIndex] = React.useState(n);
-  const [animate, setAnimate] = React.useState(true);
-  const [hovered, setHovered] = React.useState(false);
-  const [inView, setInView] = React.useState(false);
-  const viewport = React.useRef<HTMLDivElement>(null);
-  const touchX = React.useRef<number | null>(null);
+  const { config } = useLandingConfig();
 
-  const go = (next: number) => {
-    setAnimate(true);
-    setIndex(Math.max(0, Math.min(slides.length - 1, next)));
-  };
+  // Curated unique themes selected by the admin, deduplicated and falling back to default top themes
+  const themes = React.useMemo(() => {
+    const slugs =
+      config.selectedThemeSlugs && config.selectedThemeSlugs.length > 0
+        ? config.selectedThemeSlugs
+        : DEFAULT_FEATURED_THEME_SLUGS;
 
-  // Once a slide lands outside the middle copy, jump back to the matching card without animating
-  React.useEffect(() => {
-    if (index >= n && index < 2 * n) return;
-    const t = setTimeout(() => {
-      setAnimate(false);
-      setIndex(((((index - n) % n) + n) % n) + n);
-    }, 750);
-    return () => clearTimeout(t);
-  }, [index, n]);
-  React.useEffect(() => {
-    if (animate) return;
-    let inner = 0;
-    const outer = requestAnimationFrame(() => {
-      inner = requestAnimationFrame(() => setAnimate(true));
-    });
-    return () => {
-      cancelAnimationFrame(outer);
-      cancelAnimationFrame(inner);
-    };
-  }, [animate]);
+    const list: ThemeDefinition[] = [];
+    const seen = new Set<string>();
 
-  React.useEffect(() => {
-    const el = viewport.current;
-    if (!el) return;
-    const io = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), { threshold: 0.25 });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+    for (const slug of slugs) {
+      const theme = getTheme(slug);
+      if (theme && !seen.has(theme.slug)) {
+        seen.add(theme.slug);
+        list.push(theme);
+      }
+    }
 
-  React.useEffect(() => {
-    if (hovered || !inView || n < 2) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const timer = setInterval(() => {
-      if (document.hidden) return;
-      setAnimate(true);
-      setIndex((i) => (i + 1 >= 3 * n ? i : i + 1));
-    }, 1500);
-    return () => clearInterval(timer);
-  }, [hovered, inView, n]);
+    return list.length > 0 ? list : Object.values(PLATFORM_THEMES).slice(0, 6);
+  }, [config.selectedThemeSlugs]);
 
-  const ease = "ease-[cubic-bezier(0.22,1,0.36,1)]";
-  const current = ((index % n) + n) % n;
+  // Build cards for TumbleDeckShowcase (ensuring rich depth for endless 3D tumbling)
+  const cards: TumbleCard[] = React.useMemo(() => {
+    const list = [...themes];
+    if (list.length < 10) {
+      const existing = new Set(list.map((t) => t.slug));
+      for (const t of Object.values(PLATFORM_THEMES)) {
+        if (!existing.has(t.slug) && t.previewImage) {
+          list.push(t);
+          existing.add(t.slug);
+        }
+        if (list.length >= 12) break;
+      }
+    }
+    return list.map((t) => ({
+      src: t.previewImage || "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=800&q=80",
+      alt: `${t.name} — ${t.tagline}`,
+    }));
+  }, [themes]);
 
   return (
-    <section id="themes" className="py-24 sm:py-32 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col items-center gap-6">
+    <section id="themes" className="py-24 sm:py-32 overflow-hidden bg-white border-t border-neutral-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col items-center gap-8">
+        {/* Section Intro */}
         <SectionIntro
-          eyebrow="Themes"
-          title="Designed to sell."
+          eyebrow={config.themesEyebrow || "Themes"}
+          title={config.themesTitle || "Designed to sell."}
           effect="words-up"
           sub="rise"
-          text="Start with Lume Editorial for free. Upgrade to unlock our full collection of designer themes."
+          text={
+            config.themesText ||
+            "Start with Lume Editorial for free. Upgrade to unlock our full collection of designer themes."
+          }
         />
-        <div className="flex gap-2 shrink-0">
-          <button
-            type="button"
-            aria-label="Previous theme"
-            onClick={() => go(index - 1)}
-            className="w-12 h-12 rounded-full border border-neutral-300 flex items-center justify-center hover:bg-black hover:text-white hover:border-black hover:scale-105 active:scale-95 transition-all duration-300"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            aria-label="Next theme"
-            onClick={() => go(index + 1)}
-            className="w-12 h-12 rounded-full border border-neutral-300 flex items-center justify-center hover:bg-black hover:text-white hover:border-black hover:scale-105 active:scale-95 transition-all duration-300"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
 
-      <div
-        ref={viewport}
-        className="mt-10 pb-8 [--w:68vw] [--g:10px] sm:[--w:320px] sm:[--g:20px] lg:[--w:340px]"
-        onPointerEnter={(e) => e.pointerType === "mouse" && setHovered(true)}
-        onPointerLeave={(e) => e.pointerType === "mouse" && setHovered(false)}
-        onTouchStart={(e) => {
-          touchX.current = e.touches[0].clientX;
-        }}
-        onTouchEnd={(e) => {
-          if (touchX.current === null) return;
-          const dx = e.changedTouches[0].clientX - touchX.current;
-          touchX.current = null;
-          if (Math.abs(dx) > 40) go(index + (dx < 0 ? 1 : -1));
-        }}
-      >
-        <div
-          className={`flex w-max ${animate ? `transition-transform duration-700 ${ease}` : ""}`}
-          style={{
-            marginLeft: "50%",
-            gap: "var(--g)",
-            transform: `translateX(calc(var(--w) * -0.5 - ${index} * (var(--w) + var(--g))))`,
-          }}
-        >
-          {slides.map((theme, i) => {
-            const active = i === index;
-            const near = Math.abs(i - index) <= 1;
-            return (
+        {/* 3D Tumble Interaction Pill */}
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-neutral-100/90 border border-neutral-200/80 text-xs font-semibold text-neutral-600 shadow-2xs">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>Interactive 3D Deck — Scroll, drag, click or use arrow keys to tumble storefronts</span>
+        </div>
+
+        {/* 3D Tumble Deck Showcase Stage */}
+        <div className="w-full relative rounded-3xl border border-neutral-200/80 bg-neutral-50/70 shadow-sm overflow-hidden py-4 sm:py-6">
+          <TumbleDeckShowcase
+            cards={cards}
+            height="580px"
+            aspect={1.65}
+            depth={5}
+            scrollPerCard={220}
+            background="transparent"
+            className="w-full"
+            ariaLabel="Storefront themes 3D tumble showcase"
+          />
+        </div>
+
+        {/* Curated Theme Quick Launch Strip */}
+        <div className="w-full pt-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h4 className="text-sm font-extrabold text-neutral-950">
+                Curated Storefront Designs ({themes.length})
+              </h4>
+              <p className="text-xs text-neutral-500">
+                Tailored for direct UPI checkout, mobile velocity, and zero setup fee.
+              </p>
+            </div>
+            <Link
+              href="/themes"
+              className="inline-flex items-center gap-1 text-xs font-bold text-neutral-900 hover:underline"
+            >
+              <span>Explore All 37 Themes</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {themes.map((theme, idx) => (
               <Link
-                key={i}
-                href={`/themes?theme=${theme.slug}`}
-                tabIndex={active ? 0 : -1}
-                aria-hidden={!active}
-                onClick={(e) => {
-                  if (!active) {
-                    e.preventDefault();
-                    go(i);
-                  }
-                }}
-                className={`group block shrink-0 py-2 ${animate ? `transition-[transform,opacity] duration-700 ${ease}` : ""} ${
-                  active ? "scale-100 opacity-100" : near ? "scale-[0.9] opacity-60" : "scale-[0.9] opacity-30"
-                }`}
-                style={{ width: "var(--w)" }}
+                key={`theme-${theme.slug}-${idx}`}
+                href={`/register?theme=${theme.slug}`}
+                className="group p-3 rounded-2xl border border-neutral-200/90 bg-white hover:border-black hover:shadow-xs transition-all flex flex-col justify-between"
               >
-                <div
-                  className={`relative aspect-[4/5] rounded-[17px] overflow-hidden bg-neutral-100 transition-shadow duration-700 ${
-                    active ? "shadow-[0_30px_60px_-30px_rgba(0,0,0,0.45)]" : ""
-                  }`}
-                >
-                  {themeThumb(theme) && (
-                    <img
-                      src={themeThumb(theme)}
-                      alt={`${theme.name} theme preview`}
-                      loading="lazy"
-                      className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
-                    />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/0" />
-                  <span className="absolute top-4 left-4 rounded-[7px] bg-white text-black text-[10px] font-bold uppercase tracking-wider px-2.5 py-1">
-                    {theme.tier === "free" ? "Free" : theme.tier === "starter" ? "Growth" : "Pro"}
-                  </span>
-                  <div className="absolute bottom-0 inset-x-0 p-5 text-white flex items-end justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-[11px] uppercase tracking-[0.14em] text-white/70">{theme.category}</div>
-                      <div className="text-xl font-bold tracking-tight truncate">{theme.name}</div>
-                    </div>
-                    <span className="w-10 h-10 shrink-0 rounded-full bg-white text-black flex items-center justify-center transition-transform duration-300 group-hover:rotate-45 group-hover:scale-110">
-                      <ArrowUpRight className="w-4 h-4" />
+                <div>
+                  <div className="flex items-center justify-between gap-1 mb-2">
+                    <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-neutral-100 text-neutral-800 group-hover:bg-black group-hover:text-white transition-colors">
+                      {theme.tier || "Free"}
                     </span>
+                    <ArrowUpRight className="w-3 h-3 text-neutral-400 group-hover:text-black group-hover:translate-x-0.5 transition-transform" />
                   </div>
+                  <h5 className="text-xs font-bold text-neutral-900 truncate group-hover:text-black">
+                    {theme.name}
+                  </h5>
+                  <p className="text-[10px] text-neutral-500 truncate mt-0.5">
+                    {theme.category || "Fashion & Lifestyle"}
+                  </p>
+                </div>
+                <div className="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-between text-[10px] font-medium text-neutral-500">
+                  <span>Start Store</span>
+                  <span className="text-neutral-950 font-bold group-hover:underline">Free →</span>
                 </div>
               </Link>
-            );
-          })}
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className="flex justify-center gap-1.5">
-        {themes.map((theme, k) => (
-          <button
-            key={theme.slug}
-            type="button"
-            aria-label={`Show ${theme.name}`}
-            onClick={() => go(index - current + k)}
-            style={{ minHeight: 0 }}
-            className={`h-1.5 rounded-full transition-all duration-500 ${current === k ? "w-6 bg-black" : "w-1.5 bg-neutral-300 hover:bg-neutral-400"}`}
-          />
-        ))}
-      </div>
-
-      <div className="mt-10 flex justify-center">
-        <Link
-          href="/themes"
-          className="group inline-flex items-center gap-2 rounded-full border border-neutral-300 px-6 py-3 text-sm font-semibold transition-colors duration-300 hover:border-black hover:bg-black hover:text-white"
-        >
-          Browse all {n} themes
-          <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-        </Link>
+        {/* Bottom Destination Link */}
+        <div className="pt-4 flex flex-col sm:flex-row items-center gap-3">
+          <Link
+            href="/themes"
+            className="group inline-flex items-center gap-2 rounded-full border border-neutral-300 px-7 py-3.5 text-sm font-semibold transition-all duration-300 hover:border-black hover:bg-black hover:text-white shadow-2xs"
+          >
+            <span>Browse the complete marketplace (37 themes)</span>
+            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+          </Link>
+          <Link
+            href="/register"
+            className="inline-flex items-center gap-2 rounded-full bg-black text-white px-7 py-3.5 text-sm font-semibold transition-all duration-300 hover:bg-neutral-800 shadow-sm"
+          >
+            <span>Launch your store for free</span>
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
     </section>
   );

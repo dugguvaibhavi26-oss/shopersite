@@ -17,3 +17,4 @@ export * from "./color-picker";
 export * from "./reorder-list";
 export * from "./date-range-picker";
 export * from "./share-card";
+export * from "./tumble-deck-showcase";

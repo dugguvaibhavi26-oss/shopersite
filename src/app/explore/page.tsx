@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ogImage } from "@/lib/seo";
 import { ArrowRight, CalendarDays, Compass } from "lucide-react";
 import { LegalShell } from "@/components/legal/legal-shell";
 import { DocsSearch } from "@/components/resources/docs-search";
@@ -22,6 +23,7 @@ export const metadata: Metadata = {
     description: "Start, sell more and grow: practical guides, tools and a festival selling calendar.",
     url: `${SITE_URL}/explore`,
     type: "website",
+    images: [{ url: ogImage("Guides to start and grow your online shop", "Explore"), width: 1200, height: 630 }],
   },
 };
 

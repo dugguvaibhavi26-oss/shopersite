@@ -1,4 +1,5 @@
 import type { Guide } from "./types";
+import { FREE_GUIDES } from "./guides-free";
 
 /**
  * Explore guides: long-form articles for Indian online sellers, each a real page at /explore/<slug>.
@@ -6,7 +7,7 @@ import type { Guide } from "./types";
  * Avoid made-up statistics; give practical, checkable advice.
  */
 
-export const GUIDES: Guide[] = [
+const CORE_GUIDES: Guide[] = [
   {
     slug: "how-to-start-an-online-store-in-india",
     category: "Start",
@@ -498,6 +499,8 @@ export const GUIDES: Guide[] = [
     related: ["trending-products-to-sell-online-india", "how-to-start-an-online-store-in-india"],
   },
 ];
+
+export const GUIDES: Guide[] = [...CORE_GUIDES, ...FREE_GUIDES];
 
 export const GUIDE_BY_SLUG = Object.fromEntries(GUIDES.map((g) => [g.slug, g]));
 

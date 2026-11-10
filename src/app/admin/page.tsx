@@ -31,6 +31,7 @@ import { AdminsManager } from "@/components/admin/admins-manager";
 import { CompanySettings } from "@/components/admin/company-settings";
 import { AssistantSettings } from "@/components/admin/assistant-settings";
 import { DiscoverSettings } from "@/components/admin/discover-settings";
+import { LandingSettings } from "@/components/admin/landing-settings";
 import {
   LifeBuoy,
   ShieldAlert,
@@ -58,6 +59,7 @@ import {
   ArrowRight,
   ArrowLeft,
   ShieldCheck,
+  LayoutTemplate,
   CreditCard,
   Sparkles,
   Bell,
@@ -137,7 +139,7 @@ function AdminDashboardContent() {
 
   // Active Tab: overview | users | subscriptions | broadcasts | banners | health
   const [activeTab, setActiveTab] = useState<
-    "overview" | "users" | "subscriptions" | "broadcasts" | "banners" | "themes" | "requests" | "admins" | "company" | "assistant" | "discover" | "health"
+    "overview" | "users" | "subscriptions" | "broadcasts" | "banners" | "themes" | "landing" | "requests" | "admins" | "company" | "assistant" | "discover" | "health"
   >("overview");
   const [openRequests, setOpenRequests] = useState(0);
   useEffect(() => {
@@ -1308,7 +1310,7 @@ function AdminDashboardContent() {
     stores.filter((s) => s.pendingSubscription).length +
     stores.reduce((n, s) => n + (s.themePurchases || []).filter((p) => p.status === "pending_verification").length, 0);
   const adminNav: {
-    id: "overview" | "users" | "subscriptions" | "broadcasts" | "banners" | "themes" | "requests" | "admins" | "company" | "assistant" | "discover" | "health";
+    id: "overview" | "users" | "subscriptions" | "broadcasts" | "banners" | "themes" | "landing" | "requests" | "admins" | "company" | "assistant" | "discover" | "health";
     label: string;
     /** shorter name for the phone grid */
     short?: string;
@@ -1322,6 +1324,7 @@ function AdminDashboardContent() {
     { id: "broadcasts", label: "Announcements", short: "Announce", icon: Send },
     { id: "banners", label: "App banners", icon: ImageIcon },
     { id: "themes", label: "Themes", icon: Layers, badge: Object.keys(PLATFORM_THEMES).length + storeService.getPlatformThemes().length },
+    { id: "landing", label: "Landing page", short: "Landing", icon: LayoutTemplate },
     { id: "requests", label: "Help requests", short: "Requests", icon: LifeBuoy, badge: openRequests || undefined, alert: openRequests > 0 },
     { id: "admins", label: "Admins", icon: ShieldCheck },
     { id: "company", label: "Company & legal", short: "Legal", icon: FileSpreadsheet },
@@ -2647,6 +2650,7 @@ function AdminDashboardContent() {
         {activeTab === "banners" && <PlatformBannersManager />}
 
         {activeTab === "themes" && <ThemesManager stores={stores} />}
+        {activeTab === "landing" && <LandingSettings myEmail={myEmail} />}
 
         {activeTab === "requests" && <SupportRequests onOpenCount={setOpenRequests} />}
 

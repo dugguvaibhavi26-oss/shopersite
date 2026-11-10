@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/components/seo/site-analytics";
 import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -205,6 +206,8 @@ function RegisterStoreContent() {
         localStorage.setItem("shopper_active_store", newStore.subdomain);
       }
 
+      // GA4 conversion: a new store was created (no personal details are sent)
+      trackEvent("sign_up", { method: user ? "existing_account" : "email", plan: planId });
       setCreatedSubdomain(newStore.subdomain);
       setStep(3);
     } catch (err: any) {

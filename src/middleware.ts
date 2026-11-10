@@ -88,6 +88,9 @@ export default async function middleware(req: NextRequest) {
     path.startsWith("/register") ||
     path.startsWith("/gallery") ||
     path.startsWith("/orders") ||
+    path.startsWith("/pricing") ||
+    path.startsWith("/themes") ||
+    path.startsWith("/delete-account") ||
     path.startsWith("/invoice/")
   ) {
     return NextResponse.next();

@@ -13,14 +13,14 @@ import { BookOpen, ChevronDown, Compass, FileText, LayoutGrid, LifeBuoy, Megapho
  */
 
 const PRODUCT_MENU = [
-  { icon: Store, title: "Online Store", text: "Launch a branded storefront in minutes", href: "/#features" },
-  { icon: QrCode, title: "UPI Payments", text: "Get paid directly to your bank", href: "/#features" },
-  { icon: Package, title: "Order Management", text: "Track every order from placed to delivered", href: "/#platform" },
-  { icon: Megaphone, title: "Marketing", text: "Banners, coupons and drop announcements", href: "/#platform" },
+  { icon: Store, title: "Free online store", text: "Launch a real store on the ₹0 plan", href: "/free-online-store-builder" },
+  { icon: Package, title: "Ecommerce website", text: "Cart, checkout, orders and stock", href: "/free-ecommerce-website-builder" },
+  { icon: Megaphone, title: "For Instagram & WhatsApp", text: "Turn DMs into orders you can track", href: "/instagram-store-builder" },
+  { icon: QrCode, title: "Made for India", text: "COD, UPI, GST and Indian couriers", href: "/online-store-builder-india" },
 ];
 
 const RESOURCES_MENU = [
-  { icon: Compass, title: "Explore", text: "Trends, campaigns, ideas & academy", href: "/explore" },
+  { icon: Compass, title: "Explore", text: "Guides, tools and a festival calendar", href: "/explore" },
   { icon: BookOpen, title: "Theme marketplace", text: "Browse every storefront design", href: "/themes" },
   { icon: FileText, title: "Documentation", text: "Setup guides, payments & integrations", href: "/docs" },
   { icon: LifeBuoy, title: "Help & FAQ", text: "Answers to common questions", href: "/#faq" },
@@ -69,7 +69,7 @@ export function SiteHeader({ user, onSignOut }: { user: boolean; onSignOut: () =
           <nav className="hidden lg:flex items-center gap-1 text-sm font-medium text-neutral-700">
             <NavDropdown label="Product" items={PRODUCT_MENU} />
             <Link href="/themes" className="px-3 py-2 rounded-[14px] hover:bg-neutral-100 transition-colors">Themes</Link>
-            <a href="/#pricing" className="px-3 py-2 rounded-[14px] hover:bg-neutral-100 transition-colors">Pricing</a>
+            <Link href="/pricing" className="px-3 py-2 rounded-[14px] hover:bg-neutral-100 transition-colors">Pricing</Link>
             <NavDropdown label="Resources" items={RESOURCES_MENU} />
           </nav>
         </div>
@@ -145,9 +145,9 @@ export function SiteHeader({ user, onSignOut }: { user: boolean; onSignOut: () =
                 {title}
               </a>
             ))}
-            <a href="/#pricing" onClick={() => setMobileOpen(false)} className="block px-3 py-3 rounded-[8px] hover:bg-neutral-100 text-sm font-medium">
+            <Link href="/pricing" onClick={() => setMobileOpen(false)} className="block px-3 py-3 rounded-[8px] hover:bg-neutral-100 text-sm font-medium">
               Pricing
-            </a>
+            </Link>
           </div>
           <div className="px-4 pb-5 grid grid-cols-2 gap-2">
             {user ? (
@@ -212,20 +212,27 @@ function NavDropdown({ label, items }: { label: string; items: typeof PRODUCT_ME
 
 const FOOTER_COLUMNS = [
   {
-    title: "Product",
+    title: "Sell online",
     links: [
-      { label: "Online Store", href: "/#features" },
-      { label: "UPI Payments", href: "/#features" },
-      { label: "Order Management", href: "/#platform" },
-      { label: "Pricing", href: "/#pricing" },
+      { label: "Free online store builder", href: "/free-online-store-builder" },
+      { label: "Free ecommerce website builder", href: "/free-ecommerce-website-builder" },
+      { label: "Build a store for free", href: "/build-online-store-for-free" },
+      { label: "Online store builder India", href: "/online-store-builder-india" },
+      { label: "For Instagram sellers", href: "/instagram-store-builder" },
+      { label: "For WhatsApp sellers", href: "/whatsapp-selling-website" },
+      { label: "For small businesses", href: "/website-builder-for-small-business" },
+      { label: "Free business website", href: "/free-website-for-small-business" },
+      { label: "Pricing", href: "/pricing" },
     ],
   },
   {
-    title: "Themes",
+    title: "Resources",
     links: [
       { label: "All Themes", href: "/themes" },
       { label: "On the homepage", href: "/#themes" },
-      { label: "Explore & Resources", href: "/explore" },
+      { label: "Guides for sellers", href: "/explore" },
+      { label: "Seller tools", href: "/explore/tools" },
+      { label: "Festival calendar", href: "/explore/festival-calendar" },
     ],
   },
   {
@@ -255,6 +262,7 @@ const FOOTER_COLUMNS = [
       { label: "Refunds & Cancellations", href: "/legal/refunds" },
       { label: "Payments", href: "/legal/payments" },
       { label: "Buyer Terms", href: "/legal/buyer-terms" },
+      { label: "Delete account", href: "/delete-account" },
       { label: "All policies", href: "/legal" },
     ],
   },

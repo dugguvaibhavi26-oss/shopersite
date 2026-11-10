@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { ogImage } from "@/lib/seo";
 import { ArrowRight, CalendarDays, Clock } from "lucide-react";
 import { LegalShell, LegalToc } from "@/components/legal/legal-shell";
 import { Blocks, Faqs, JsonLd } from "@/components/resources/blocks";
@@ -22,8 +23,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     description: g.summary,
     keywords: g.keywords,
     alternates: { canonical: `/explore/${g.slug}` },
-    openGraph: { title: g.title, description: g.summary, url: `${SITE_URL}/explore/${g.slug}`, type: "article", publishedTime: g.date },
-    twitter: { card: "summary_large_image", title: g.title, description: g.summary },
+    openGraph: { title: g.title, description: g.summary, url: `${SITE_URL}/explore/${g.slug}`, type: "article", publishedTime: g.date, modifiedTime: g.date, authors: ["Shopersite team"], siteName: "Shopersite", locale: "en_IN", images: [{ url: ogImage(g.title, "Guide"), width: 1200, height: 630, alt: g.title }] },
+    twitter: { card: "summary_large_image", title: g.title, description: g.summary, images: [ogImage(g.title, "Guide")] },
   };
 }
 

@@ -28,6 +28,9 @@
     /* Classic monochrome palette: black ink on white */
     --background: #FFFFFF;
     --foreground: #111111;
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-primary: var(--primary);
 
     --card: #FFFFFF;
     --card-foreground: #111111;

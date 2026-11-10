@@ -3,6 +3,7 @@ import { LEGAL_DOCS } from "@/lib/legal/docs";
 import { DOCS } from "@/lib/resources/docs";
 import { GUIDES } from "@/lib/resources/guides";
 import { SITE_URL } from "@/lib/resources";
+import { LANDINGS } from "@/lib/landings";
 
 /** The marketing site's public pages, for search engines. Shops are on their own addresses. */
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -10,7 +11,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const latestGuide = GUIDES.reduce((d, g) => (g.date > d ? g.date : d), "2026-01-01");
   return [
     { url: `${base}/`, changeFrequency: "weekly", priority: 1 },
+    // the high-intent landing pages, right under the homepage
+    ...LANDINGS.map((l) => ({ url: `${base}/${l.slug}`, lastModified: "2026-11-10", changeFrequency: "monthly" as const, priority: 0.9 })),
     { url: `${base}/themes`, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${base}/register`, changeFrequency: "yearly", priority: 0.6 },
     { url: `${base}/explore`, lastModified: latestGuide, changeFrequency: "weekly", priority: 0.8 },
     { url: `${base}/explore/tools`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${base}/explore/festival-calendar`, changeFrequency: "monthly", priority: 0.7 },
