@@ -48,6 +48,17 @@ function PriceBlock({ plan, muted }: { plan: PlanFeature; muted: boolean }) {
       </div>
     );
   }
+  if (plan.priceMonthly > 0) {
+    return (
+      <div className="mt-4">
+        <p className="flex items-baseline gap-1.5">
+          <span className="text-[32px] font-semibold leading-none tracking-tight tabular-nums">{rupees(plan.priceMonthly)}</span>
+          <span className="text-sm text-neutral-500">/ month</span>
+        </p>
+        <p className="mt-2 text-[13px] text-neutral-500">Paid automatically each month</p>
+      </div>
+    );
+  }
   return (
     <div className="mt-4">
       <p className="flex items-baseline gap-1.5">
@@ -78,7 +89,12 @@ export function PlansSection({
   onUpgrade,
   onRenew,
   lowerNote,
+  trialUsed,
+  introUsed,
 }: {
+  /** this shop already had its free trial / introductory price: show the normal price instead */
+  trialUsed?: boolean;
+  introUsed?: boolean;
   currentPlanId: string;
   moveFor: (planId: string) => PlanMove;
   pending: boolean;
@@ -87,7 +103,9 @@ export function PlansSection({
   lowerNote?: string;
 }) {
   const [compareOpen, setCompareOpen] = React.useState(false);
-  const plans = ORDER.map((id) => PLATFORM_PLANS[id]).filter(Boolean);
+  const plans = ORDER.map((id) => PLATFORM_PLANS[id])
+    .filter(Boolean)
+    .map((p) => ({ ...p, trialDays: trialUsed ? undefined : p.trialDays, ...(introUsed ? { introPriceMonthly: undefined, introMonths: undefined } : {}) }));
 
   return (
     <section className="space-y-4">

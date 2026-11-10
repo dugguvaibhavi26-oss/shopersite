@@ -6,8 +6,9 @@
  * - While a paid plan is running, the seller can renew it or move UP, never down.
  * - `planRenewal: "off"` means the seller cancelled: no renewal reminders, the plan simply ends.
  *
- * Payments are manual UPI for now, so "renewal" means we remind the seller to pay before the end
- * date. Automatic deduction (UPI AutoPay) needs a payment gateway's subscription API.
+ * Two ways to pay. Automatic (a Razorpay subscription, card or UPI AutoPay): Razorpay charges each
+ * month and the server moves `planPaidUntil` forward, so there is nothing to remind about. Manual
+ * UPI: "renewal" means we remind the seller to pay before the end date.
  */
 
 export const PLAN_RANK: Record<string, number> = { free: 0, starter: 1, pro: 2 };
@@ -16,7 +17,29 @@ const DAY = 24 * 60 * 60 * 1000;
 
 export const rankOf = (planId?: string) => PLAN_RANK[planId || "free"] ?? 0;
 
-type PlanFields = { planId?: string; planPaidUntil?: string; planRenewal?: "on" | "off"; expiredPlanId?: string };
+/** the parts of the automatic-payment record (see billing/subscription-core) these rules read */
+type AutoPayRecord = { status: string; trial?: boolean; cancelRequested?: boolean; startsAt?: string; currentEnd?: string; nextChargeAt?: string; paidCount?: number };
+type PlanFields = {
+  planId?: string;
+  planPaidUntil?: string;
+  planRenewal?: "on" | "off";
+  expiredPlanId?: string;
+  planBilling?: { current?: AutoPayRecord | null } | null;
+};
+
+/** Automatic payments that are running: "trial" and "scheduled" haven't charged yet, "retrying" means the last charge failed. */
+export type AutoPay = { stage: "trial" | "scheduled" | "active" | "retrying"; nextChargeAt?: Date };
+
+function autoPayOf(store: PlanFields, planId: string): AutoPay | undefined {
+  const cur = store.planBilling?.current;
+  if (!cur || cur.cancelRequested || store.planRenewal === "off") return undefined;
+  if ((store.planId || "free") !== planId) return undefined;
+  const date = (v?: string) => (v && Number.isFinite(Date.parse(v)) ? new Date(v) : undefined);
+  if (cur.status === "authenticated") return { stage: cur.trial ? "trial" : "scheduled", nextChargeAt: date(cur.startsAt) || date(cur.nextChargeAt) };
+  if (cur.status === "active") return { stage: "active", nextChargeAt: date(cur.nextChargeAt) || date(cur.currentEnd) };
+  if (cur.status === "pending") return { stage: "retrying" };
+  return undefined;
+}
 
 /** The plan the store is actually on right now: an ended paid plan counts as Free. */
 export function effectivePlan<T extends PlanFields>(store: T, now = Date.now()): T {
@@ -29,7 +52,7 @@ export function effectivePlan<T extends PlanFields>(store: T, now = Date.now()):
 
 export type SubscriptionState =
   | { kind: "free"; endedPlanId?: string; endedAt?: Date }
-  | { kind: "active"; planId: string; endsAt?: Date; daysLeft?: number; renewing: boolean; endingSoon: boolean };
+  | { kind: "active"; planId: string; endsAt?: Date; daysLeft?: number; renewing: boolean; endingSoon: boolean; autoPay?: AutoPay };
 
 /** Where the subscription stands, for the billing page and reminders. Expects the raw store (planId as saved). */
 export function subscriptionState(store: PlanFields, now = Date.now()): SubscriptionState {
@@ -38,13 +61,16 @@ export function subscriptionState(store: PlanFields, now = Date.now()): Subscrip
   const endsAt = store.planPaidUntil ? new Date(store.planPaidUntil) : undefined;
   if (endsAt && endsAt.getTime() <= now) return { kind: "free", endedPlanId: planId, endedAt: endsAt };
   const daysLeft = endsAt ? Math.max(0, Math.ceil((endsAt.getTime() - now) / DAY)) : undefined;
+  const autoPay = autoPayOf(store, planId);
   return {
     kind: "active",
     planId,
     endsAt,
     daysLeft,
     renewing: store.planRenewal !== "off",
-    endingSoon: daysLeft !== undefined && daysLeft <= REMIND_DAYS,
+    // with automatic payments the end date moves forward by itself: nothing to renew by hand
+    endingSoon: !autoPay && daysLeft !== undefined && daysLeft <= REMIND_DAYS,
+    autoPay,
   };
 }
 

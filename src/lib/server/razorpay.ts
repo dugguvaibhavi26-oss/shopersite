@@ -195,3 +195,8 @@ export async function revokeOAuthToken(token: string): Promise<void> {
     // best-effort; the connection is removed on our side regardless
   }
 }
+
+/** Any Razorpay API call with a key pair (Shopersite's own account: plan subscriptions). */
+export function razorpayRequest<T>(keys: { keyId: string; keySecret: string }, method: "GET" | "POST" | "PATCH", url: string, body?: unknown): Promise<T> {
+  return call<T>(basicAuth(keys.keyId, keys.keySecret), url, { method, body });
+}

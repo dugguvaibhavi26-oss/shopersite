@@ -17,11 +17,13 @@ export const PRIVATE_STORE_KEYS = [
   "pendingSubscription",
   "subscriptionHistory",
   "themePurchases",
+  // the shop's Razorpay subscription for its Shopersite plan (server-written)
+  "planBilling",
 ] as const;
 export type PrivateStoreKey = (typeof PRIVATE_STORE_KEYS)[number];
 
 /** Private fields that only the server or an admin may change (payment requests and approvals). */
-export const BILLING_KEYS = ["pendingSubscription", "subscriptionHistory", "themePurchases"] as const;
+export const BILLING_KEYS = ["pendingSubscription", "subscriptionHistory", "themePurchases", "planBilling"] as const;
 
 /** Public fields a store owner may never change themselves (plan, ownership, suspension…). */
 export const OWNER_LOCKED_KEYS = [
@@ -63,6 +65,7 @@ export function mergeStoreParts(pub: Partial<StoreData>, priv?: Partial<StoreDat
     pendingSubscription: null,
     subscriptionHistory: [],
     themePurchases: [],
+    planBilling: null,
   };
   for (const k of PRIVATE_STORE_KEYS) {
     const fromPriv = priv && k in priv ? (priv as Record<string, unknown>)[k] : undefined;

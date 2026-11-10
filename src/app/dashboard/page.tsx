@@ -57,6 +57,7 @@ import {
   TrackingSettings,
 } from "@/components/dashboard/store-settings-sections";
 import { fetchPaidOnlineOrders } from "@/lib/payments/client";
+import { BILLING_DISMISSED, BILLING_NOT_CONFIGURED, BillingError, cancelPlanSubscription, startPlanSubscription } from "@/lib/billing/client";
 import { HomeFeed } from "@/components/dashboard/home-feed";
 import { PlansSection } from "@/components/dashboard/plans-page";
 import { FilterMenu } from "@/components/dashboard/filter-menu";
@@ -347,7 +348,9 @@ function DashboardPageContent() {
     }
     const cycle: BillingCycle = cycleParam === "quarterly" || cycleParam === "yearly" ? cycleParam : "monthly";
     setActiveTab("billing");
-    openSubscriptionModal(checkoutParam, cycle);
+    // monthly is paid automatically through Razorpay; longer periods are still paid by UPI
+    if (cycle === "monthly") handleUpgradePlan(checkoutParam);
+    else openSubscriptionModal(checkoutParam, cycle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store?.subdomain, checkoutParam]);
 
@@ -1068,8 +1071,26 @@ function DashboardPageContent() {
     setTimeout(() => setLogoSavedToast(false), 2500);
   };
 
-  const handleUpgradePlan = (planId: "starter" | "pro") => {
-    openSubscriptionModal(planId);
+  // Choosing a plan sets up automatic payments (Razorpay: card or UPI AutoPay). Until Razorpay is
+  // switched on for the platform, it falls back to paying by UPI and waiting for approval.
+  const [planBusy, setPlanBusy] = useState(false);
+  const handleUpgradePlan = async (planId: "starter" | "pro", upiCycle: BillingCycle = "monthly") => {
+    if (!store || planBusy) return;
+    setPlanBusy(true);
+    setUpgradeSuccess(false);
+    try {
+      await startPlanSubscription(store.subdomain, planId, { name: user?.displayName || undefined, email: user?.email || undefined, contact: store.contactPhone || undefined });
+      refreshStore();
+      setUpgradeSuccess(true);
+      setActiveTab("billing");
+      scrollDashTop({ top: 0 });
+    } catch (err) {
+      const code = err instanceof BillingError ? err.code : undefined;
+      if (code === BILLING_NOT_CONFIGURED) openSubscriptionModal(planId, upiCycle);
+      else if (code !== BILLING_DISMISSED) appAlert(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setPlanBusy(false);
+    }
   };
 
   const handleActivateTheme = (themeSlug: string) => {
@@ -1379,7 +1400,7 @@ function DashboardPageContent() {
   // Sidebar navigation, grouped. `badge` is a count, "dot" (needs attention) or "lock" (paid feature).
   const subNow = subscriptionState(store);
   // the Subscription page gets a red dot while the plan is ending or has ended
-  const planNeedsAttention = (subNow.kind === "active" && subNow.endingSoon) || (subNow.kind === "free" && !!subNow.endedPlanId);
+  const planNeedsAttention = (subNow.kind === "active" && (subNow.endingSoon || subNow.autoPay?.stage === "retrying")) || (subNow.kind === "free" && !!subNow.endedPlanId);
   const policiesMissing = missingPolicies(store);
   const needsPolicy = !hasAnyPolicy(store);
   const shopClosed = isShopClosed(store);
@@ -1584,7 +1605,16 @@ function DashboardPageContent() {
       };
     });
   const expiryNotices: { id: string; title: string; desc: string; time: string; type: string }[] = [];
-  if (subNow.kind === "active" && subNow.endingSoon && subNow.renewing && subNow.endsAt) {
+  if (subNow.kind === "active" && subNow.autoPay?.stage === "retrying") {
+    const name = PLATFORM_PLANS[subNow.planId]?.name || "paid";
+    expiryNotices.push({
+      id: `plan-retry-${new Date().toISOString().slice(0, 10)}`,
+      title: `Your ${name} payment didn't go through`,
+      desc: "We'll try again over the next few days. Keep enough balance in your account, or your shop moves to Free.",
+      time: "Today",
+      type: "plan",
+    });
+  } else if (subNow.kind === "active" && subNow.endingSoon && subNow.renewing && subNow.endsAt) {
     const name = PLATFORM_PLANS[subNow.planId]?.name || "paid";
     const day = new Date().toISOString().slice(0, 10);
     const n = subNow.daysLeft ?? 0;
@@ -5506,8 +5536,37 @@ function DashboardPageContent() {
           const cycleName = (c?: string) => (c === "yearly" ? "Yearly" : c === "quarterly" ? "Every 3 months" : "Monthly");
           const lastPaid = history.find((h) => h.status === "verified" && h.planId === (sub.kind === "active" ? sub.planId : sub.endedPlanId));
           const daysText = (n: number) => (n <= 0 ? "today" : n === 1 ? "in 1 day" : `in ${n} days`);
-          const renew = (planId: string) => openSubscriptionModal(planId as "starter" | "pro", (lastPaid?.billingCycle as BillingCycle) || "monthly");
+          const renew = (planId: string) => handleUpgradePlan(planId as "starter" | "pro", (lastPaid?.billingCycle as BillingCycle) || "monthly");
+          const autoPay = sub.kind === "active" ? sub.autoPay : undefined;
+          const price = (paise: number) => `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
+          // what the next automatic charge will be: Pro's first months are at the introductory price
+          const autoCharge = (() => {
+            if (!autoPay || !activePlan) return "";
+            const b = store.planBilling?.current;
+            const intro = !!b?.intro && !!activePlan.introPriceMonthly && (b.paidCount || 0) < (activePlan.introMonths || 0);
+            return price(intro ? activePlan.introPriceMonthly! : activePlan.priceMonthly);
+          })();
+          const stopAutoPay = async () => {
+            const until = fmtDate(sub.kind === "active" ? sub.endsAt : undefined);
+            const text =
+              autoPay?.stage === "trial"
+                ? `Nothing will be charged. Your free trial stays until ${until}, then your store moves to Free.`
+                : `No more payments will be taken. ${activePlan?.name || "Your plan"} stays active until ${until}, then your store moves to Free.`;
+            if (!(await appConfirm(text, { title: "Cancel your subscription?", okLabel: "Cancel subscription", cancelLabel: "Keep it", danger: true }))) return;
+            setPlanBusy(true);
+            try {
+              await cancelPlanSubscription(store.subdomain);
+              refreshStore();
+            } catch (err) {
+              appAlert(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+            } finally {
+              setPlanBusy(false);
+            }
+          };
           const setRenewal = async (value: "on" | "off") => {
+            if (value === "off" && autoPay) return stopAutoPay();
+            // automatic payments that were cancelled can't be switched back on: start them again
+            if (value === "on" && store.planBilling?.current && sub.kind === "active") return renew(sub.planId);
             if (value === "off" && !(await appConfirm(`${activePlan?.name || "Your plan"} stays active until ${fmtDate(sub.kind === "active" ? sub.endsAt : undefined)}, then your store moves to Free. Nothing is charged automatically.`, { title: "Cancel your subscription?", okLabel: "Cancel subscription", cancelLabel: "Keep it", danger: true }))) return;
             storeService.updateStore(store.subdomain, { planRenewal: value });
             refreshStore();
@@ -5525,7 +5584,23 @@ function DashboardPageContent() {
               {upgradeSuccess && (
                 <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                  <span>You&apos;re now on <b>{currentPlan.name}</b>. Your new limits are active.</span>
+                  <span>
+                    You&apos;re now on <b>{currentPlan.name}</b>. Your new limits are active.
+                    {autoPay?.stage === "trial" && autoPay.nextChargeAt ? ` Your free trial runs until ${fmtDate(autoPay.nextChargeAt)}; cancel before then and you pay nothing.` : ""}
+                  </span>
+                </div>
+              )}
+
+              {/* amber card: an automatic payment failed and is being retried */}
+              {autoPay?.stage === "retrying" && activePlan && (
+                <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
+                  <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-amber-900">Your {activePlan.name} payment didn&apos;t go through</p>
+                    <p className="mt-0.5 text-[13px] text-amber-800">
+                      We&apos;ll try again over the next few days. Keep enough balance in your account. If it keeps failing, your store moves to Free.
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -5583,15 +5658,27 @@ function DashboardPageContent() {
                 </div>
                 <dl className={`grid grid-cols-1 divide-y divide-neutral-100 border-t border-neutral-100 text-sm sm:divide-x sm:divide-y-0 ${sub.kind === "active" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
                   <div className="px-5 py-3.5 sm:px-6">
-                    <dt className="text-xs text-neutral-500">{sub.kind === "active" ? (sub.renewing ? "Renews on" : "Ends on") : "Price"}</dt>
+                    <dt className="text-xs text-neutral-500">
+                      {sub.kind === "active" ? (autoPay ? (autoPay.stage === "trial" ? "Free trial until" : autoPay.stage === "retrying" ? "Payment" : "Next payment") : sub.renewing ? "Renews on" : "Ends on") : "Price"}
+                    </dt>
                     <dd className="mt-0.5 font-medium">
-                      {sub.kind === "active" ? (sub.endsAt ? fmtDate(sub.endsAt) : "No end date") : "₹0"}
+                      {sub.kind === "active"
+                        ? autoPay
+                          ? autoPay.stage === "retrying"
+                            ? "Retrying"
+                            : fmtDate(autoPay.nextChargeAt || sub.endsAt)
+                          : sub.endsAt
+                            ? fmtDate(sub.endsAt)
+                            : "No end date"
+                        : "₹0"}
                     </dd>
                   </div>
                   {sub.kind === "active" && (
                     <div className="px-5 py-3.5 sm:px-6">
                       <dt className="text-xs text-neutral-500">Billing</dt>
-                      <dd className="mt-0.5 font-medium">{lastPaid ? `${cycleName(lastPaid.billingCycle)} · ${lastPaid.amountFormatted.replace(/\.00$/, "")}` : "Paid by UPI"}</dd>
+                      <dd className="mt-0.5 font-medium">
+                        {autoPay ? `Monthly · ${autoCharge} · automatic` : lastPaid ? `${cycleName(lastPaid.billingCycle)} · ${lastPaid.amountFormatted.replace(/\.00$/, "")}` : "Paid by UPI"}
+                      </dd>
                     </div>
                   )}
                   <div className="px-5 py-3.5 sm:px-6">
@@ -5607,22 +5694,30 @@ function DashboardPageContent() {
                 {sub.kind === "active" && sub.endsAt && (
                   <div className="flex flex-col gap-2 border-t border-neutral-100 px-5 py-4 text-[13px] sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <p className="text-neutral-500">
-                      {sub.renewing
-                        ? `You pay by UPI each period. We'll remind you daily from ${REMIND_DAYS} days before ${fmtDate(sub.endsAt)}.`
-                        : `No more reminders. Your plan stays active until ${fmtDate(sub.endsAt)}.`}
+                      {autoPay
+                        ? autoPay.stage === "trial"
+                          ? `Your free trial is on. ${autoCharge} is taken automatically on ${fmtDate(autoPay.nextChargeAt)}, then every month. Cancel before then and you pay nothing.`
+                          : autoPay.stage === "retrying"
+                            ? "Your last payment failed. We're trying again automatically."
+                            : `${autoCharge} is taken automatically${autoPay.nextChargeAt ? ` on ${fmtDate(autoPay.nextChargeAt)}` : ""}, then every month. Cancel any time.`
+                        : sub.renewing
+                          ? `You pay by UPI each period. We'll remind you daily from ${REMIND_DAYS} days before ${fmtDate(sub.endsAt)}.`
+                          : store.planBilling?.current
+                            ? `No more payments will be taken. Your plan stays active until ${fmtDate(sub.endsAt)}.`
+                            : `No more reminders. Your plan stays active until ${fmtDate(sub.endsAt)}.`}
                     </p>
                     <div className="flex shrink-0 items-center gap-2">
-                      {!pending && !sub.endingSoon && (
+                      {!pending && !sub.endingSoon && !autoPay && sub.renewing && (
                         <button type="button" onClick={() => renew(sub.planId)} className="h-9 rounded-xl border border-neutral-300 px-3.5 text-[13px] font-medium hover:border-neutral-900">
                           Renew early
                         </button>
                       )}
                       {sub.renewing ? (
-                        <button type="button" onClick={() => setRenewal("off")} className="h-9 rounded-xl px-3 text-[13px] font-medium text-neutral-500 hover:text-red-600">
+                        <button type="button" disabled={planBusy} onClick={() => setRenewal("off")} className="h-9 rounded-xl px-3 text-[13px] font-medium text-neutral-500 hover:text-red-600 disabled:opacity-50">
                           Cancel subscription
                         </button>
                       ) : (
-                        <button type="button" onClick={() => setRenewal("on")} className="h-9 rounded-xl border border-neutral-300 px-3.5 text-[13px] font-medium hover:border-neutral-900">
+                        <button type="button" disabled={planBusy || !!pending} onClick={() => setRenewal("on")} className="h-9 rounded-xl border border-neutral-300 px-3.5 text-[13px] font-medium hover:border-neutral-900 disabled:opacity-50">
                           Resume subscription
                         </button>
                       )}
@@ -5652,8 +5747,10 @@ function DashboardPageContent() {
               <PlansSection
                 currentPlanId={store.planId || "free"}
                 moveFor={(id) => planMove(store.planId, id, sub)}
-                pending={!!pending}
-                onUpgrade={handleUpgradePlan}
+                pending={!!pending || planBusy}
+                trialUsed={!!store.planBilling?.trialUsed || history.some((h) => h.status === "verified") || (store.planId || "free") !== "free" || !!store.expiredPlanId}
+                introUsed={!!store.planBilling?.introUsed}
+                onUpgrade={(id) => handleUpgradePlan(id)}
                 onRenew={renew}
                 lowerNote={sub.kind === "active" && rankOf(store.planId) > 0 ? `Lower plans can be chosen after your ${currentPlan.name} plan ends${sub.endsAt ? ` on ${fmtDate(sub.endsAt)}` : ""}.` : undefined}
               />

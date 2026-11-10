@@ -20,6 +20,7 @@ import {
 import { isReservedSubdomain } from "./reserved-names";
 import type { OrderPolicy, PolicyId, StorePolicy } from "./policies";
 import { BILLING_KEYS, OWNER_LOCKED_KEYS, mergeStoreParts, splitStoreUpdate } from "./store-keys";
+import type { PlanBilling } from "./billing/subscription-core";
 
 export interface ProductVariant {
   id: string;
@@ -293,6 +294,8 @@ export interface StoreData {
   planPaidUntil?: string;
   /** "off" when the seller cancelled their subscription: it ends on planPaidUntil and isn't renewed */
   planRenewal?: "on" | "off";
+  /** the Razorpay subscription paying for the plan (private; written only by the server) */
+  planBilling?: PlanBilling | null;
   /** set in memory (never saved) when the paid plan has ended: the plan it was on; planId is then "free" */
   expiredPlanId?: string;
   /** themes this shop bought; they're theirs on any plan */
@@ -370,7 +373,8 @@ export interface SubscriptionRequest {
   amountFormatted: string;
   billingCycle: "monthly" | "quarterly" | "yearly";
   status: "pending_verification" | "verified" | "rejected";
-  paymentMethod: "upi";
+  /** "razorpay": an automatic monthly payment through Razorpay Subscriptions */
+  paymentMethod: "upi" | "razorpay";
   payeeUpiId: string;
   paymentUtr?: string;
   createdAt: string;
@@ -1108,6 +1112,24 @@ class StoreService {
     const data = (await res.json().catch(() => ({}))) as T & { error?: string };
     if (!res.ok) throw new Error(data.error || "Something went wrong. Please try again.");
     return data;
+  }
+
+  /** The plan as the server just saved it (after an automatic payment was set up or cancelled). */
+  public applyPlan(
+    subdomain: string,
+    plan: { planId: StoreData["planId"]; planPaidUntil: string | null; planRenewal: "on" | "off" | null; planBilling: PlanBilling | null; subscriptionHistory: SubscriptionRequest[] }
+  ) {
+    const store = this.getStore(subdomain);
+    if (!store) return;
+    this.stores[store.subdomain] = {
+      ...store,
+      planId: plan.planId,
+      planPaidUntil: plan.planPaidUntil || undefined,
+      planRenewal: plan.planRenewal || undefined,
+      planBilling: plan.planBilling,
+      subscriptionHistory: plan.subscriptionHistory,
+    };
+    this.notify();
   }
 
   /**

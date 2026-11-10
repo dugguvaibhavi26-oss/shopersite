@@ -192,22 +192,25 @@ export async function verifyRazorpayPayment(
 
 type RazorpayCheckoutOptions = {
   key: string;
-  amount: number;
-  currency: "INR";
-  order_id: string;
+  /** a one-time payment has an order; a plan subscription has a subscription and no amount */
+  amount?: number;
+  currency?: "INR";
+  order_id?: string;
+  subscription_id?: string;
   name?: string;
+  description?: string;
   prefill?: { name?: string; contact?: string; email?: string };
   theme?: { color?: string };
 };
 
 type RazorpayConstructor = new (options: RazorpayCheckoutOptions & {
-  handler: (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => void;
+  handler: (response: { razorpay_payment_id: string; razorpay_order_id?: string; razorpay_subscription_id?: string; razorpay_signature: string }) => void;
   modal?: { ondismiss?: () => void };
-}) => { open(): void; close(): void };
+}) => { open(): void; close(): void; on?(event: "payment.failed", cb: (r: { error?: { description?: string } }) => void): void };
 
 let rzpSdk: Promise<RazorpayConstructor> | null = null;
 
-function loadRazorpay(): Promise<RazorpayConstructor> {
+export function loadRazorpay(): Promise<RazorpayConstructor> {
   const w = window as unknown as { Razorpay?: RazorpayConstructor };
   if (w.Razorpay) return Promise.resolve(w.Razorpay);
   if (!rzpSdk) {
@@ -244,7 +247,7 @@ export async function openRazorpayCheckout(opts: {
       name: opts.storeName || "Shopersite",
       prefill: opts.prefill,
       theme: { color: "#171717" },
-      handler: resolve,
+      handler: (r) => resolve({ razorpay_payment_id: r.razorpay_payment_id, razorpay_order_id: r.razorpay_order_id || opts.rzOrderId, razorpay_signature: r.razorpay_signature }),
       modal: { ondismiss: () => reject(new Error("Payment was cancelled.")) },
     });
     rzp.open();
