@@ -862,29 +862,31 @@ function ThemesCarousel() {
     return list.length > 0 ? list : Object.values(PLATFORM_THEMES).slice(0, 6);
   }, [config.selectedThemeSlugs]);
 
-  // Build cards for TumbleDeckShowcase (ensuring rich depth for endless 3D tumbling)
+  // Build cards for TumbleDeckShowcase using real website preview thumbnails
   const cards: TumbleCard[] = React.useMemo(() => {
     const list = [...themes];
     if (list.length < 10) {
       const existing = new Set(list.map((t) => t.slug));
       for (const t of Object.values(PLATFORM_THEMES)) {
-        if (!existing.has(t.slug) && t.previewImage) {
+        if (!existing.has(t.slug)) {
           list.push(t);
           existing.add(t.slug);
         }
-        if (list.length >= 12) break;
+        if (list.length >= 14) break;
       }
     }
     return list.map((t) => ({
-      src: t.previewImage || "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=800&q=80",
+      src: themeThumb(t),
       alt: `${t.name} — ${t.tagline}`,
+      title: t.name,
+      category: t.category || "Designer Theme",
     }));
   }, [themes]);
 
   return (
-    <section id="themes" className="py-24 sm:py-32 overflow-hidden bg-white border-t border-neutral-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col items-center gap-8">
-        {/* Section Intro */}
+    <section id="themes" className="py-20 sm:py-28 bg-white border-t border-neutral-100 overflow-x-clip">
+      {/* Section Intro */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col items-center gap-8 mb-4 sm:mb-6">
         <SectionIntro
           eyebrow={config.themesEyebrow || "Themes"}
           title={config.themesTitle || "Designed to sell."}
@@ -895,94 +897,32 @@ function ThemesCarousel() {
             "Start with Lume Editorial for free. Upgrade to unlock our full collection of designer themes."
           }
         />
+      </div>
 
-        {/* 3D Tumble Interaction Pill */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-neutral-100/90 border border-neutral-200/80 text-xs font-semibold text-neutral-600 shadow-2xs">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Interactive 3D Deck — Scroll, drag, click or use arrow keys to tumble storefronts</span>
-        </div>
+      {/* 3D Tumble Deck Showcase Stage (Full-bleed across the entire viewport width, no max-w-7xl limitation) */}
+      <div className="w-full relative py-2 sm:py-4">
+        <TumbleDeckShowcase
+          cards={cards}
+          height="700px"
+          aspect={1.62}
+          depth={5}
+          scrollPerCard={220}
+          background="transparent"
+          showBacksideText={true}
+          className="w-full"
+          ariaLabel="Storefront themes 3D tumble showcase"
+        />
+      </div>
 
-        {/* 3D Tumble Deck Showcase Stage */}
-        <div className="w-full relative rounded-3xl border border-neutral-200/80 bg-neutral-50/70 shadow-sm overflow-hidden py-4 sm:py-6">
-          <TumbleDeckShowcase
-            cards={cards}
-            height="580px"
-            aspect={1.65}
-            depth={5}
-            scrollPerCard={220}
-            background="transparent"
-            className="w-full"
-            ariaLabel="Storefront themes 3D tumble showcase"
-          />
-        </div>
-
-        {/* Curated Theme Quick Launch Strip */}
-        <div className="w-full pt-4">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h4 className="text-sm font-extrabold text-neutral-950">
-                Curated Storefront Designs ({themes.length})
-              </h4>
-              <p className="text-xs text-neutral-500">
-                Tailored for direct UPI checkout, mobile velocity, and zero setup fee.
-              </p>
-            </div>
-            <Link
-              href="/themes"
-              className="inline-flex items-center gap-1 text-xs font-bold text-neutral-900 hover:underline"
-            >
-              <span>Explore All 37 Themes</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {themes.map((theme, idx) => (
-              <Link
-                key={`theme-${theme.slug}-${idx}`}
-                href={`/register?theme=${theme.slug}`}
-                className="group p-3 rounded-2xl border border-neutral-200/90 bg-white hover:border-black hover:shadow-xs transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-1 mb-2">
-                    <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-neutral-100 text-neutral-800 group-hover:bg-black group-hover:text-white transition-colors">
-                      {theme.tier || "Free"}
-                    </span>
-                    <ArrowUpRight className="w-3 h-3 text-neutral-400 group-hover:text-black group-hover:translate-x-0.5 transition-transform" />
-                  </div>
-                  <h5 className="text-xs font-bold text-neutral-900 truncate group-hover:text-black">
-                    {theme.name}
-                  </h5>
-                  <p className="text-[10px] text-neutral-500 truncate mt-0.5">
-                    {theme.category || "Fashion & Lifestyle"}
-                  </p>
-                </div>
-                <div className="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-between text-[10px] font-medium text-neutral-500">
-                  <span>Start Store</span>
-                  <span className="text-neutral-950 font-bold group-hover:underline">Free →</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Bottom Destination Link */}
-        <div className="pt-4 flex flex-col sm:flex-row items-center gap-3">
-          <Link
-            href="/themes"
-            className="group inline-flex items-center gap-2 rounded-full border border-neutral-300 px-7 py-3.5 text-sm font-semibold transition-all duration-300 hover:border-black hover:bg-black hover:text-white shadow-2xs"
-          >
-            <span>Browse the complete marketplace (37 themes)</span>
-            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-          </Link>
-          <Link
-            href="/register"
-            className="inline-flex items-center gap-2 rounded-full bg-black text-white px-7 py-3.5 text-sm font-semibold transition-all duration-300 hover:bg-neutral-800 shadow-sm"
-          >
-            <span>Launch your store for free</span>
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
+      {/* Only Single Browse Templates Button */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 flex justify-center">
+        <Link
+          href="/themes"
+          className="group inline-flex items-center gap-2.5 rounded-full bg-black text-white px-8 py-4 text-sm font-semibold transition-all duration-300 hover:bg-neutral-800 hover:shadow-xl hover:shadow-black/15 hover:-translate-y-0.5"
+        >
+          <span>Browse templates</span>
+          <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+        </Link>
       </div>
     </section>
   );

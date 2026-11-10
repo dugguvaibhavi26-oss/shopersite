@@ -21,6 +21,8 @@ import gsap from "gsap"
 export type TumbleCard = {
   src: string
   alt?: string
+  title?: string
+  category?: string
 }
 
 export type TumbleDeckShowcaseProps = {
@@ -37,6 +39,8 @@ export type TumbleDeckShowcaseProps = {
   className?: string
   style?: React.CSSProperties
   ariaLabel?: string
+  showBacksideText?: boolean
+  onActiveIndexChange?: (index: number) => void
 }
 
 // #region pose
@@ -91,6 +95,16 @@ export function cardPose(k: number, pos: number, depth: number): Pose {
 }
 // #endregion
 
+export function splitThemeTitle(raw?: string): { left: string; right: string } {
+  if (!raw) return { left: "THEME", right: "01" }
+  const clean = raw.split(" — ")[0].split(" - ")[0].trim()
+  const parts = clean.split(/\s+/)
+  if (parts.length >= 2) {
+    return { left: parts[0].toUpperCase(), right: parts.slice(1).join(" ").toUpperCase() }
+  }
+  return { left: "THEME", right: clean.toUpperCase() }
+}
+
 export function TumbleDeckShowcase({
   cards,
   height = "100svh",
@@ -101,9 +115,14 @@ export function TumbleDeckShowcase({
   className,
   style,
   ariaLabel = "Website showcase",
+  showBacksideText = true,
+  onActiveIndexChange,
 }: TumbleDeckShowcaseProps) {
   const rootRef = React.useRef<HTMLDivElement>(null)
   const sceneRef = React.useRef<HTMLDivElement>(null)
+  const backsideLeftRef = React.useRef<HTMLSpanElement>(null)
+  const backsideRightRef = React.useRef<HTMLSpanElement>(null)
+  const lastActiveIdx = React.useRef<number>(-1)
   const cardRefs = React.useRef<(HTMLDivElement | null)[]>([])
   const imgRefs = React.useRef<(HTMLImageElement | null)[]>([])
   const slotK = React.useRef<number[]>([])
@@ -135,7 +154,40 @@ export function TumbleDeckShowcase({
       const shade = p.flat ? 0.06 : (-p.angle / 90) * 0.06
       el.style.setProperty("--td-shade", String(shade))
     })
-  }, [depth, pool, cards, n])
+
+    if (n > 0) {
+      const activeIdx = wrap(Math.round(pos), n)
+      if (showBacksideText) {
+        const c = cards[activeIdx]
+        if (c) {
+          const rawTitle = c.title || c.alt || ""
+          const { left, right } = splitThemeTitle(rawTitle)
+          if (backsideLeftRef.current) {
+            if (backsideLeftRef.current.textContent !== left) {
+              backsideLeftRef.current.textContent = left
+            }
+            // Scale dynamically if left word is longer so the start is never cut off
+            const scaleL = left.length > 7 ? 0.78 : left.length > 5 ? 0.88 : 1
+            backsideLeftRef.current.style.transform = scaleL < 1 ? `scale(${scaleL})` : "none"
+            backsideLeftRef.current.style.transformOrigin = "right center"
+          }
+          if (backsideRightRef.current) {
+            if (backsideRightRef.current.textContent !== right) {
+              backsideRightRef.current.textContent = right
+            }
+            // Scale dynamically if right word is longer (e.g. EDITORIAL) so the end is never cut off
+            const scaleR = right.length > 8 ? 0.75 : right.length > 6 ? 0.86 : 1
+            backsideRightRef.current.style.transform = scaleR < 1 ? `scale(${scaleR})` : "none"
+            backsideRightRef.current.style.transformOrigin = "left center"
+          }
+        }
+      }
+      if (onActiveIndexChange && activeIdx !== lastActiveIdx.current) {
+        lastActiveIdx.current = activeIdx
+        onActiveIndexChange(activeIdx)
+      }
+    }
+  }, [depth, pool, cards, n, showBacksideText, onActiveIndexChange])
 
   // New images: re-point every slot on the next paint.
   React.useLayoutEffect(() => {
@@ -152,13 +204,18 @@ export function TumbleDeckShowcase({
     const fit = () => {
       const W0 = root.clientWidth
       const H0 = root.clientHeight
-      const wFrac = W0 < 420 ? 0.76 : 0.655
-      const h = Math.max(60, Math.min((W0 * wFrac) / aspect, H0 * 0.42, 620))
+      const isMobile = W0 < 640
+      const isTablet = W0 < 1024
+      // Increase width fraction so card feels much bigger and substantial
+      const wFrac = isMobile ? 0.88 : isTablet ? 0.72 : 0.62
+      // Increase max card height ratio from 0.42 to 0.52 for larger cards
+      const maxHByScreen = isMobile ? H0 * 0.46 : H0 * 0.52
+      const h = Math.max(100, Math.min((W0 * wFrac) / aspect, maxHByScreen, 430))
       const w = h * aspect
-      const top = H0 / 2 - 0.62 * h
-      geo.current = { h, gap: 0.24 * h }
-      scene.style.perspective = `${6 * h}px`
-      scene.style.perspectiveOrigin = `50% ${top - 1.66 * h}px`
+      const top = H0 / 2 - 0.58 * h
+      geo.current = { h, gap: 0.22 * h }
+      scene.style.perspective = `${5.8 * h}px`
+      scene.style.perspectiveOrigin = `50% ${top - 1.55 * h}px`
       root.style.setProperty("--td-w", `${w}px`)
       root.style.setProperty("--td-h", `${h}px`)
       root.style.setProperty("--td-top", `${top}px`)
@@ -303,15 +360,53 @@ export function TumbleDeckShowcase({
       style={{ height, background, ...style }}
     >
       <style>{`
-        .td-scene { position: absolute; inset: 0; transform-style: preserve-3d; }
+        .td-scene { position: absolute; inset: 0; transform-style: preserve-3d; z-index: 1; }
+        .td-backside-watermark {
+          position: absolute;
+          inset: 0;
+          z-index: 0;
+          pointer-events: none;
+          user-select: none;
+        }
+        .td-backside-word-left {
+          position: absolute;
+          top: calc(var(--td-top, 40%) + var(--td-h, 200px) * 0.44);
+          transform: translateY(-50%);
+          right: calc(50% + var(--td-w, 300px) / 2 + clamp(16px, 2.5vw, 40px));
+          text-align: right;
+          white-space: nowrap;
+        }
+        .td-backside-word-right {
+          position: absolute;
+          top: calc(var(--td-top, 40%) + var(--td-h, 200px) * 0.44);
+          transform: translateY(-50%);
+          left: calc(50% + var(--td-w, 300px) / 2 + clamp(16px, 2.5vw, 40px));
+          text-align: left;
+          white-space: nowrap;
+        }
+        .td-backside-word {
+          display: inline-block;
+          font-size: clamp(32px, 5.2vw, 88px);
+          font-weight: 950;
+          line-height: 0.85;
+          text-transform: uppercase;
+          letter-spacing: -0.04em;
+          white-space: nowrap;
+          background: linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0%, rgba(0, 0, 0, 0.04) 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          -webkit-text-stroke: 1.5px rgba(0, 0, 0, 0.12);
+          filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.03));
+          transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+        }
         .td-card {
           position: absolute; left: 50%; top: var(--td-top);
           width: var(--td-w); height: var(--td-h); margin-left: calc(var(--td-w) / -2);
           transform-origin: 50% 100%; transform-style: preserve-3d;
           backface-visibility: visible; will-change: transform;
-          border-radius: 3px; overflow: hidden; cursor: pointer;
-          background: color-mix(in oklab, var(--color-foreground) 8%, var(--color-background));
-          box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-foreground) 10%, transparent);
+          border-radius: 8px; overflow: hidden; cursor: pointer;
+          background: #ffffff;
+          box-shadow: 0 22px 50px -15px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.06);
         }
         .td-card img {
           display: block; width: 100%; height: 100%; max-width: none;
@@ -323,6 +418,20 @@ export function TumbleDeckShowcase({
         }
         .td-root:focus-visible { box-shadow: inset 0 0 0 2px var(--color-primary); }
       `}</style>
+      {showBacksideText && cards.length > 0 && (
+        <div className="td-backside-watermark" aria-hidden>
+          <div className="td-backside-word-left">
+            <span ref={backsideLeftRef} className="td-backside-word">
+              {splitThemeTitle(cards[0]?.title || cards[0]?.alt).left}
+            </span>
+          </div>
+          <div className="td-backside-word-right">
+            <span ref={backsideRightRef} className="td-backside-word">
+              {splitThemeTitle(cards[0]?.title || cards[0]?.alt).right}
+            </span>
+          </div>
+        </div>
+      )}
       <div ref={sceneRef} className="td-scene">
         {Array.from({ length: pool }, (_, j) => (
           <div

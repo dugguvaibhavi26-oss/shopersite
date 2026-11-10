@@ -800,7 +800,9 @@ export function getAllThemes(): ThemeDefinition[] {
 export function getTheme(slug?: string): ThemeDefinition {
   const custom = getCustomTheme(slug);
   if (custom) return customThemeDefinition(custom);
-  return (slug && PLATFORM_THEMES[slug]) || PLATFORM_THEMES["classic-bloom"];
+  if (!slug) return PLATFORM_THEMES["classic-bloom"];
+  const normalized = slug.replace(/^theme-(\d+)$/, "theme$1");
+  return PLATFORM_THEMES[slug] || PLATFORM_THEMES[normalized] || PLATFORM_THEMES["classic-bloom"];
 }
 
 /**
@@ -808,5 +810,7 @@ export function getTheme(slug?: string): ThemeDefinition {
  * made from /themes/preview/<slug>?shot=1). Themes uploaded by the admin use their own preview image.
  */
 export function themeThumb(theme: Pick<ThemeDefinition, "slug" | "previewImage">): string {
-  return getCustomTheme(theme.slug) ? theme.previewImage || "" : `/theme-previews/${theme.slug}.webp`;
+  if (getCustomTheme(theme.slug)) return theme.previewImage || "";
+  const slug = theme.slug.replace(/^theme-(\d+)$/, "theme$1");
+  return `/theme-previews/${slug}.webp`;
 }

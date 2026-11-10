@@ -13,9 +13,9 @@ export interface LandingConfig {
 export const DEFAULT_FEATURED_THEME_SLUGS = [
   "classic-bloom", // Lume Editorial
   "mono-studio",   // Mono Studio
-  "theme-03",      // Theme 03
-  "theme-04",      // Theme 04
-  "theme-05",      // Theme 05
+  "theme03",       // Theme 03
+  "theme04",       // Theme 04
+  "theme05",       // Theme 05
   "f01",           // F01
 ];
 
