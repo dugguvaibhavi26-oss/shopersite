@@ -661,9 +661,9 @@ function StorePreview({
     <CollageShowcase
       intro={
         <>
-          <h2 className="text-4xl xl:text-5xl [@media(max-height:760px)]:text-3xl font-semibold leading-[1.05]">
+          <h1 className="text-4xl xl:text-5xl [@media(max-height:760px)]:text-3xl font-semibold leading-[1.05]">
             {live ? "Your shop is open." : "See your shop take shape."}
-          </h2>
+          </h1>
           {/* quick facts, styled like the grid boxes behind them */}
           <div className="mt-7 grid grid-cols-3 gap-3 max-w-md [@media(max-height:700px)]:hidden">
             {[

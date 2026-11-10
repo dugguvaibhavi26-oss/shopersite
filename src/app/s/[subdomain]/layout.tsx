@@ -15,9 +15,16 @@ import { getStoreDoc } from "@/lib/server/firebase-admin";
  */
 export async function generateMetadata({ params }: { params: Promise<{ subdomain: string }> }): Promise<Metadata> {
   const { subdomain } = await params;
+  // Used when the shop cannot be read in time, so a shop never shows Shopersite's own description.
+  const fallback: Metadata = {
+    title: subdomain,
+    description: `Shop ${subdomain} online. Browse products and order easily.`,
+    openGraph: { title: subdomain, siteName: subdomain, images: [] },
+    twitter: { card: "summary", title: subdomain },
+  };
   try {
     const store = await Promise.race([getStoreDoc(subdomain), new Promise<null>((r) => setTimeout(() => r(null), 1500))]);
-    if (!store) return { title: subdomain, openGraph: { siteName: subdomain, images: [] }, twitter: { card: "summary" } };
+    if (!store) return fallback;
     const name = store.name || subdomain;
     const description = (store.tagline || `Shop ${name} online. Browse products and order easily.`).slice(0, 160);
     const hidden = store.isPaused || store.status === "draft";
@@ -31,7 +38,7 @@ export async function generateMetadata({ params }: { params: Promise<{ subdomain
       ...(store.logoUrl ? { icons: { icon: store.logoUrl, apple: store.logoUrl } } : {}),
     };
   } catch {
-    return { title: subdomain, openGraph: { siteName: subdomain, images: [] } };
+    return fallback;
   }
 }
 
