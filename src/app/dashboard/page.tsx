@@ -49,6 +49,7 @@ import { AbandonedCheckouts } from "@/components/dashboard/abandoned-checkouts";
 import { ReviewsPanel } from "@/components/dashboard/reviews-panel";
 import { IAnalytics, IHome, IOrders, IProducts, ICategories, ICustomers, IReviews, IDiscounts, IThemes, IPlugins, ISettings, INotifications, IProfile, IRupee, IRepeat, IStar, ITrend, ISparkle, IPercent, ITruck, ICard, ICollections, ICheck, IWarning, ISoldOut, IStore, IImage, IGlobe, ICart, IActivity, ILock, IPolicies, IMail, IEye, IChat } from "@/components/icons";
 import { WorkplaceChat } from "@/components/staff/workplace-chat";
+import { Pager, pageOf } from "@/components/dashboard/pager";
 import { EmptyState, Illustration, PageHero, SectionIcon, StatChips, StatStrip, dailyCounts, type Section } from "@/components/dashboard/ui-kit";
 import {
   AccountSettings,
@@ -367,6 +368,11 @@ function DashboardPageContent() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerFilter, setCustomerFilter] = useState<"all" | "repeat" | "new">("all");
   const [customerSort, setCustomerSort] = useState<"recent" | "orders" | "spent">("recent");
+  // long lists show 50 rows at a time; changing a search, filter or sort starts again from the first page
+  const [productPage, setProductPage] = useState(1);
+  const [customerPage, setCustomerPage] = useState(1);
+  useEffect(() => setProductPage(1), [productSearch, productFilter, productCategory, productSort]);
+  useEffect(() => setCustomerPage(1), [customerSearch, customerFilter, customerSort]);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [pTitle, setPTitle] = useState("");
   const [pCategory, setPCategory] = useState("");
@@ -3627,86 +3633,110 @@ function DashboardPageContent() {
                         />
                       )
                     ) : (
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-                        {list.map((prod, idx) => {
+                      (() => {
+                        const pg = pageOf(list, productPage);
+                        return (
+                      <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+                        {/* column titles (computers) */}
+                        <div className="hidden md:grid-cols-[minmax(0,1fr)_96px_120px_120px_128px] items-center gap-4 border-b border-neutral-100 bg-neutral-50/70 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 md:grid">
+                          <span>Product</span>
+                          <span>Status</span>
+                          <span>Stock</span>
+                          <span className="text-right">Price</span>
+                          <span />
+                        </div>
+                        <ul className="divide-y divide-neutral-100">
+                        {pg.rows.map((prod) => {
                           const stock =
                             prod.stock <= 0
                               ? { text: "Sold out", cls: "bg-rose-50 text-rose-700" }
                               : prod.stock <= LOW
                                 ? { text: `Only ${prod.stock} left`, cls: "bg-amber-50 text-amber-700" }
                                 : { text: `${prod.stock} in stock`, cls: "bg-emerald-50 text-emerald-700" };
+                          const live = prod.status === "published";
+                          const price = `₹${(prod.price / 100).toLocaleString("en-IN")}`;
                           return (
-                            <div
+                            <li
                               key={prod.id}
-                              className={`group flex flex-col rounded-xl border border-neutral-200 bg-white overflow-hidden transition-all duration-300 hover:border-neutral-300 hover:shadow-[0_14px_30px_-22px_rgba(0,0,0,0.35)] animate-enter-slide-up stagger-${(idx % 6) + 1}`}
+                              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5 transition-colors hover:bg-neutral-50/70 md:gap-4 md:px-5 md:grid-cols-[minmax(0,1fr)_96px_120px_120px_128px]"
                             >
-                              <div className="relative aspect-[4/3] bg-neutral-100 overflow-hidden">
-                                {prod.images[0] ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
-                                    src={prod.images[0]}
-                                    alt={prod.title}
-                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                  />
-                                ) : (
-                                  <span className="absolute inset-0 flex items-center justify-center text-neutral-300">
-                                    <ImageIcon className="w-8 h-8" />
-                                  </span>
-                                )}
-                                <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold ${stock.cls}`}>{stock.text}</span>
-                                {prod.status !== "published" && (
-                                  <span className="absolute top-2 right-2 rounded-full bg-neutral-900/80 px-2 py-0.5 text-[10px] font-semibold text-white capitalize">
-                                    {prod.status}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex-1 flex flex-col p-2.5">
-                                <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 truncate">{prod.category}</span>
-                                <h4 className="mt-0.5 text-[13px] font-semibold leading-snug truncate" title={prod.title}>{prod.title}</h4>
-                                <span className="mt-0.5 flex items-baseline gap-1.5">
-                                  <span className="text-[13px] font-semibold">₹{(prod.price / 100).toLocaleString("en-IN")}</span>
-                                  {prod.compareAtPrice && prod.compareAtPrice > prod.price && (
-                                    <span className="text-[11px] text-neutral-400 line-through">
-                                      ₹{(prod.compareAtPrice / 100).toLocaleString("en-IN")}
-                                    </span>
+                              {/* photo and name: tap to edit */}
+                              <button type="button" onClick={() => openEditProduct(prod)} style={{ minHeight: 0 }} className="flex min-w-0 items-center gap-3 text-left">
+                                <span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-neutral-100 text-neutral-300">
+                                  {prod.images[0] ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={prod.images[0]} alt="" loading="lazy" className="h-full w-full object-cover" />
+                                  ) : (
+                                    <ImageIcon className="h-5 w-5" />
                                   )}
                                 </span>
-                                <div className="mt-auto pt-2.5 flex items-center gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => openEditProduct(prod)}
-                                    className="flex-1 h-8 rounded-[9px] bg-neutral-950 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-black transition-colors"
-                                  >
-                                    <Edit className="w-3.5 h-3.5" />
-                                    Edit
-                                  </button>
-                                  <Link
-                                    href={getStoreUrl(store.subdomain, `/products/${prod.slug}`)}
-                                    target="_blank"
-                                    aria-label={`View ${prod.title} in your store`}
-                                    className="w-8 h-8 shrink-0 rounded-[9px] border border-neutral-200 flex items-center justify-center text-neutral-600 hover:border-neutral-900 hover:text-black transition-colors"
-                                  >
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                  </Link>
-                                  <button
-                                    type="button"
-                                    aria-label={`Delete ${prod.title}`}
-                                    onClick={async () => {
-                                      if (await appConfirm(`"${prod.title}" will be removed from your store. This can't be undone.`, { title: "Delete this product?", danger: true })) {
-                                        storeService.deleteProduct(store.subdomain, prod.id);
-                                        refreshStore();
-                                      }
-                                    }}
-                                    className="w-8 h-8 shrink-0 rounded-[9px] border border-neutral-200 flex items-center justify-center text-neutral-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition-colors"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
+                                <span className="min-w-0">
+                                  <span className="block truncate text-sm font-semibold" title={prod.title}>{prod.title}</span>
+                                  <span className="hidden truncate text-xs text-neutral-500 md:block">{prod.category || "No category"}</span>
+                                  {/* phones: price, stock and status on one quiet line */}
+                                  <span className="mt-0.5 flex items-center gap-1.5 text-xs text-neutral-500 md:hidden">
+                                    <span className="font-semibold text-neutral-900">{price}</span>
+                                    <span className={`truncate rounded-full px-1.5 py-px text-[10px] font-semibold ${stock.cls}`}>{stock.text}</span>
+                                    {!live && <span className="rounded-full bg-neutral-100 px-1.5 py-px text-[10px] font-semibold capitalize text-neutral-600">{prod.status}</span>}
+                                  </span>
+                                </span>
+                              </button>
+                              <span className="hidden md:block">
+                                <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${live ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-600"}`}>
+                                  <span className={`h-1.5 w-1.5 rounded-full ${live ? "bg-emerald-500" : "bg-neutral-400"}`} />
+                                  {live ? "Live" : prod.status}
+                                </span>
+                              </span>
+                              <span className="hidden md:block">
+                                <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${stock.cls}`}>{stock.text}</span>
+                              </span>
+                              <span className="hidden text-right md:block">
+                                <span className="block text-[13px] font-semibold tabular-nums">{price}</span>
+                                {prod.compareAtPrice && prod.compareAtPrice > prod.price && (
+                                  <span className="block text-[11px] tabular-nums text-neutral-400 line-through">₹{(prod.compareAtPrice / 100).toLocaleString("en-IN")}</span>
+                                )}
+                              </span>
+                              <span className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => openEditProduct(prod)}
+                                  aria-label={`Edit ${prod.title}`}
+                                  style={{ minHeight: 0 }}
+                                  className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-neutral-950 text-white transition-colors hover:bg-black md:flex"
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </button>
+                                <Link
+                                  href={getStoreUrl(store.subdomain, `/products/${prod.slug}`)}
+                                  target="_blank"
+                                  aria-label={`View ${prod.title} in your store`}
+                                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-neutral-200 text-neutral-600 transition-colors hover:border-neutral-900 hover:text-black"
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </Link>
+                                <button
+                                  type="button"
+                                  aria-label={`Delete ${prod.title}`}
+                                  style={{ minHeight: 0 }}
+                                  onClick={async () => {
+                                    if (await appConfirm(`"${prod.title}" will be removed from your store. This can't be undone.`, { title: "Delete this product?", danger: true })) {
+                                      storeService.deleteProduct(store.subdomain, prod.id);
+                                      refreshStore();
+                                    }
+                                  }}
+                                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-neutral-200 text-neutral-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </span>
+                            </li>
                           );
                         })}
+                        </ul>
+                        <Pager total={list.length} page={pg.current} noun="products" onPage={(n) => { setProductPage(n); scrollDashTop({ top: 0, behavior: "smooth" }); }} />
                       </div>
+                        );
+                      })()
                     )}
                   </>
                 );
@@ -5227,7 +5257,7 @@ function DashboardPageContent() {
                         <span />
                       </div>
                       <ul className="divide-y divide-neutral-100">
-                        {list.map((cust) => {
+                        {pageOf(list, customerPage).rows.map((cust) => {
                           const digits = cust.phone.replace(/[^0-9]/g, "");
                           const wa = digits.length === 10 ? `91${digits}` : digits;
                           return (
@@ -5268,6 +5298,7 @@ function DashboardPageContent() {
                           );
                         })}
                       </ul>
+                      <Pager total={list.length} page={customerPage} noun="customers" onPage={(n) => { setCustomerPage(n); scrollDashTop({ top: 0, behavior: "smooth" }); }} />
                     </div>
                   )}
                 </>
