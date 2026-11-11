@@ -14,7 +14,7 @@ import { hasAnyPolicy, isShopClosed, missingPolicies } from "@/lib/policies";
 import { BulkUploadPanel } from "@/components/dashboard/bulk-upload";
 import { ProductCategoryField, moneyInput, uniqueSlug } from "@/components/dashboard/product-fields";
 import { checkPrices, checkStock } from "@/lib/validation";
-import { planMove, rankOf, REMIND_DAYS, subscriptionState } from "@/lib/subscription";
+import { effectivePlan, planMove, rankOf, REMIND_DAYS, subscriptionState } from "@/lib/subscription";
 import React, { useState, useEffect, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -41,13 +41,14 @@ import { SubscriptionPaymentModal } from "@/components/dashboard/subscription-pa
 import { RazorpayPaymentsCard } from "@/components/dashboard/razorpay-payments";
 import { GeneralSettings } from "@/components/dashboard/general-settings";
 import { DomainSettings } from "@/components/dashboard/domain-settings";
-import { StaffAccounts, useEnsureStoreCode } from "@/components/dashboard/staff-accounts";
+import { StaffAccounts, ownerHeaders, useEnsureStoreCode } from "@/components/dashboard/staff-accounts";
 import { PluginsHub, type PluginId } from "@/components/dashboard/plugins-hub";
 import { InvoiceButton, ShiprocketShip, WhatsAppUpdates } from "@/components/dashboard/order-tools";
 import { GST_RATES } from "@/lib/invoice";
 import { AbandonedCheckouts } from "@/components/dashboard/abandoned-checkouts";
 import { ReviewsPanel } from "@/components/dashboard/reviews-panel";
-import { IAnalytics, IHome, IOrders, IProducts, ICategories, ICustomers, IReviews, IDiscounts, IThemes, IPlugins, ISettings, INotifications, IProfile, IRupee, IRepeat, IStar, ITrend, ISparkle, IPercent, ITruck, ICard, ICollections, ICheck, IWarning, ISoldOut, IStore, IImage, IGlobe, ICart, IActivity, ILock, IPolicies, IMail, IEye } from "@/components/icons";
+import { IAnalytics, IHome, IOrders, IProducts, ICategories, ICustomers, IReviews, IDiscounts, IThemes, IPlugins, ISettings, INotifications, IProfile, IRupee, IRepeat, IStar, ITrend, ISparkle, IPercent, ITruck, ICard, ICollections, ICheck, IWarning, ISoldOut, IStore, IImage, IGlobe, ICart, IActivity, ILock, IPolicies, IMail, IEye, IChat } from "@/components/icons";
+import { WorkplaceChat } from "@/components/staff/workplace-chat";
 import { EmptyState, Illustration, PageHero, SectionIcon, StatChips, StatStrip, dailyCounts, type Section } from "@/components/dashboard/ui-kit";
 import {
   AccountSettings,
@@ -187,7 +188,7 @@ function DashboardPageContent() {
   const [store, setStore] = useState<StoreData | null>(null);
   const [userStores, setUserStores] = useState<StoreData[]>([]);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "analytics" | "products" | "categories" | "orders" | "discounts" | "customers" | "reviews" | "banners" | "policies" | "themes" | "billing" | "settings" | "plugins" | "notifications" | "profile"
+    "overview" | "analytics" | "products" | "categories" | "orders" | "discounts" | "customers" | "reviews" | "staff" | "workplace" | "banners" | "policies" | "themes" | "billing" | "settings" | "plugins" | "notifications" | "profile"
   >((urlTabParam as any) || "overview");
 
   // Remember the pages visited so each page's back button can return to the previous one
@@ -1419,7 +1420,13 @@ function DashboardPageContent() {
   type DashTab = typeof activeTab;
   const navGroups: {
     label: string;
-    items: { id: DashTab; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number | "dot" | "lock" | "active" }[];
+    items: {
+      id: DashTab;
+      label: string;
+      icon: React.ComponentType<{ className?: string }>;
+      badge?: number | "dot" | "lock" | "active";
+      children?: { id: DashTab; label: string; badge?: number | "lock" }[];
+    }[];
   }[] = [
     {
       label: "Sell",
@@ -1427,10 +1434,8 @@ function DashboardPageContent() {
         { id: "overview", label: "Home", icon: IHome },
         { id: "analytics", label: "Analytics", icon: IAnalytics },
         { id: "orders", label: "Orders", icon: IOrders, badge: unfulfilledOrders.length > 0 ? "dot" : undefined },
-        { id: "products", label: "Products", icon: IProducts, badge: totalProducts },
-        { id: "categories", label: "Categories", icon: ICategories, badge: store.categories?.length || 0 },
-        { id: "customers", label: "Customers", icon: ICustomers },
-        { id: "reviews", label: "Reviews", icon: IReviews, badge: canUseReviews(store.planId) ? undefined : "lock" },
+        { id: "products", label: "Products", icon: IProducts, badge: totalProducts, children: [{ id: "categories", label: "Categories", badge: store.categories?.length || 0 }] },
+        { id: "customers", label: "Customers", icon: ICustomers, children: [{ id: "reviews", label: "Reviews", badge: canUseReviews(store.planId) ? undefined : "lock" }] },
       ],
     },
     {
@@ -1444,6 +1449,7 @@ function DashboardPageContent() {
       items: [
         { id: "themes", label: "Themes", icon: IThemes },
         { id: "plugins", label: "Plugins", icon: IPlugins },
+        { id: "staff", label: "Staff", icon: IProfile, badge: store.planId === "pro" ? undefined : "lock", children: [{ id: "workplace", label: "WorkPlace" }] },
         { id: "settings", label: "Settings", icon: ISettings, badge: policiesMissing.length || planNeedsAttention ? "dot" : undefined },
       ],
     },
@@ -1458,6 +1464,8 @@ function DashboardPageContent() {
     customers: { title: "Customers", text: "People who have ordered from you." },
     analytics: { title: "Analytics", text: "Every number about your shop, for any period." },
     reviews: { title: "Reviews", text: "Ratings buyers left on your products." },
+    staff: { title: "Staff", text: "Give your team their own logins. Each role sees only its own work." },
+    workplace: { title: "WorkPlace", text: "One chat for you and your whole team." },
     banners: { title: "Banners", text: "Big promo images at the top of your store." },
     policies: { title: "Settings", text: "Everything about how your store runs, in one place." },
     themes: { title: "Themes", text: "Choose how your store looks, then edit its text and photos." },
@@ -1478,7 +1486,6 @@ function DashboardPageContent() {
     { id: "billing", label: "Plan & billing", icon: ICard, dot: planNeedsAttention },
     { id: "store", label: "Store link & logo", icon: IImage },
     { id: "domain", label: "Domain", icon: IGlobe, tag: store.planId === "pro" ? undefined : "Pro" },
-    { id: "staff", label: "Staff", icon: IProfile, tag: store.planId === "pro" ? undefined : "Pro" },
     { id: "payments", label: "Payments", icon: IRupee },
     { id: "checkout", label: "Checkout", icon: IOrders },
     { id: "accounts", label: "Customer accounts", icon: ICustomers },
@@ -1500,7 +1507,6 @@ function DashboardPageContent() {
     billing: { title: "Plan & billing", text: "Your ShoperSite plan, its limits and your past payments." },
     store: { title: "Store link & logo", text: "Your web address, logo and the message at the top of your store." },
     domain: { title: "Domain", text: "Use your own web address, like www.yourbrand.com, for your store." },
-    staff: { title: "Staff", text: "Give your team their own logins. Each role sees only its own work." },
     payments: { title: "Payments", text: "Choose how buyers can pay. Money always goes straight to you." },
     checkout: { title: "Checkout", text: "Rules for placing an order: minimum amount, cash-on-delivery limit and what buyers fill in." },
     accounts: { title: "Customer accounts", text: "Whether buyers can order as guests or must sign in first." },
@@ -1753,6 +1759,8 @@ function DashboardPageContent() {
     (activeTab === "orders" && !!selectedOrder);
   // phones: the top bar and bottom bar only show on the main pages; everything else is a sub page with a back button
   const showPhoneChrome = !inEditor && activeTab === "overview";
+  // WorkPlace takes the whole page: no page title, no margins, the chat runs edge to edge
+  const workplaceFull = activeTab === "workplace" && effectivePlan(store).planId === "pro";
   // the phone's bottom bar is only on the two main screens, Home and the Orders list; inner pages
   // (an order's details, settings pages, products…) use their back arrow instead
   const showDock = !inEditor && (activeTab === "overview" || (activeTab === "orders" && !selectedOrder));
@@ -1948,7 +1956,7 @@ function DashboardPageContent() {
       <div className={`${showPhoneChrome ? "pt-16" : "pt-[env(safe-area-inset-top)]"} md:pt-3 md:pb-3 md:pl-[var(--dash-rail,var(--rail))] ${inSettings && !inEditor ? "lg:pl-[calc(var(--dash-rail,var(--rail))+244px)]" : ""} md:pr-3 ${assistantOpen && assistantSide ? "md:pr-[calc(var(--aw)+1.5rem)]" : ""} md:transition-[padding] md:duration-500 md:ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col min-h-screen md:h-screen md:min-h-0 overflow-x-clip`} style={{ "--rail": `${RAIL_WIDTH}px`, "--aw": `${ASSISTANT_WIDTH}px` } as React.CSSProperties}>
         <div id="dash-scroll" className="flex-1 flex flex-col md:min-h-0 md:overflow-y-auto md:overscroll-contain md:rounded-[28px] md:bg-[#F0F0F0] dash-panel-scroll">
         {/* Main Workspace Area (Scrolls smoothly under the fixed top header) */}
-        <main className={`flex-1 min-w-0 px-5 pt-5 sm:px-10 sm:pt-8 lg:px-16 lg:pt-10 ${showDock ? "pb-28" : "pb-10"} md:pb-14 max-w-6xl w-full mx-auto`}>
+        <main className={workplaceFull ? "flex-1 min-w-0 w-full bg-white" : `flex-1 min-w-0 px-5 pt-5 sm:px-10 sm:pt-8 lg:px-16 lg:pt-10 ${showDock ? "pb-28" : "pb-10"} md:pb-14 max-w-6xl w-full mx-auto`}>
           {unseenPlanUpdate && (
             <div
               className={`mb-5 flex items-start gap-3 rounded-2xl p-4 ${
@@ -1991,7 +1999,7 @@ function DashboardPageContent() {
           {/* moving between settings pages keeps the frame still; only the page inside changes */}
           <div key={inSettings ? "settings" : activeTab} className="tab-enter">
           {/* Page title (overview greets you inside the hero card): a soft band in the section's own colour */}
-          {activeTab !== "overview" && !inEditor && (() => {
+          {activeTab !== "overview" && !inEditor && !workplaceFull && (() => {
             const look: Record<string, { section: Section; icon: React.ElementType }> = {
               products: { section: "products", icon: IProducts },
               categories: { section: "categories", icon: ICategories },
@@ -2000,6 +2008,8 @@ function DashboardPageContent() {
               customers: { section: "customers", icon: ICustomers },
               analytics: { section: "overview", icon: IAnalytics },
               reviews: { section: "reviews", icon: IStar },
+              staff: { section: "customers", icon: IProfile },
+              workplace: { section: "customers", icon: IChat },
               banners: { section: "themes", icon: IImage },
               themes: { section: "themes", icon: IThemes },
               plugins: { section: "plugins", icon: IPlugins },
@@ -5266,6 +5276,24 @@ function DashboardPageContent() {
           </div>
         )}
 
+        {/* STAFF: team accounts, roles and the WorkPlace chat */}
+        {activeTab === "staff" && (
+          <div className="animate-enter-blur">
+            <StaffAccounts store={store} onUpgrade={() => { setActiveTab("billing"); scrollDashTop({ top: 0 }); }} onOpenWorkplace={() => { setActiveTab("workplace"); scrollDashTop({ top: 0 }); }} />
+          </div>
+        )}
+
+        {/* WorkPlace: the team chat (Pro), a page of its own under Staff */}
+        {activeTab === "workplace" && (
+          <div className="animate-enter-blur">
+            {workplaceFull ? (
+              <WorkplaceChat store={store.subdomain} authHeaders={ownerHeaders} full onBack={() => goBackRef.current()} className="h-[calc(100dvh-env(safe-area-inset-top))] md:h-[calc(100dvh-1.5rem)]" />
+            ) : (
+              <StaffAccounts store={store} onUpgrade={() => { setActiveTab("billing"); scrollDashTop({ top: 0 }); }} />
+            )}
+          </div>
+        )}
+
         {/* TAB 5: REVIEWS */}
         {activeTab === "reviews" && (
           <div className="space-y-6 animate-enter-blur">
@@ -5818,7 +5846,6 @@ function DashboardPageContent() {
               <GeneralSettings store={store} onChanged={refreshStore} onOpenPolicies={() => setActiveTab("policies")} />
             )}
             {settingsSection === "domain" && <DomainSettings store={store} onUpgrade={() => openSettings("billing")} />}
-            {settingsSection === "staff" && <StaffAccounts store={store} onUpgrade={() => openSettings("billing")} />}
             {settingsSection === "checkout" && <CheckoutSettings store={store} onChanged={refreshStore} />}
             {settingsSection === "accounts" && <AccountSettings store={store} onChanged={refreshStore} />}
             {settingsSection === "taxes" && <TaxSettings store={store} onChanged={refreshStore} />}
@@ -6269,7 +6296,7 @@ function DashboardPageContent() {
       />
 
       {/* Assistant: ask or command, every change confirmed first */}
-      {!inEditor && !assistantOpen && <AssistantButton onClick={() => setAssistantOpen(true)} raised={showDock} />}
+      {!inEditor && !assistantOpen && !workplaceFull && <AssistantButton onClick={() => setAssistantOpen(true)} raised={showDock} />}
       <AssistantPanel
         store={store}
         ownerName={ownerName}
@@ -6342,6 +6369,8 @@ function DashboardPageContent() {
                   { id: "discounts", label: "Discounts", icon: IDiscounts, locked: !canUseCoupons(store.planId) },
                   { id: "themes", label: "Themes", icon: IThemes },
                   { id: "plugins", label: "Plugins", icon: IPlugins },
+                  { id: "staff", label: "Staff", icon: IProfile, locked: store.planId !== "pro" },
+                  { id: "workplace", label: "WorkPlace", icon: IChat, locked: store.planId !== "pro" },
                   { id: "notifications", label: "Alerts", icon: INotifications, dot: notifications.some((n) => n.unread) },
                 ] as { id: DashTab; label: string; icon: React.ElementType; dot?: boolean; locked?: boolean }[]
               ).map((item, i) => {
@@ -6458,7 +6487,7 @@ function DashboardPageContent() {
 }
 
 /** Settings pages that live inside the Settings tab (Policies, Plan & billing and Emails to buyers are their own tabs, shown in the same frame). */
-const SETTINGS_SECTIONS = ["general", "store", "domain", "staff", "payments", "checkout", "accounts", "delivery", "taxes", "notifications", "events", "privacy"] as const;
+const SETTINGS_SECTIONS = ["general", "store", "domain", "payments", "checkout", "accounts", "delivery", "taxes", "notifications", "events", "privacy"] as const;
 type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 /** Full-screen holding state for the dashboard (loading, or about to redirect), in the app's style. */

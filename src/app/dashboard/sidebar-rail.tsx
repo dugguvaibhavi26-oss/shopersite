@@ -11,6 +11,8 @@ export type RailItem<T extends string> = {
   icon: React.ComponentType<{ className?: string }>;
   /** a count, "dot" (needs attention), "lock" (paid feature) or "active" (switched on) */
   badge?: number | "dot" | "lock" | "active";
+  /** pages that belong under this one; they show beneath it while the rail is open and this group is in use */
+  children?: { id: T; label: string; badge?: number | "lock" }[];
 };
 
 export type RailGroup<T extends string> = { label: string; items: RailItem<T>[] };
@@ -169,11 +171,12 @@ export function SidebarRail<T extends string>({
                 className="mx-2.5 my-3 h-px w-6 shrink-0 bg-white/15 transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-data-[open=true]/rail:w-[calc(100%-20px)] [@media(max-height:900px)]:my-2"
               />
             )}
-            {group.items.map(({ id, label: name, icon: Icon, badge }) => {
-              const on = active === id;
+            {group.items.map(({ id, label: name, icon: Icon, badge, children }) => {
+              const childOn = !!children?.some((c) => c.id === active);
+              const on = active === id || childOn;
               return (
+                <React.Fragment key={id}>
                 <button
-                  key={id}
                   type="button"
                   data-tour={`nav-${id}`}
                   onClick={() => onSelect(id)}
@@ -204,6 +207,30 @@ export function SidebarRail<T extends string>({
                     {badge === "active" && <span className={tag}>On</span>}
                   </span>
                 </button>
+                {/* sub-pages: listed under their page while the rail is open and you are inside that group */}
+                {children && open && on && (
+                  <div className="reveal-in flex flex-col">
+                    {children.map((c) => {
+                      const cOn = active === c.id;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          data-tour={`nav-${c.id}`}
+                          onClick={() => onSelect(c.id)}
+                          aria-current={cOn ? "page" : undefined}
+                          className={`relative z-[1] flex h-9 w-full shrink-0 items-center gap-2 whitespace-nowrap rounded-[12px] pl-11 pr-3 text-left text-[13px] outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-white/70 [@media(max-height:900px)]:h-8 ${cOn ? "font-semibold text-white" : "font-medium text-white/50 hover:text-white"}`}
+                        >
+                          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cOn ? "bg-white" : "bg-white/25"}`} />
+                          <span className="truncate">{c.label}</span>
+                          {typeof c.badge === "number" && <span className={`${tag} rounded-full bg-white/10 px-1.5 py-px text-white/75`}>{c.badge}</span>}
+                          {c.badge === "lock" && <Lock className="ml-auto h-3 w-3 shrink-0 text-white/45" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                </React.Fragment>
               );
             })}
           </React.Fragment>
