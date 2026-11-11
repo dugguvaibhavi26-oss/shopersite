@@ -66,7 +66,7 @@ import { TutorialRunner, type Tutorial } from "@/components/dashboard/tutorials"
 import { AnalyticsPage } from "@/components/dashboard/analytics-page";
 import { ASSISTANT_WIDTH, AssistantButton, AssistantPanel, assistantFitsBeside } from "@/components/dashboard/assistant-panel";
 import { ThemePurchaseModal } from "@/components/dashboard/theme-purchase-modal";
-import { canEditTheme, canUseTheme, formatThemePrice, getThemePrice, ownsTheme, planIncludesTheme } from "@/lib/theme-pricing";
+import { canEditTheme, canUseTheme, formatThemePrice, FREE_THEME_SLUG, getThemePlan, getThemePrice, ownsTheme, planIncludesTheme, THEME_SALES } from "@/lib/theme-pricing";
 import { getTheme, getAllThemes, themeThumb } from "@/lib/themes";
 import { computeSalesAnalytics } from "@/lib/sales-analytics";
 import { siteConfig, getStoreUrl, getPublicStoreUrl, getPublicStoreAddress } from "@/lib/config/site";
@@ -447,7 +447,17 @@ function DashboardPageContent() {
   // Brand Theme State (3 Fields: Primary, Background, Surface)
   const [themeAppliedToast, setThemeAppliedToast] = useState<string | null>(null);
   // the theme the seller is buying, in the purchase window
-  const [themeToBuy, setThemeToBuy] = useState<string | null>(() => searchParams.get("buy"));
+  const [themeToBuy, setThemeToBuy] = useState<string | null>(() => (THEME_SALES ? searchParams.get("buy") : null));
+  /** A theme the shop can't use yet: themes come with plans, so point the seller at the plan that has it. */
+  const askForTheme = (slug: string) => {
+    if (THEME_SALES) return setThemeToBuy(slug);
+    const theme = getTheme(slug);
+    const plan = getThemePlan(slug);
+    const planName = plan === "starter" ? "Growth and Pro plans" : "Pro plan";
+    appConfirm(`${theme.name} comes with the ${planName}. You can still preview it with your products.`, { title: `Upgrade to use ${theme.name}?`, okLabel: "See plans" }).then(
+      (ok) => ok && setActiveTab("billing")
+    );
+  };
 
   const [copiedLink, setCopiedLink] = useState(false);
   // Settings is split into three short pages; coming back from Razorpay opens Payments
@@ -1121,7 +1131,7 @@ function DashboardPageContent() {
       appConfirm(`${theme.name} becomes the look of your shop. Your products and settings stay the same.`, { title: `Make ${theme.name} live?`, okLabel: "Make live" }).then(
         (ok) => ok && handleActivateTheme(theme.slug)
       );
-    } else setThemeToBuy(theme.slug);
+    } else askForTheme(theme.slug);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useParam, store?.subdomain]);
 
@@ -5324,13 +5334,13 @@ function DashboardPageContent() {
                   <p className="text-sm text-neutral-700 flex-1">
                     <b className="text-neutral-950">{getTheme(activeSlug).name}</b> came with your plan
                     {store.planPaidUntil ? `, which ended on ${new Date(store.planPaidUntil).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}. Your shop
-                    shows Mono Studio until you renew or buy it.
+                    shows {getTheme(FREE_THEME_SLUG).name} until you renew{THEME_SALES ? " or buy it" : ""}.
                   </p>
                   <div className="flex gap-2 shrink-0">
                     <button type="button" onClick={() => setActiveTab("billing")} className="h-9 px-3.5 rounded-xl border border-neutral-300 text-xs font-semibold hover:border-black">
                       Renew plan
                     </button>
-                    {getThemePrice(activeSlug) > 0 && (
+                    {THEME_SALES && getThemePrice(activeSlug) > 0 && (
                       <button type="button" onClick={() => setThemeToBuy(activeSlug)} className="h-9 px-3.5 rounded-xl bg-black text-white text-xs font-semibold hover:bg-neutral-800">
                         Buy for {formatThemePrice(getThemePrice(activeSlug))}
                       </button>
@@ -5399,7 +5409,7 @@ function DashboardPageContent() {
               {mine.length > 0 && (
                 <section>
                   <h3 className="text-sm font-semibold text-neutral-950">Your other themes</h3>
-                  <p className="mt-0.5 text-xs text-neutral-500">Themes you&apos;ve edited or own. Buyers only see your live theme.</p>
+                  <p className="mt-0.5 text-xs text-neutral-500">Themes you&apos;ve edited or used. Buyers only see your live theme.</p>
                   <div className="mt-3 divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
                     {mine.map((t) => {
                       const usable = canUseTheme(store, t.slug);
@@ -5414,7 +5424,7 @@ function DashboardPageContent() {
                             <p className="truncate text-sm font-semibold text-neutral-950">{t.name}</p>
                             <p className="truncate text-xs text-neutral-500">
                               {status}
-                              {!usable && " · locked until you renew or buy"}
+                              {!usable && (THEME_SALES ? " · locked until you renew or buy" : ` · comes with ${getThemePlan(t.slug) === "starter" ? "Growth" : "Pro"}`)}
                             </p>
                           </div>
                           {usable ? (
@@ -5422,8 +5432,8 @@ function DashboardPageContent() {
                               Make live
                             </button>
                           ) : getThemePrice(t.slug) > 0 ? (
-                            <button type="button" onClick={() => setThemeToBuy(t.slug)} className="h-9 rounded-xl bg-neutral-950 px-3 text-xs font-semibold text-white">
-                              Buy
+                            <button type="button" onClick={() => askForTheme(t.slug)} className="h-9 rounded-xl bg-neutral-950 px-3 text-xs font-semibold text-white">
+                              {THEME_SALES ? "Buy" : "Upgrade"}
                             </button>
                           ) : null}
                           <button type="button" onClick={() => router.push(editHref(t.slug))} className="h-9 rounded-xl bg-neutral-100 px-3 text-xs font-semibold hover:bg-neutral-200">
@@ -5445,8 +5455,10 @@ function DashboardPageContent() {
               <section>
                 <div className="flex items-end justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-neutral-950">{onFree ? "Free themes for your shop" : "Included in your plan"}</h3>
-                    <p className="mt-0.5 text-xs text-neutral-500">Preview any of them with your products. Your shop only changes when you make one live.</p>
+                    <h3 className="text-sm font-semibold text-neutral-950">{picks.length === 0 ? "More themes" : onFree ? "Free themes for your shop" : "Included in your plan"}</h3>
+                    <p className="mt-0.5 text-xs text-neutral-500">
+                      {picks.length === 0 && onFree ? "Growth and Pro come with more themes. " : ""}Preview any of them with your products. Your shop only changes when you make one live.
+                    </p>
                   </div>
                   <Link href="/themes" className="hidden shrink-0 text-xs font-semibold text-neutral-600 underline-offset-4 hover:text-black hover:underline sm:block">
                     All themes
@@ -5490,7 +5502,7 @@ function DashboardPageContent() {
                     <span className="relative">
                       <span className="block text-base font-semibold">Theme marketplace</span>
                       <span className="mt-1 block text-xs leading-relaxed text-white/60">
-                        {moreCount > 0 ? `${moreCount} more themes, free and paid. ` : ""}Browse, preview and buy.
+                        {moreCount > 0 ? `${moreCount} more themes${THEME_SALES ? ", free and paid" : ""}. ` : ""}{THEME_SALES ? "Browse, preview and buy." : "Browse and preview them all."}
                       </span>
                       <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold">
                         Open marketplace <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -6403,7 +6415,7 @@ function DashboardPageContent() {
         </div>
       )}
       {/* Buying a theme once */}
-      {store && themeToBuy && (
+      {store && themeToBuy && THEME_SALES && (
         <ThemePurchaseModal
           store={store}
           theme={getTheme(themeToBuy)}

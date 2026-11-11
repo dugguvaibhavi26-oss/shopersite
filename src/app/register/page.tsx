@@ -127,7 +127,7 @@ function RegisterStoreContent() {
   const chosenPlan = PLATFORM_PLANS[planId];
   // theme picked in the theme marketplace (?theme=slug); new shops start on it when their plan includes it
   const pickedTheme = searchParams.get("theme") || "";
-  const [appliedTheme, setAppliedTheme] = useState(() => getTheme("mono-studio").name);
+  const [appliedTheme, setAppliedTheme] = useState(() => getTheme("classic-bloom").name);
   // a priced theme picked in the marketplace that the new shop still has to buy
   const [themeToBuy, setThemeToBuy] = useState("");
 
@@ -594,9 +594,9 @@ function RegisterStoreContent() {
             ) : (
               <AuthButton
                 type="button"
-                onClick={() => router.push(`/dashboard?store=${createdSubdomain}${themeToBuy ? `&tab=themes&buy=${themeToBuy}` : ""}`)}
+                onClick={() => router.push(`/dashboard?store=${createdSubdomain}${themeToBuy ? `&tab=themes&use=${themeToBuy}` : ""}`)}
               >
-                {themeToBuy ? `Get ${getTheme(themeToBuy).name}` : "Go to my dashboard"}
+                {themeToBuy ? `See how to get ${getTheme(themeToBuy).name}` : "Go to my dashboard"}
                 <ArrowRight className="w-4 h-4" />
               </AuthButton>
             )}

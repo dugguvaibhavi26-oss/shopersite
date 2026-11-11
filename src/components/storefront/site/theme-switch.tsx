@@ -7,7 +7,7 @@ import { storeService, type StoreData } from "@/lib/store-service";
 import { themeKeyOf } from "@/lib/site-content";
 import { StatusScreen } from "@/components/ui/status-screen";
 import { SiteApp } from "./site-app";
-import { canUseTheme } from "@/lib/theme-pricing";
+import { canUseTheme, FREE_THEME_SLUG } from "@/lib/theme-pricing";
 
 /**
  * Every storefront page (home, catalog, product, bag, checkout…) is drawn here in the shop's
@@ -81,7 +81,7 @@ export function StorefrontThemeSwitch() {
     <SiteApp
       store={store}
       // a theme that came with a plan that has since lapsed shows as the free default until renewed or bought
-      theme={themeKeyOf(preview || (canUseTheme(store, store.activeThemeSlug) ? store.activeThemeSlug : "mono-studio"))}
+      theme={themeKeyOf(preview || (canUseTheme(store, store.activeThemeSlug) ? store.activeThemeSlug : FREE_THEME_SLUG))}
       base={onAppAddress ? prefix : ""}
       path={path}
       query={search.get("q")}

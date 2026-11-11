@@ -1,6 +1,6 @@
 import { BILLING_CYCLES, PLATFORM_PLANS, canAddProduct, canUseCoupons, calculatePlanPrice, type BillingCycle, applyPlanAccess, getDefaultPlanAccess, getAllPlanAccess, applyPlanDetails, getAllPlanDetails, getDefaultPlanDetails, type PlanAccess, type PlanDetails, type PlanId } from "./plans";
 import { getTheme, PLATFORM_THEMES } from "./themes";
-import { applyThemePricing, canUseTheme, formatThemePrice, getThemePlan, getThemePrice, getThemePricingOverrides, MAX_THEME_PRICE, ownsTheme, type ThemePlan } from "./theme-pricing";
+import { applyThemePricing, canUseTheme, FREE_THEME_SLUG, THEME_SALES, formatThemePrice, getThemePlan, getThemePrice, getThemePricingOverrides, MAX_THEME_PRICE, ownsTheme, type ThemePlan } from "./theme-pricing";
 import { registerCustomThemes, type CustomThemeDef } from "./site-content";
 import { auth, db, storage } from "./firebase";
 import { getStoreDomain, siteConfig } from "./config/site";
@@ -890,8 +890,8 @@ class StoreService {
       freeDeliveryThreshold: 50000, // ₹500
       standardDeliveryFee: 5000, // ₹50
       planId: "free",
-      // new shops start on Mono Studio, which every plan can use
-      activeThemeSlug: "mono-studio",
+      // new shops start on Lume Editorial, the Free plan's theme, which every plan can use
+      activeThemeSlug: FREE_THEME_SLUG,
       customBrandTheme: {
         primary: "#111111",
         background: "#FDFBF7",
@@ -1254,7 +1254,9 @@ class StoreService {
       const withPlan = plan ? ` or get it with ${PLATFORM_PLANS[plan]?.name || "a paid plan"}` : "";
       return {
         success: false,
-        error: price
+        error: !THEME_SALES && plan
+          ? `${theme.name} comes with the ${plan === "pro" ? "Pro plan" : "Growth and Pro plans"}. Upgrade to use it.`
+          : price
           ? `${theme.name} costs ${formatThemePrice(price)}. Buy it once to keep it for good${withPlan}.`
           : `${theme.name} isn't included in your plan. Upgrade to use it.`,
       };

@@ -6,7 +6,7 @@ import { Download, Eye, EyeOff, FileArchive, Loader2, Search, Trash2, Upload } f
 import { storeService, type StoreData } from "@/lib/store-service";
 import { getTheme, PLATFORM_THEMES, themeThumb, type ThemeDefinition } from "@/lib/themes";
 import { buildThemeZip, readThemePackage, themeZipName } from "@/lib/theme-package";
-import { ALL_THEMES_FREE, defaultThemePlan, defaultThemePrice, formatThemePrice, getThemePlan, getThemePrice, type ThemePlan } from "@/lib/theme-pricing";
+import { ALL_THEMES_FREE, DEFAULT_THEME_PRICE, THEME_SALES, defaultThemePlan, defaultThemePrice, formatThemePrice, getThemePlan, getThemePrice, type ThemePlan } from "@/lib/theme-pricing";
 import type { CustomThemeDef } from "@/lib/site-content";
 
 /** Admin: every theme sellers can use, a download of each as a zip, and uploading new or edited theme zips. */
@@ -280,7 +280,40 @@ function ThemeCard({
  */
 function PriceField({ slug }: { slug: string }) {
   if (ALL_THEMES_FREE) return <p className="text-[11px] font-medium text-neutral-500">Free on every plan</p>;
-  return <PriceFieldEditor slug={slug} />;
+  return THEME_SALES ? <PriceFieldEditor slug={slug} /> : <PlanFieldEditor slug={slug} />;
+}
+
+/** Which plan a theme comes with, while themes aren't sold one by one. */
+function PlanFieldEditor({ slug }: { slug: string }) {
+  const price = getThemePrice(slug);
+  const plan = getThemePlan(slug);
+  const value = price === 0 ? "free" : plan === "starter" ? "starter" : "pro";
+  const changed = price !== defaultThemePrice(slug) || (price > 0 && plan !== defaultThemePlan(slug));
+  return (
+    <div className="space-y-2 rounded-lg bg-neutral-50 p-2.5">
+      <div className="flex items-center gap-2">
+        <span className="w-[70px] shrink-0 text-[11px] font-semibold text-neutral-600">Comes with</span>
+        <select
+          value={value}
+          aria-label="Plan this theme comes with"
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "free") storeService.setThemePricing(slug, { price: 0 });
+            else storeService.setThemePricing(slug, { price: price || DEFAULT_THEME_PRICE, plan: v as ThemePlan });
+          }}
+          className="h-8 flex-1 rounded-lg border border-neutral-200 bg-white px-2 text-xs font-semibold text-neutral-900 outline-none focus:border-neutral-900"
+        >
+          <option value="free">Every plan (Free too)</option>
+          <option value="starter">Growth and Pro</option>
+          <option value="pro">Pro only</option>
+        </select>
+      </div>
+      <p className="text-[11px] text-neutral-500">
+        {value === "free" ? "Free for every shop" : value === "starter" ? "Included while on Growth or Pro" : "Included while on Pro"}
+        {changed && " · changed"}
+      </p>
+    </div>
+  );
 }
 
 function PriceFieldEditor({ slug }: { slug: string }) {

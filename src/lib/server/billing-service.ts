@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { applyPlanDetails, BILLING_CYCLES, calculatePlanPrice, PLATFORM_PLANS, type BillingCycle } from "../plans";
 import { registerCustomThemes, type CustomThemeDef } from "../site-content";
 import { getTheme } from "../themes";
-import { applyThemePricing, getThemePrice } from "../theme-pricing";
+import { applyThemePricing, getThemePrice, THEME_SALES } from "../theme-pricing";
 import { siteConfig } from "../config/site";
 import { isValidUpiId, type PlatformPayment, type StoreData, type SubscriptionRequest, type ThemePurchase } from "../store-service";
 import { ApiError } from "./api-error";
@@ -121,6 +121,7 @@ export async function cancelPlan(subdomain: string): Promise<void> {
 }
 
 export async function themeQuote(themeSlug: string) {
+  if (!THEME_SALES) throw new ApiError(400, "Themes come with the Growth and Pro plans and aren't sold one by one.");
   await loadPlatformPricing();
   const theme = getTheme(themeSlug);
   if (!theme || theme.slug !== themeSlug) throw new ApiError(404, "Theme not found.");

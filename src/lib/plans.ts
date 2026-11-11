@@ -101,8 +101,8 @@ export function canAddProduct(currentCount: number, planId: string = "free"): {
 }
 
 /**
- * Built-in themes are open to every plan for now; per-plan theme tiers (Free 1, Growth 7, Pro 30)
- * come with the theme tiers work. Uploaded themes count when switched on.
+ * Whether a theme exists for shops at all. Which plan a theme comes with (Free: Lume Editorial, Growth: 7 more,
+ * Pro: all) is decided in theme-pricing.ts. Uploaded themes count when switched on.
  */
 export function isThemeAllowed(themeSlug: string, planId: string = "free"): boolean {
   void planId;

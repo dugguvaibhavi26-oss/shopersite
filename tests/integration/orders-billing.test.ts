@@ -18,7 +18,7 @@ vi.mock("@/lib/server/firebase-admin", () => ({
 import * as orders from "@/lib/server/order-service";
 import * as billing from "@/lib/server/billing-service";
 import { calculatePlanPrice } from "@/lib/plans";
-import { getThemePrice } from "@/lib/theme-pricing";
+import { getThemePrice, THEME_SALES } from "@/lib/theme-pricing";
 
 const SUB = "lume";
 function seed(over: Record<string, unknown> = {}) {
@@ -198,6 +198,11 @@ describe("seller payments to Shopersite", () => {
   it("theme: priced by the server, can't buy twice or own already", async () => {
     const slug = "f02";
     const price = getThemePrice(slug);
+    if (!THEME_SALES) {
+      // themes only come with plans: the server refuses a single purchase
+      await expect(billing.requestTheme(SUB, { themeSlug: slug, utr: "612345678901" })).rejects.toThrow(/aren't sold one by one/);
+      return;
+    }
     if (!price) return; // free theme in this build: nothing to buy
     const p = await billing.requestTheme(SUB, { themeSlug: slug, utr: "612345678901" });
     expect(p).toMatchObject({ themeSlug: slug, amount: price, status: "pending_verification", payeeUpiId: "shopersite@ybl" });

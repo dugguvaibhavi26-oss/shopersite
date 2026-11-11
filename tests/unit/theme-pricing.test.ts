@@ -7,21 +7,20 @@ import { applyThemePricing, canEditTheme, canUseTheme, getThemePlan, getThemePri
 const DAY = 24 * 60 * 60 * 1000;
 const later = (days: number) => new Date(Date.now() + days * DAY).toISOString();
 
-// these check the paid-theme rules, which are switched off while every theme is free
+// these check the plan-theme rules
 beforeAll(() => setAllThemesFree(false));
-afterAll(() => setAllThemesFree(true));
+afterAll(() => setAllThemesFree(false));
 
 describe("Theme prices and plans", () => {
   beforeEach(() => applyThemePricing(null));
 
-  it("starts a few themes free and the rest priced, some with a plan", () => {
-    expect(getThemePrice("mono-studio")).toBe(0);
+  it("starts Lume Editorial free, seven themes with Growth and the rest with Pro", () => {
+    expect(getThemePrice("classic-bloom")).toBe(0);
     expect(getThemePrice("theme20")).toBe(49900);
-    expect(getThemePlan("theme06")).toBe("starter");
-    expect(getThemePlan("theme12")).toBe("pro");
-    expect(getThemePlan("theme20")).toBeNull();
+    for (const slug of ["mono-studio", "theme03", "theme05", "theme06", "f02", "theme07", "theme21"]) expect(getThemePlan(slug)).toBe("starter");
+    for (const slug of ["theme04", "f01", "theme08", "theme12", "theme20", "theme35"]) expect(getThemePlan(slug)).toBe("pro");
     // a free theme needs no plan
-    expect(getThemePlan("mono-studio")).toBeNull();
+    expect(getThemePlan("classic-bloom")).toBeNull();
   });
 
   it("follows the admin's prices and plans", () => {
@@ -35,7 +34,7 @@ describe("Theme prices and plans", () => {
     applyThemePricing({ prices: { theme20: -5, theme21: "abc" }, plans: { theme22: "gold" } });
     expect(getThemePrice("theme20")).toBe(49900);
     expect(getThemePrice("theme21")).toBe(49900);
-    expect(getThemePlan("theme22")).toBeNull();
+    expect(getThemePlan("theme22")).toBe("pro");
   });
 });
 
@@ -44,8 +43,9 @@ describe("Who can use and edit a theme", () => {
 
   it("lets a Free shop use free themes but not edit them", () => {
     const shop = { planId: "free" };
-    expect(canUseTheme(shop, "mono-studio")).toBe(true);
-    expect(canEditTheme(shop, "mono-studio")).toBe(false);
+    expect(canUseTheme(shop, "classic-bloom")).toBe(true);
+    expect(canEditTheme(shop, "classic-bloom")).toBe(false);
+    expect(canUseTheme(shop, "mono-studio")).toBe(false);
     expect(canUseTheme(shop, "theme20")).toBe(false);
   });
 
@@ -62,8 +62,9 @@ describe("Who can use and edit a theme", () => {
     expect(canEditTheme(paid, "theme06")).toBe(true);
     // a Pro-only theme isn't on Growth
     expect(canUseTheme(paid, "theme12")).toBe(false);
-    // a theme with no plan has to be bought
     expect(canUseTheme(paid, "theme20")).toBe(false);
+    expect(canUseTheme(paid, "theme21")).toBe(true);
+    expect(canUseTheme(paid, "classic-bloom")).toBe(true);
 
     const lapsed = { planId: "starter", planPaidUntil: later(-1), activeThemeSlug: "theme06", planThemes: ["theme06"] };
     expect(planActive(lapsed)).toBe(false);

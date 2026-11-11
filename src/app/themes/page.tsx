@@ -10,7 +10,7 @@ import { usePlatformSettings } from "@/lib/use-platform-settings";
 import { getAllThemes, type ThemeDefinition } from "@/lib/themes";
 import { getCustomTheme } from "@/lib/site-content";
 import { PLATFORM_PLANS } from "@/lib/plans";
-import { formatThemePrice, getThemePlan, getThemePrice } from "@/lib/theme-pricing";
+import { formatThemePrice, getThemePlan, getThemePrice, THEME_SALES } from "@/lib/theme-pricing";
 import { SiteFooter, SiteHeader } from "@/components/home/site-chrome";
 import { ShopperMark } from "@/components/brand/shopper-logo";
 
@@ -33,8 +33,8 @@ const monthly = (id: PlanId) => {
   return p.priceMonthly ? `₹${(p.priceMonthly / 100).toLocaleString("en-IN")}/mo` : "Free";
 };
 /**
- * How a theme is sold: free, or a one-time price to own it for good (editing included), and maybe also included
- * with Growth or Pro for as long as the shop is on that plan.
+ * How a shop gets a theme: free on every plan, or included with Growth or Pro for as long as the shop is on that
+ * plan. (With THEME_SALES on, a theme can also be bought once.) "price" above 0 means the theme isn't free.
  */
 const offerFor = (slug: string) => {
   const price = getThemePrice(slug);
@@ -42,7 +42,7 @@ const offerFor = (slug: string) => {
   return {
     price,
     plan,
-    label: formatThemePrice(price),
+    label: price && !THEME_SALES && plan ? `${PLATFORM_PLANS[plan].name} plan` : formatThemePrice(price),
     /** "Growth" or "Pro": the cheapest plan that includes it */
     planName: plan ? PLATFORM_PLANS[plan].name : null,
   };
@@ -362,7 +362,8 @@ function ThemeCard({ theme, offer, delay, useHref, onOpen }: { theme: ThemeDefin
 
   const price = offer.label;
   // the line under the price: how else to get it
-  const also = offer.price ? (offer.planName ? `or with ${offer.planName}` : "Own it forever") : `Edit from ${monthly("starter")}`;
+  const also = offer.price ? (!THEME_SALES && offer.plan ? `From ${monthly(offer.plan)}` : offer.planName ? `or with ${offer.planName}` : "Own it forever") : `Edit from ${monthly("starter")}`;
+  const getIt = !THEME_SALES && offer.planName ? `Use with ${offer.planName}` : `Buy for ${price}`;
 
   return (
     <div className={`hero-rise relative ${hot ? "z-40" : raised ? "z-30" : "z-0"}`} style={{ animationDelay: `${delay}ms` }} onPointerEnter={enter} onPointerLeave={leave}>
@@ -423,8 +424,8 @@ function ThemeCard({ theme, offer, delay, useHref, onOpen }: { theme: ThemeDefin
             <Link
               href={useHref}
               tabIndex={hot ? 0 : -1}
-              aria-label={offer.price ? `Buy ${theme.name}` : `Use ${theme.name}`}
-              {...tip.bind(offer.price ? `Buy for ${price}` : "Use for free")}
+              aria-label={offer.price && THEME_SALES ? `Buy ${theme.name}` : `Use ${theme.name}`}
+              {...tip.bind(offer.price ? getIt : "Use for free")}
               className={`${ctl} border-2 border-white/40 hover:border-white`}
             >
               <ShoppingBag className="h-4 w-4" />
@@ -444,7 +445,7 @@ function ThemeCard({ theme, offer, delay, useHref, onOpen }: { theme: ThemeDefin
 
           <div className="mt-4 flex items-center gap-2">
             <span className="text-[14px] font-bold tabular-nums">{price}</span>
-            <span className="rounded-[3px] border border-white/40 px-1.5 py-px text-[10.5px] font-medium leading-tight text-white/85">{offer.price ? (offer.planName ? `${offer.planName}+` : "Own it") : "All plans"}</span>
+            <span className="rounded-[3px] border border-white/40 px-1.5 py-px text-[10.5px] font-medium leading-tight text-white/85">{offer.price ? (offer.plan === "pro" ? "Pro" : offer.planName ? `${offer.planName}+` : "Own it") : "All plans"}</span>
             <span className="rounded-[3px] border border-white/40 px-1.5 py-px text-[10.5px] font-medium leading-tight text-white/85">Phone + desktop</span>
             <span className="ml-auto">
               <Swatches colors={theme.previewColors} size="h-3 w-3" ring="ring-[#141414]" />
@@ -604,7 +605,7 @@ function ThemeDetails({ theme, offer, useHref, signedIn, onClose }: { theme: The
             </div>
             <div className="mt-3 divide-y divide-neutral-100">
               {[
-                ...(offer.price ? [{ key: "own", name: "Buy once", price: offer.label, has: true, top: true, text: "Yours for good on any plan, editor included" }] : []),
+                ...(offer.price && THEME_SALES ? [{ key: "own", name: "Buy once", price: offer.label, has: true, top: true, text: "Yours for good on any plan, editor included" }] : []),
                 ...PLAN_ORDER.map((id) => {
                   const included = offer.price === 0 || (id === "starter" ? offer.plan === "starter" : id === "pro" ? !!offer.plan : false);
                   return {
@@ -612,9 +613,9 @@ function ThemeDetails({ theme, offer, useHref, signedIn, onClose }: { theme: The
                     name: `${PLATFORM_PLANS[id].name} plan`,
                     price: id === "free" ? "₹0" : monthly(id),
                     has: included,
-                    top: offer.price === 0 && id === "free",
+                    top: offer.price === 0 ? id === "free" : !THEME_SALES && id === offer.plan,
                     text: !included
-                      ? id === "free" ? "Buy it once to use it on Free" : "Not included"
+                      ? id === "free" && THEME_SALES ? "Buy it once to use it on Free" : "Not included"
                       : id === "free" ? "This theme as it comes" : offer.price ? "Included while you're on the plan, with the editor" : "This theme, plus the editor",
                   };
                 }),
@@ -623,7 +624,7 @@ function ThemeDetails({ theme, offer, useHref, signedIn, onClose }: { theme: The
                   <span className="min-w-0">
                     <span className="flex items-center gap-1.5 text-sm font-semibold">
                       {row.name}
-                      {row.top && <span className="rounded-full bg-black px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wider text-white">{offer.price ? "Best value" : "Starts here"}</span>}
+                      {row.top && <span className="rounded-full bg-black px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wider text-white">{offer.price && THEME_SALES ? "Best value" : "Starts here"}</span>}
                     </span>
                     <span className="mt-0.5 block text-xs text-neutral-500">{row.text}</span>
                   </span>
@@ -638,14 +639,16 @@ function ThemeDetails({ theme, offer, useHref, signedIn, onClose }: { theme: The
               href={useHref}
               className="group mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-[14px] bg-black text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
             >
-              {signedIn ? (offer.price ? `Get it for ${offer.label}` : "Use this theme") : offer.price ? `Start and get it for ${offer.label}` : "Start free with this theme"}
+              {!THEME_SALES && offer.planName
+                ? signedIn ? `Use it with ${offer.planName}` : `Start your shop, then go ${offer.planName}`
+                : signedIn ? (offer.price ? `Get it for ${offer.label}` : "Use this theme") : offer.price ? `Start and get it for ${offer.label}` : "Start free with this theme"}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
             <p className="mt-2.5 text-center text-xs text-neutral-500">
               {signedIn
-                ? "Opens your dashboard's themes, where you can buy it or use it with your plan."
+                ? THEME_SALES ? "Opens your dashboard's themes, where you can buy it or use it with your plan." : "Opens your dashboard's themes, where you can use it with your plan."
                 : offer.price
-                  ? "Create your free shop, then buy it once in Themes. Pay by UPI."
+                  ? THEME_SALES ? "Create your free shop, then buy it once in Themes. Pay by UPI." : `Create your shop, then switch to this theme on ${offer.planName || "a paid plan"}.`
                   : "No card needed. Switch themes any time."}
             </p>
           </div>

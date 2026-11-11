@@ -1,37 +1,45 @@
 import { canUseThemeEditor, isPaidPlan, isThemeAllowed } from "./plans";
 
 /**
- * What each storefront theme costs, and who may use and edit it.
+ * Which plan each storefront theme comes with, and who may use and edit it.
  *
  * - Free themes: every shop can use them.
- * - Bought themes: a one-time price. Once bought, the shop keeps the theme for good, on any plan, and can edit it
- *   in the website editor even on Free.
- * - Plan themes: a theme can also come with Growth or Pro (Pro gets Growth's too). Those last only while the plan
- *   is paid for; when the paid month runs out without a renewal they lock again, unless the shop bought them.
- * - Shops already on a theme before it got a price keep it.
+ * - Plan themes: a theme comes with Growth or Pro (Pro gets Growth's too). Those last only while the plan is paid
+ *   for; when the paid month runs out without a renewal they lock again.
+ * - Shops already on a theme before it was locked keep it until they switch away.
+ * - Themes are not sold one by one (THEME_SALES is off). A theme the admin unlocked for a shop earlier
+ *   (ownedThemes) stays that shop's. The price below only marks a theme as "not free" while sales are off.
  *
- * The admin sets each theme's price and plan; these are the starting ones.
+ * The admin sets each theme's plan; these are the starting ones.
  */
 
 export type ThemePlan = "starter" | "pro" | null;
 
 /**
- * Every theme is free on every plan (Growth and Pro add the website editor, not themes).
- * Set to false to bring back the prices and plan themes below, including the admin's saved prices.
+ * true makes every theme free on every plan. Off: themes follow the plans below and what the admin saved.
  */
-export let ALL_THEMES_FREE = true;
+export let ALL_THEMES_FREE = false;
+
+/** Whether a shop can buy a single theme once (by UPI). Off: themes only come with plans. */
+export const THEME_SALES: boolean = false;
 
 /** For tests of the paid-theme rules. */
 export function setAllThemesFree(on: boolean) {
   ALL_THEMES_FREE = on;
 }
 
+/** The theme every shop starts on and the one the Free plan gets: Lume Editorial. */
+export const FREE_THEME_SLUG = "classic-bloom";
 /** Built-in themes that start out free. */
-const FREE_THEMES = ["classic-bloom", "mono-studio", "theme03", "theme04", "theme05"];
-/** Built-in themes that start out included with Growth (and so Pro). */
-const GROWTH_THEMES = ["theme06", "f01", "f02", "theme07", "theme08", "theme09"];
-/** Built-in themes that start out included with Pro only. */
-const PRO_THEMES = ["theme10", "theme11", "theme12", "theme13", "theme14", "theme15"];
+const FREE_THEMES = [FREE_THEME_SLUG];
+/** Built-in themes that start out included with Growth (and so Pro): Mono Studio, Theme 03, Theme 05, E01, F02, Theme 07, Theme 21. */
+const GROWTH_THEMES = ["mono-studio", "theme03", "theme05", "theme06", "f02", "theme07", "theme21"];
+
+/** The plan a built-in theme starts out included with; every built-in theme outside Free and Growth is Pro's. */
+function builtInPlan(slug: string): ThemePlan {
+  if (slug.startsWith("custom-") || FREE_THEMES.includes(slug)) return null;
+  return GROWTH_THEMES.includes(slug) ? "starter" : "pro";
+}
 
 /** ₹499, in paise */
 export const DEFAULT_THEME_PRICE = 49900;
@@ -73,7 +81,7 @@ export function defaultThemePrice(slug: string): number {
 
 /** The plan a theme starts out included with, before the admin changes it. */
 export function defaultThemePlan(slug: string): ThemePlan {
-  return GROWTH_THEMES.includes(slug) ? "starter" : PRO_THEMES.includes(slug) ? "pro" : null;
+  return builtInPlan(slug);
 }
 
 /** What a theme costs once, in paise; 0 means free. */
@@ -85,7 +93,9 @@ export function getThemePrice(slug: string): number {
 /** The plan that includes the theme ("starter" is Growth); null when no plan does. Free themes need none. */
 export function getThemePlan(slug: string): ThemePlan {
   if (getThemePrice(slug) === 0) return null;
-  return slug in planOverrides ? planOverrides[slug] : defaultThemePlan(slug);
+  const plan = slug in planOverrides ? planOverrides[slug] : defaultThemePlan(slug);
+  // with single sales off, a theme that isn't free always comes with a plan
+  return plan || (THEME_SALES ? null : "pro");
 }
 
 /** "₹499", or "Free" for a free theme. */

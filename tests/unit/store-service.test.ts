@@ -22,7 +22,7 @@ describe("Platform Multi-Tenant Store & Subscription Engine", () => {
     expect(store).toBeDefined();
     expect(store.subdomain).toBe(testSubdomain);
     expect(store.planId).toBe("free");
-    expect(store.activeThemeSlug).toBe("mono-studio");
+    expect(store.activeThemeSlug).toBe("classic-bloom");
     // a new store starts empty: no sample products, banners or stock-photo collections
     expect(store.products).toEqual([]);
     expect(store.banners).toEqual([]);
