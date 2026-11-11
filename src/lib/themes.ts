@@ -70,7 +70,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme03: {
     id: "theme-15",
     slug: "theme03",
-    name: "Theme 03",
+    name: "Active Pulse",
     tagline: "Sporty, clean and photo-led",
     tier: "free",
     category: "Fashion & Lifestyle",
@@ -90,7 +90,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme04: {
     id: "theme-16",
     slug: "theme04",
-    name: "Theme 04",
+    name: "Bold Runway",
     tagline: "Big condensed fashion headlines",
     tier: "free",
     category: "Fashion & Lifestyle",
@@ -110,7 +110,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme05: {
     id: "theme-17",
     slug: "theme05",
-    name: "Theme 05",
+    name: "Pure Form",
     tagline: "Soft, modern product store",
     tier: "free",
     category: "Fashion & Lifestyle",
@@ -130,7 +130,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme06: {
     id: "theme-18",
     slug: "theme06",
-    name: "E01",
+    name: "Lavender Tech",
     tagline: "Soft lavender tech and lifestyle store",
     tier: "free",
     category: "Electronics & Lifestyle",
@@ -150,7 +150,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   f01: {
     id: "theme-19",
     slug: "f01",
-    name: "F01",
+    name: "Oak Atelier",
     tagline: "Warm, minimal furniture and home store",
     tier: "free",
     category: "Furniture & Home",
@@ -170,7 +170,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   f02: {
     id: "theme-20",
     slug: "f02",
-    name: "F02",
+    name: "Olive Table",
     tagline: "Calm dining furniture store",
     tier: "free",
     category: "Furniture & Home",
@@ -190,7 +190,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme07: {
     id: "theme-21",
     slug: "theme07",
-    name: "Theme 07",
+    name: "Clay Studio",
     tagline: "Bright handmade ceramics store",
     tier: "free",
     category: "Home & Decor",
@@ -210,7 +210,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme08: {
     id: "theme-22",
     slug: "theme08",
-    name: "Theme 08",
+    name: "Scarlet Tote",
     tagline: "Bold bag and accessories store",
     tier: "free",
     category: "Fashion & Accessories",
@@ -230,7 +230,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme09: {
     id: "theme-23",
     slug: "theme09",
-    name: "Theme 09",
+    name: "Noble Paws",
     tagline: "Quiet luxury pet store",
     tier: "free",
     category: "Pets & Lifestyle",
@@ -250,7 +250,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme10: {
     id: "theme-24",
     slug: "theme10",
-    name: "Theme 10",
+    name: "Daily Wear",
     tagline: "Clean everyday fashion store",
     tier: "free",
     category: "Fashion & Apparel",
@@ -270,7 +270,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme11: {
     id: "theme-25",
     slug: "theme11",
-    name: "Theme 11",
+    name: "Sneaker Drop",
     tagline: "Bold sneaker drop store",
     tier: "free",
     category: "Footwear & Sports",
@@ -290,7 +290,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme12: {
     id: "theme-26",
     slug: "theme12",
-    name: "Theme 12",
+    name: "Orange Kick",
     tagline: "Bright sneaker and gear shop",
     tier: "free",
     category: "Footwear & Sports",
@@ -310,7 +310,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme13: {
     id: "theme-27",
     slug: "theme13",
-    name: "Theme 13",
+    name: "Sugar Crumb",
     tagline: "Playful bakery and dessert shop",
     tier: "free",
     category: "Food & Bakery",
@@ -330,7 +330,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme14: {
     id: "theme-28",
     slug: "theme14",
-    name: "Theme 14",
+    name: "Spice Pantry",
     tagline: "Bold spice and pantry brand",
     tier: "free",
     category: "Food & Grocery",
@@ -350,7 +350,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme15: {
     id: "theme-29",
     slug: "theme15",
-    name: "Theme 15",
+    name: "Fizz Pop",
     tagline: "Colourful drinks brand",
     tier: "free",
     category: "Food & Drinks",
@@ -370,7 +370,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme16: {
     id: "theme-30",
     slug: "theme16",
-    name: "Theme 16",
+    name: "Earth Glow",
     tagline: "Warm natural skincare brand",
     tier: "free",
     category: "Beauty & Wellness",
@@ -390,7 +390,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme17: {
     id: "theme-31",
     slug: "theme17",
-    name: "Theme 17",
+    name: "Sunny Lane",
     tagline: "Bright modern lifestyle store",
     tier: "free",
     category: "Fashion & Lifestyle",
@@ -410,7 +410,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme18: {
     id: "theme-32",
     slug: "theme18",
-    name: "Theme 18",
+    name: "Rose Dew",
     tagline: "Dreamy pink skincare brand",
     tier: "free",
     category: "Beauty & Wellness",
@@ -430,7 +430,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme19: {
     id: "theme-33",
     slug: "theme19",
-    name: "Theme 19",
+    name: "Berry Boost",
     tagline: "Playful drinks and nutrition brand",
     tier: "free",
     category: "Food & Drinks",
@@ -450,7 +450,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme20: {
     id: "theme-34",
     slug: "theme20",
-    name: "Theme 20",
+    name: "Open Road",
     tagline: "Minimal bike and gear store",
     tier: "free",
     category: "Sports & Outdoors",
@@ -470,7 +470,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme21: {
     id: "theme-35",
     slug: "theme21",
-    name: "Theme 21",
+    name: "Golden Hour",
     tagline: "Modern gold jewellery store",
     tier: "free",
     category: "Jewellery",
@@ -490,7 +490,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme22: {
     id: "theme-36",
     slug: "theme22",
-    name: "Theme 22",
+    name: "Terra Gem",
     tagline: "Terracotta fine jewellery house",
     tier: "free",
     category: "Jewellery",
@@ -510,7 +510,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme23: {
     id: "theme-37",
     slug: "theme23",
-    name: "Theme 23",
+    name: "Quiet Scent",
     tagline: "Quiet luxury fragrance house",
     tier: "free",
     category: "Beauty & Fragrance",
@@ -530,7 +530,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme24: {
     id: "theme-38",
     slug: "theme24",
-    name: "Theme 24",
+    name: "Volt Gear",
     tagline: "Clean tech accessories store",
     tier: "free",
     category: "Electronics",
@@ -550,7 +550,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme25: {
     id: "theme-39",
     slug: "theme25",
-    name: "Theme 25",
+    name: "Burger Joint",
     tagline: "Playful burger and food joint",
     tier: "free",
     category: "Food & Restaurant",
@@ -570,7 +570,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme26: {
     id: "theme-40",
     slug: "theme26",
-    name: "Theme 26",
+    name: "Noir Jewel",
     tagline: "Dark luxury jewellery house",
     tier: "free",
     category: "Jewellery",
@@ -590,7 +590,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme27: {
     id: "theme-41",
     slug: "theme27",
-    name: "Theme 27",
+    name: "Kind Stones",
     tagline: "Handmade jewellery that gives back",
     tier: "free",
     category: "Jewellery",
@@ -610,7 +610,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme28: {
     id: "theme-42",
     slug: "theme28",
-    name: "Theme 28",
+    name: "Festive Threads",
     tagline: "Ethnic wear for every occasion",
     tier: "free",
     category: "Fashion",
@@ -630,7 +630,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme29: {
     id: "theme-43",
     slug: "theme29",
-    name: "Theme 29",
+    name: "Silk Heritage",
     tagline: "Heritage silk saree house",
     tier: "free",
     category: "Fashion",
@@ -650,7 +650,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme30: {
     id: "theme-44",
     slug: "theme30",
-    name: "Theme 30",
+    name: "Plum Drape",
     tagline: "Saree boutique in plum and cream",
     tier: "free",
     category: "Fashion",
@@ -670,7 +670,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme31: {
     id: "theme-45",
     slug: "theme31",
-    name: "Theme 31",
+    name: "Every Curve",
     tagline: "Size-inclusive womenswear",
     tier: "free",
     category: "Fashion",
@@ -690,7 +690,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme32: {
     id: "theme-46",
     slug: "theme32",
-    name: "Theme 32",
+    name: "Happy Home",
     tagline: "Playful home objects in pink and red",
     tier: "free",
     category: "Home & Living",
@@ -710,7 +710,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme33: {
     id: "theme-47",
     slug: "theme33",
-    name: "Theme 33",
+    name: "Paper Parade",
     tagline: "Colourful illustrated prints and stationery",
     tier: "free",
     category: "Art & Stationery",
@@ -730,7 +730,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme34: {
     id: "theme-48",
     slug: "theme34",
-    name: "Theme 34",
+    name: "Velvet Rouge",
     tagline: "Luxe burgundy boutique",
     tier: "free",
     category: "Gifts & Lifestyle",
@@ -750,7 +750,7 @@ export const PLATFORM_THEMES: Record<string, ThemeDefinition> = {
   theme35: {
     id: "theme-49",
     slug: "theme35",
-    name: "Theme 35",
+    name: "Happy Paws",
     tagline: "Bright and friendly pet store",
     tier: "free",
     category: "Pets",

@@ -14,7 +14,7 @@ describe("Theme packages", () => {
     const files = unzipSync(buildThemeZip("theme13"));
     expect(Object.keys(files).sort()).toEqual(["README.md", "sample-catalog.json", "theme.json"]);
     const json = JSON.parse(strFromU8(files["theme.json"]));
-    expect(json).toMatchObject({ format: "shopersite-theme", version: 1, name: "Theme 13", base: "theme13" });
+    expect(json).toMatchObject({ format: "shopersite-theme", version: 1, name: "Sugar Crumb", base: "theme13" });
     expect(json.content.sections.map((s: { type: string }) => s.type)).toEqual(getDefaultSiteContent("theme13", "Your brand").sections.map((s) => s.type));
     expect(JSON.parse(strFromU8(files["sample-catalog.json"])).products.length).toBeGreaterThanOrEqual(10);
     expect(themeZipName("theme13")).toBe("theme13-theme.zip");
@@ -24,12 +24,12 @@ describe("Theme packages", () => {
     const res = readThemePackage(buildThemeZip("theme21"), "theme21-theme.zip");
     expect(res.ok).toBe(true);
     if (!res.ok) return;
-    expect(res.theme.slug).toBe("custom-theme-21");
+    expect(res.theme.slug).toBe("custom-golden-hour");
     expect(res.theme.base).toBe("theme21");
     expect(res.theme.enabled).toBe(true);
     // a second upload with the same name gets its own slug
     const again = readThemePackage(buildThemeZip("theme21"), "x.zip", [res.theme.slug]);
-    expect(again.ok && again.theme.slug).toBe("custom-theme-21-2");
+    expect(again.ok && again.theme.slug).toBe("custom-golden-hour-2");
   });
 
   it("keeps edits, drops unknown sections and accepts a bare theme.json", () => {
@@ -67,7 +67,7 @@ describe("Theme packages", () => {
     const slug = res.theme.slug;
     expect(toSiteTheme(slug)).toBe("theme22");
     expect(themeKeyOf(slug)).toBe(slug);
-    expect(getTheme(slug).name).toBe("Theme 22");
+    expect(getTheme(slug).name).toBe("Terra Gem");
     expect(getAllThemes().some((t) => t.slug === slug)).toBe(true);
     expect(isThemeAllowed(slug, "free")).toBe(true);
     const content = getDefaultSiteContent(slug, "Acme Gold");
