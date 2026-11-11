@@ -12,6 +12,9 @@ export const config = {
      * 4. all root files inside /public (e.g. /favicon.ico)
      */
     "/((?!api/|_next/|_static/|[\\w-]+\\.\\w+).*)",
+    // these two are answered per shop on shop addresses (see below)
+    "/robots.txt",
+    "/sitemap.xml",
   ],
 };
 
@@ -58,6 +61,13 @@ export default async function middleware(req: NextRequest) {
   const customDomain = !storeSub && !isPlatformHost(bareHost);
   if (customDomain) storeSub = await storeForCustomDomain(req, bareHost);
   const path = url.pathname;
+
+  // A shop's own robots.txt and sitemap.xml, so search engines list its pages under its own address
+  if (path === "/robots.txt" || path === "/sitemap.xml") {
+    if (!storeSub) return NextResponse.next();
+    url.pathname = `/s/${storeSub}${path}`;
+    return NextResponse.rewrite(url);
+  }
 
   if (storeSub) {
     // Links written as /s/roxtenn/... are tidied to /... so the address isn't repeated
