@@ -5991,7 +5991,7 @@ function DashboardPageContent() {
                   <p className="mt-0.5 text-sm text-white/60">Cards, UPI and net banking with your own payment gateway. Part of Growth.</p>
                 </div>
                 <button type="button" onClick={() => openSettings("billing")} className="h-10 shrink-0 rounded-xl bg-white px-4 text-sm font-semibold text-neutral-950 hover:bg-neutral-100">
-                  Try Growth free for 10 days
+                  Try Growth free
                 </button>
               </div>
             )}

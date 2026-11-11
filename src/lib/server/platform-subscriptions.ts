@@ -205,8 +205,9 @@ export async function startSubscription(subdomain: string, planIdRaw: string): P
 function describe(planName: string, sub: BillingSub): string {
   const plan = PLATFORM_PLANS[sub.planId];
   const price = `${rupees(plan.priceMonthly)}/month`;
-  if (sub.trial && sub.startsAt) return `${planName}: free until ${day(Date.parse(sub.startsAt))}, then ${price}`;
-  if (sub.intro && plan.introPriceMonthly) return `${planName}: ${rupees(plan.introPriceMonthly)}/month for ${plan.introMonths} months, then ${price}`;
+  const paid = sub.intro && plan.introPriceMonthly ? `${rupees(plan.introPriceMonthly)}/month for ${plan.introMonths} months, then ${price}` : price;
+  if (sub.trial && sub.startsAt) return `${planName}: free until ${day(Date.parse(sub.startsAt))}, then ${paid}`;
+  if (sub.intro) return `${planName}: ${paid}`;
   if (sub.startsAt) return `${planName}: ${price} from ${day(Date.parse(sub.startsAt))}`;
   return `${planName}: ${price}`;
 }

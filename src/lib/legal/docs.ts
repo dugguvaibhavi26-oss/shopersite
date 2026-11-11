@@ -132,7 +132,7 @@ export function buildLegalDocs(C: Company): LegalDoc[] {
         body: [
           `Creating a Shop is free. Optional paid plans (currently Growth and Pro) and premium themes are offered at the prices shown on ${D} at the time you buy. Prices are in Indian rupees and include applicable taxes unless stated otherwise.`,
           `${B} charges no commission on Sellers' sales.`,
-          "Paid plans run for the period you pay for and are not renewed automatically. When a plan ends and isn't renewed, the Shop moves to the Free plan: features and limits beyond it switch off, but your Shop and data remain. Refunds are covered by our Refund & Cancellation Policy.",
+          "Paid plans are billed monthly and renew automatically through Razorpay (card or UPI AutoPay) until you cancel. When a plan is cancelled or a payment cannot be collected, the Shop moves to the Free plan: features and limits beyond it switch off, but your Shop and data remain. Refunds are covered by our Refund & Cancellation Policy.",
           "We may change plan prices or features in the future. Changes never affect a period you have already paid for, and we will announce price changes before they apply to you.",
         ],
       },
@@ -407,7 +407,7 @@ export function buildLegalDocs(C: Company): LegalDoc[] {
     group: "Sellers",
     summary: [
       "This covers what sellers pay ShoperSite (plans and themes). Refunds for products bought from a shop are handled by that shop.",
-      "Plans never renew automatically, so there is nothing to cancel to stop future charges.",
+      "Paid plans are paid automatically each month through Razorpay (card or UPI AutoPay). Cancel any time in Settings → Plan & billing and no further payments are taken.",
       "Charged twice, charged by mistake, or not activated within 24 hours? You get a full refund. Ask within 7 days.",
       "Refunds reach your original payment method within 5–7 working days.",
     ],
@@ -417,8 +417,8 @@ export function buildLegalDocs(C: Company): LegalDoc[] {
         id: "cancel",
         title: "Cancelling a plan",
         body: [
-          "Paid plans are bought for a fixed period (monthly or yearly) and do not renew automatically, so you are never charged again unless you choose to renew.",
-          "You can stop using a paid plan at any time. Your plan stays active until the end of the period you paid for, then your shop moves to the Free plan. Your shop, products and orders are kept.",
+          "Paid plans are billed monthly. When you subscribe you approve automatic payments (card or UPI AutoPay) through Razorpay, and the plan price is charged each month until you cancel. Where a free trial or an introductory price applies, the dates and amounts are shown before you approve.",
+          "You can cancel at any time in Settings → Plan & billing. No further payments are taken. If you cancel during a free trial you are not charged. Your plan stays active until the end of the period you paid for (or the end of the free trial), then your shop moves to the Free plan. Your shop, products and orders are kept.",
         ],
       },
       {

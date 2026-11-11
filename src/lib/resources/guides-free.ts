@@ -116,7 +116,7 @@ export const FREE_GUIDES: Guide[] = [
       ] },
       { type: "h", id: "snapshot", text: "A snapshot of common options" },
       { type: "table", head: ["Platform", "Free option (Nov 2026)", "Good to know"], rows: [
-        ["Shopersite", "Free plan, ₹0 forever: up to 75 products, cash on delivery, WhatsApp order messages", "Online payments via Razorpay, coupons and Shiprocket from Growth (₹199/mo after a 10-day trial)"],
+        ["Shopersite", "Free plan, ₹0 forever: up to 75 products, cash on delivery, WhatsApp order messages", "Online payments via Razorpay, coupons and Shiprocket from Growth (1 month free, then ₹199/mo)"],
         ["Shopify", "Free trial, then paid monthly plans", "Large app ecosystem; costs grow with apps and plan"],
         ["Wix", "Free plan for building a site", "Accepting payments needs a paid premium plan, per Wix's support pages"],
         ["Instamojo", "Free plan with a per-transaction fee", "Fee on each payment; paid plans lower it"],

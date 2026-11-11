@@ -82,7 +82,7 @@ export const LANDINGS: Landing[] = [
       { title: "Share your link", text: "Put yourbrand.shopersite.in in your Instagram bio and WhatsApp status." },
     ],
     faqs: [
-      { q: "Is Shopersite free forever, or is it a free trial?", a: "The Free plan is free forever — ₹0, with no time limit and no card. The 10-day trial applies only if you choose to try the paid Growth plan." },
+      { q: "Is Shopersite free forever, or is it a free trial?", a: "The Free plan is free forever — ₹0, with no time limit and no card. Free trials apply only if you choose to try a paid plan: 1 month on Growth, 10 days on Pro." },
       { q: "Can I take online payments on the free plan?", a: "The Free plan takes orders with cash on delivery. Online payments (UPI, cards, net banking) through your own Razorpay account start on the Growth plan." },
       { q: "Will my store show Shopersite branding?", a: "A small “Made with Shopersite” note appears on Free and Growth stores. Pro removes it." },
       { q: "What happens if I upgrade and later stop paying?", a: "Your store moves back to Free plan limits. Your products, orders and customers stay." },

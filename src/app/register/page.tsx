@@ -9,7 +9,7 @@ import { storeService } from "@/lib/store-service";
 import { siteConfig, getStoreUrl, getPublicStoreUrl, getPublicStoreAddress } from "@/lib/config/site";
 import { cn } from "@/lib/utils";
 import { isReservedSubdomain } from "@/lib/reserved-names";
-import { introOfferText, PLATFORM_PLANS, type BillingCycle } from "@/lib/plans";
+import { introOfferText, PLATFORM_PLANS, priceAfterTrial, trialLength, type BillingCycle } from "@/lib/plans";
 import { usePlatformSettings } from "@/lib/use-platform-settings";
 import { getTheme } from "@/lib/themes";
 import {
@@ -228,7 +228,7 @@ function RegisterStoreContent() {
     ...(user
       ? []
       : [{ key: "account", fields: ["email", "password"] as QuestionId[], title: "Create your login.", text: "You'll use these to sign in to your seller dashboard." }]),
-    { key: "plan", fields: ["plan"], title: "Choose your plan.", text: "Start free, or try Growth free for 10 days. You can change any time." },
+    { key: "plan", fields: ["plan"], title: "Choose your plan.", text: "Start free, or try a paid plan free first. You can change any time." },
   ];
   const current = steps[Math.min(qIndex, steps.length - 1)];
   const fields = current.fields;
@@ -454,7 +454,7 @@ function RegisterStoreContent() {
                             {id !== "free" && <span className={cn("text-xs font-normal", on ? "text-white/60" : "text-neutral-500")}>/mo</span>}
                           </span>
                           <span className={cn("block h-4 text-[11px]", on ? "text-white/60" : "text-neutral-500")}>
-                            {p.trialDays ? `${p.trialDays} days free` : p.introPriceMonthly ? `₹${p.introPriceMonthly / 100} first ${p.introMonths} mo` : ""}
+                            {p.trialDays ? `${trialLength(p.trialDays)} free` : p.introPriceMonthly ? `₹${p.introPriceMonthly / 100} first ${p.introMonths} mo` : ""}
                           </span>
                         </button>
                       );
@@ -473,7 +473,7 @@ function RegisterStoreContent() {
                     {planId !== "free" && (
                       <p className="mt-3 border-t border-neutral-100 pt-3 text-xs text-neutral-500">
                         {chosenPlan.trialDays
-                          ? `Your store goes live right away. Next you'll set up payment to start your ${chosenPlan.trialDays}-day free trial; your first ${chosenPlan.priceFormatted.split(" ")[0]} charge is on day ${chosenPlan.trialDays + 1}. Cancel any time before that and you won't be charged.`
+                          ? `Your store goes live right away. Next you'll set up payment to start your free trial (${trialLength(chosenPlan.trialDays)}). After it you pay ${priceAfterTrial(chosenPlan)}, taken automatically. Cancel before the trial ends and you won't be charged.`
                           : chosenPlan.introPriceMonthly
                             ? `Your store goes live right away. Next you'll subscribe: ${introOfferText(chosenPlan)}.`
                             : `Your store goes live right away. Next you'll subscribe to ${chosenPlan.name}.`}

@@ -2,12 +2,12 @@
 
 import * as React from "react";
 import { Check, ChevronDown, Minus, Plug } from "lucide-react";
-import { PLATFORM_PLANS, type PlanFeature } from "@/lib/plans";
+import { PLATFORM_PLANS, trialLength, type PlanFeature } from "@/lib/plans";
 import { PLAN_BLOCKS, type Cell } from "@/lib/plan-blocks";
 import type { PlanMove } from "@/lib/subscription";
 
 /**
- * The plans section of Settings → Plan & billing: three plan cards (with the Growth trial and the
+ * The plans section of Settings → Plan & billing: three plan cards (with the free trials and the
  * Pro intro price spelled out before checkout) and a full comparison, block by block.
  */
 
@@ -30,6 +30,11 @@ function PriceBlock({ plan, muted }: { plan: PlanFeature; muted: boolean }) {
           <span className="text-sm text-neutral-500">/ month</span>
         </p>
         <p className={`mt-2 text-[13px] ${muted ? "text-neutral-500" : "text-neutral-700"}`}>
+          {plan.trialDays ? (
+            <>
+              <b className="font-semibold text-neutral-900">{trialLength(plan.trialDays)} free</b>, then this price{" "}
+            </>
+          ) : null}
           for the first {plan.introMonths} months, then <b className="font-semibold text-neutral-900">{rupees(plan.priceMonthly)}/month</b>
         </p>
       </div>
@@ -43,7 +48,7 @@ function PriceBlock({ plan, muted }: { plan: PlanFeature; muted: boolean }) {
           <span className="text-sm text-neutral-500">/ month</span>
         </p>
         <p className={`mt-2 text-[13px] ${muted ? "text-neutral-500" : "text-neutral-700"}`}>
-          <b className="font-semibold text-neutral-900">{plan.trialDays} days free</b>, first charge on day {plan.trialDays + 1}
+          <b className="font-semibold text-neutral-900">{trialLength(plan.trialDays)} free</b>, then paid automatically each month
         </p>
       </div>
     );
@@ -138,7 +143,7 @@ export function PlansSection({
                 <span className={`text-[15px] font-semibold ${lower ? "" : tone.head}`}>{plan.name}</span>
                 {isCurrent ? (
                   <span className="rounded-full bg-neutral-950 px-2.5 py-0.5 text-[11px] font-medium text-white">Current plan</span>
-                ) : plan.trialDays && !lower ? (
+                ) : plan.highlight && !lower ? (
                   <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${tone.badge}`}>Most popular</span>
                 ) : plan.introPriceMonthly && !lower ? (
                   <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${tone.badge}`}>Intro offer</span>
@@ -158,7 +163,7 @@ export function PlansSection({
                       tone.btn || "border border-neutral-300 bg-white text-neutral-950 hover:border-neutral-950"
                     }`}
                   >
-                    {plan.trialDays ? `Start ${plan.trialDays}-day free trial` : `Get ${plan.name}`}
+                    {plan.trialDays ? `Start ${trialLength(plan.trialDays)} free` : `Get ${plan.name}`}
                   </button>
                 ) : move === "renew" ? (
                   <button
@@ -177,7 +182,7 @@ export function PlansSection({
                 {move === "upgrade" && (plan.trialDays || plan.introPriceMonthly) ? (
                   <p className="mt-2 text-center text-[11px] text-neutral-500">
                     {plan.trialDays
-                      ? `Cancel before day ${plan.trialDays + 1} and pay nothing`
+                      ? "Cancel before the trial ends and pay nothing"
                       : `${rupees(plan.priceMonthly)}/month from month ${(plan.introMonths || 0) + 1}`}
                   </p>
                 ) : null}

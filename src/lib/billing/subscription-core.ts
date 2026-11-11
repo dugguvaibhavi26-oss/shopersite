@@ -161,7 +161,8 @@ export function applySubscription(
     planBilling: {
       ...billing,
       trialUsed: billing.trialUsed || (!!sub.trial && live) || undefined,
-      introUsed: billing.introUsed || (!!sub.intro && live) || undefined,
+      // the intro price counts as used once it has been charged, not while a free trial is still running
+      introUsed: billing.introUsed || (!!sub.intro && live && paidCount > 0) || undefined,
       current: sub,
       attempt: isAttempt ? null : billing.attempt,
     },

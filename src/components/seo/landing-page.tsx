@@ -8,7 +8,7 @@ import { Breadcrumbs, StartBand } from "@/components/resources/parts";
 import { LANDING_ICONS, LANDINGS, type Landing } from "@/lib/landings";
 import { GUIDE_BY_SLUG } from "@/lib/resources/guides";
 import { DOC_BY_SLUG } from "@/lib/resources/docs";
-import { PLATFORM_PLANS } from "@/lib/plans";
+import { PLATFORM_PLANS, priceAfterTrial, trialLength } from "@/lib/plans";
 import { SITE_URL, breadcrumbs } from "@/lib/seo";
 import { faqLd } from "@/lib/resources";
 
@@ -47,7 +47,7 @@ export function PlanFacts() {
   const growth = PLATFORM_PLANS.starter;
   const pro = PLATFORM_PLANS.pro;
   const rows: [string, boolean | string, boolean | string, boolean | string][] = [
-    ["Price", "₹0 forever", `${rupees(growth.priceMonthly)}/mo after ${growth.trialDays}-day trial`, pro.introPriceMonthly ? `${rupees(pro.introPriceMonthly)}/mo for ${pro.introMonths} months, then ${rupees(pro.priceMonthly)}/mo` : `${rupees(pro.priceMonthly)}/mo`],
+    ["Price", "₹0 forever", ...[growth, pro].map((p) => (p.trialDays ? `${trialLength(p.trialDays)} free, then ${priceAfterTrial(p)}` : priceAfterTrial(p))) as [string, string]],
     ["Products", `Up to ${free.maxProducts}`, `Up to ${growth.maxProducts}`, "Unlimited"],
     ["Your own shop address (yourbrand.shopersite.in)", true, true, true],
     ["Cash on delivery", true, true, true],

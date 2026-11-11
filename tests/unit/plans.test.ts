@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 import { PLATFORM_PLANS, canUseCoupons, canUseEmail, canUseReviews, planDiscountPercent } from "@/lib/plans";
 
 describe("subscription plans", () => {
-  it("prices Growth at ₹199 with a 10-day trial, and Pro at ₹599 with ₹299 for the first 2 months", () => {
+  it("prices Growth at ₹199 with a 1-month trial, and Pro at ₹599 with a 10-day trial and ₹299 for the first 2 months", () => {
     expect(PLATFORM_PLANS.starter.priceMonthly).toBe(19900);
-    expect(PLATFORM_PLANS.starter.trialDays).toBe(10);
+    expect(PLATFORM_PLANS.starter.trialDays).toBe(30);
+    expect(PLATFORM_PLANS.pro.trialDays).toBe(10);
     expect(PLATFORM_PLANS.pro.priceMonthly).toBe(59900);
     expect(PLATFORM_PLANS.pro.introPriceMonthly).toBe(29900);
     expect(PLATFORM_PLANS.pro.introMonths).toBe(2);

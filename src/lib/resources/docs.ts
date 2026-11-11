@@ -39,7 +39,7 @@ export const DOCS: DocArticle[] = [
           { title: "Name your shop", text: "Type your brand name. We suggest a web address from it, like **yourbrand.shopersite.in**. You can change it while it's free." },
           { title: "Tell us what you sell", text: "Pick a category (fashion, beauty, home, food and so on). We use it to set up starter collections and suggest a theme." },
           { title: "Add your details", text: "Your name, phone and email. Order emails and important account messages go to this email." },
-          { title: "Choose a plan", text: "Start on **Free**, or try **Growth free for 10 days**. You can change plans any time from Settings → Plan & billing." },
+          { title: "Choose a plan", text: "Start on **Free**, or try a paid plan free first: **Growth for 1 month**, **Pro for 10 days**. You can change plans any time from Settings → Plan & billing." },
         ],
       },
       { type: "callout", tone: "tip", text: "Use the brand name buyers know you by on Instagram or WhatsApp. It makes your shop link instantly recognisable when you share it." },
@@ -759,7 +759,7 @@ export const DOCS: DocArticle[] = [
     minutes: 4,
     body: [
       { type: "table", head: ["", "Free", "Growth", "Pro"], rows: [
-        ["Price", "₹0 forever", "₹199/month after a 10-day free trial", "₹299/month for 2 months, then ₹599/month"],
+        ["Price", "₹0 forever", "1 month free, then ₹199/month", "10 days free, then ₹299/month for 2 months, then ₹599/month"],
         ["Products", "75", "200", "Unlimited"],
         ["Themes", "1", "7", "30"],
         ["Website editor", "Photos only", "Full", "Full"],
@@ -776,7 +776,7 @@ export const DOCS: DocArticle[] = [
       { type: "p", text: "See the full comparison in your dashboard under **Settings → Plan & billing**." },
     ],
     faqs: [
-      { q: "How does the Growth trial work?", a: "You set up a payment method at the start. Growth is free for 10 days, and the first ₹199 charge is on day 11. Cancel before then and you won't be charged." },
+      { q: "How do the free trials work?", a: "You approve automatic payments (card or UPI AutoPay) at the start. Growth is free for 1 month, then ₹199 a month. Pro is free for 10 days, then ₹299 a month for 2 months, then ₹599 a month. Cancel before the trial ends and you won't be charged. Each shop gets one free trial." },
       { q: "What happens if my plan ends?", a: "Your shop moves to Free limits. Nothing is deleted; features from the paid plan pause until you renew." },
     ],
     related: ["upgrade-or-cancel", "online-payments-razorpay"],
@@ -792,7 +792,8 @@ export const DOCS: DocArticle[] = [
       { type: "p", text: "Everything is in **Settings → Plan & billing**: your current plan, renewal date, product usage, payment history and the plan cards." },
       { type: "list", items: [
         "**Upgrade** any time; new features switch on as soon as payment is confirmed.",
-        "**Cancel** and your plan stays active until the end of the paid period, then your shop moves to Free.",
+        "Paid plans are **paid automatically each month** by card or UPI AutoPay through Razorpay. You approve it once.",
+        "**Cancel** any time and no more payments are taken. Your plan stays active until the end of the paid period (or the free trial), then your shop moves to Free.",
         "Lower plans can be chosen once your current paid period ends.",
       ] },
     ],

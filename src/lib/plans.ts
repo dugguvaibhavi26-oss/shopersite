@@ -12,7 +12,7 @@ export interface PlanFeature {
   originalPriceFormatted?: string;
   priceYearly?: number; // in paise
   priceYearlyFormatted?: string;
-  /** free trial before the first charge (Growth) */
+  /** free trial before the first charge */
   trialDays?: number;
   /** introductory monthly price in paise for the first `introMonths` months (Pro) */
   introPriceMonthly?: number;
@@ -46,7 +46,7 @@ export const PLATFORM_PLANS: Record<string, PlanFeature> = {
     tier: "starter",
     priceMonthly: 19900,
     priceFormatted: "₹199 / month",
-    trialDays: 10,
+    trialDays: 30,
     maxProducts: 200,
     themesAllowed: [],
     customDomain: false,
@@ -61,6 +61,7 @@ export const PLATFORM_PLANS: Record<string, PlanFeature> = {
     tier: "pro",
     priceMonthly: 59900,
     priceFormatted: "₹599 / month",
+    trialDays: 10,
     introPriceMonthly: 29900,
     introMonths: 2,
     maxProducts: 999999,
@@ -71,6 +72,16 @@ export const PLATFORM_PLANS: Record<string, PlanFeature> = {
     features: ["Everything in Growth", "Unlimited products", "All 30 themes", "Your own domain", "Remove Shopersite branding", "Automatic invoices", "Email integration and automatic emails", "AI business insights and the full AI agent", "Advanced SEO"],
   },
 };
+
+/** How long a free trial is, in words: "1 month" for 30 days, otherwise "10 days". */
+export function trialLength(days: number): string {
+  return days === 30 ? "1 month" : `${days} days`;
+}
+
+/** What a plan costs once any free trial is over: "₹199/month", or the intro offer in words. */
+export function priceAfterTrial(plan: PlanFeature): string {
+  return introOfferText(plan) || `₹${Math.round(plan.priceMonthly / 100).toLocaleString("en-IN")}/month`;
+}
 
 /** "₹299 for 2 months, then ₹599/month": the intro offer in words, or "" when there isn't one. */
 export function introOfferText(plan: PlanFeature): string {

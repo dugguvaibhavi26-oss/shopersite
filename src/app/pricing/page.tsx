@@ -25,6 +25,8 @@ import {
   BILLING_CYCLES,
   type BillingCycle,
   type PlanId,
+  priceAfterTrial,
+  trialLength,
 } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
@@ -323,6 +325,12 @@ export default function PricingPage() {
                         </span>
                       </div>
 
+                      {!isFree && billingCycle === "monthly" && (plan.trialDays || plan.introPriceMonthly) ? (
+                        <p className={cn("mt-1.5 text-xs font-bold", hi ? "text-amber-300" : "text-emerald-700")}>
+                          {plan.trialDays ? `${trialLength(plan.trialDays)} free, then ` : ""}
+                          {priceAfterTrial(plan)}
+                        </p>
+                      ) : null}
                       {!isFree && billingCycle !== "monthly" && (
                         <p className={cn("mt-1.5 text-xs font-bold", hi ? "text-amber-300" : "text-emerald-700")}>
                           {pricing.billingText}

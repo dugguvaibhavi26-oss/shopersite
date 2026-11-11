@@ -100,7 +100,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     title: "Plans",
     keywords: ["plan", "plans", "pricing", "upgrade", "pro", "growth", "free", "price", "subscription", "billing"],
     body:
-      "Free (₹0): up to 75 products, 1 theme, Cash on Delivery, edit your theme's photos. Growth (₹199/month after a 10-day free trial): 200 products, 7 themes and the full editor, online payments, coupons, reviews, abandoned carts, shipping and bulk upload. Pro (₹299/month for 2 months, then ₹599/month): unlimited products, all 30 themes, your own domain, no Shopersite branding, invoices, email and AI insights. Upgrade in Settings → Plan & billing. Plan payments are always done by you.",
+      "Free (₹0): up to 75 products, 1 theme, Cash on Delivery, edit your theme's photos. Growth (1 month free, then ₹199/month): 200 products, 7 themes and the full editor, online payments, coupons, reviews, abandoned carts, shipping and bulk upload. Pro (10 days free, then ₹299/month for 2 months, then ₹599/month): unlimited products, all 30 themes, your own domain, no Shopersite branding, invoices, email and AI insights. Upgrade in Settings → Plan & billing. Plan payments are always done by you.",
   },
   {
     id: "domain",

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { siteConfig } from "@/lib/config/site";
 import { usePlatformSettings } from "@/lib/use-platform-settings";
-import { PLATFORM_PLANS, planDiscountPercent, calculatePlanPrice, BILLING_CYCLES, type BillingCycle } from "@/lib/plans";
+import { PLATFORM_PLANS, priceAfterTrial, trialLength, planDiscountPercent, calculatePlanPrice, BILLING_CYCLES, type BillingCycle } from "@/lib/plans";
 import { PLATFORM_THEMES, getTheme, themeThumb, type ThemeDefinition } from "@/lib/themes";
 import { useLandingConfig } from "@/lib/landing-client";
 import { DEFAULT_FEATURED_THEME_SLUGS } from "@/lib/landing-config";
@@ -1105,6 +1105,12 @@ function Pricing() {
                     )}
                     <span className={cn("text-sm", hi ? "text-neutral-400" : "text-neutral-500")}>/month</span>
                   </div>
+                  {!isFree && billingCycle === "monthly" && (plan.trialDays || plan.introPriceMonthly) ? (
+                    <p className={cn("mt-1 text-xs font-medium", hi ? "text-amber-300" : "text-emerald-700")}>
+                      {plan.trialDays ? `${trialLength(plan.trialDays)} free, then ` : ""}
+                      {priceAfterTrial(plan)}
+                    </p>
+                  ) : null}
                   {!isFree && billingCycle !== "monthly" && (
                     <p className={cn("mt-1 text-xs font-medium", hi ? "text-amber-300" : "text-emerald-700")}>
                       {pricing.billingText}

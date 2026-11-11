@@ -121,6 +121,17 @@ describe("plan subscriptions (Razorpay)", () => {
     expect(c.needsIntroSwitch).toBeUndefined();
   });
 
+  it("Pro free trial: the intro price is not used up until it is charged", () => {
+    const trialEnd = now + 10 * DAY;
+    const pro = attempt({ subscriptionId: "sub_pro", planId: "pro", rzPlanId: "plan_pro_intro", intro: "plan", trial: true });
+    const c = applySubscription(shop({ planBilling: { attempt: pro } }), rz({ id: "sub_pro", plan_id: "plan_pro_intro", start_at: secs(trialEnd), charge_at: secs(trialEnd) }), { now })!;
+    expect(c.updates.planId).toBe("pro");
+    expect(Date.parse(c.updates.planPaidUntil!)).toBe(secs(trialEnd) * 1000 + CHARGE_GRACE_MS);
+    expect(c.updates.planBilling.trialUsed).toBe(true);
+    expect(c.updates.planBilling.introUsed).toBeUndefined();
+    expect(c.updates.subscriptionHistory).toBeUndefined();
+  });
+
   it("the intro plan asks to move to full price once the intro months are paid", () => {
     const current = attempt({ subscriptionId: "sub_pro", planId: "pro", rzPlanId: "plan_pro_intro", intro: "plan", status: "active", paidCount: 1 });
     const store = shop({ planId: "pro", planPaidUntil: iso(now + DAY), planBilling: { introUsed: true, current } });
