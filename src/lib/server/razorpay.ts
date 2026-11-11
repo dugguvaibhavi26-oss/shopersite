@@ -8,6 +8,8 @@ export function razorpayKeyMode(keyId: string): RazorpayMode {
 }
 
 export class RazorpayError extends Error {
+  /** Razorpay's own words about what went wrong, when it sends them */
+  description = "";
   constructor(public status: number, public code: string, message: string) {
     super(message);
   }
@@ -113,8 +115,21 @@ const AUTH_BASE = "https://auth.razorpay.com";
 export function oauthConfig() {
   const clientId = (process.env.RAZORPAY_CLIENT_ID || "").trim();
   const clientSecret = (process.env.RAZORPAY_CLIENT_SECRET || "").trim();
-  const mode: RazorpayMode = process.env.RAZORPAY_OAUTH_MODE === "live" ? "live" : "test";
+  const mode = oauthModeFrom(process.env.RAZORPAY_OAUTH_MODE);
   return { clientId, clientSecret, mode, configured: !!(clientId && clientSecret) };
+}
+
+/** RAZORPAY_OAUTH_MODE: "live", "production" or "prod" (any case) mean live; anything else is test. */
+export function oauthModeFrom(value: string | undefined): RazorpayMode {
+  return ["live", "production", "prod"].includes((value || "").trim().toLowerCase()) ? "live" : "test";
+}
+
+/**
+ * Razorpay ties the mode to the partner app's client: a Production client only accepts "live" and a
+ * Development client only "test". When Razorpay says the mode is wrong, this gives the other one.
+ */
+export function otherModeFor(description: string, tried: RazorpayMode): RazorpayMode | null {
+  return /\bmode\b/i.test(description) ? (tried === "live" ? "test" : "live") : null;
 }
 
 function requireOAuth() {
@@ -148,8 +163,11 @@ async function authPost<T>(path: string, body: Record<string, string>): Promise<
   }
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
-    console.warn("[razorpay oauth]", path, res.status, (json as { error?: unknown }).error);
-    throw new RazorpayError(res.status, String(res.status), "Razorpay rejected the request.");
+    const error = (json as { error?: { description?: unknown } }).error;
+    console.warn("[razorpay oauth]", path, res.status, error);
+    const err = new RazorpayError(res.status, String(res.status), "Razorpay rejected the request.");
+    err.description = typeof error?.description === "string" ? error.description : "";
+    throw err;
   }
   return json as T;
 }
@@ -165,16 +183,26 @@ export function oauthAuthorizeUrl(redirectUri: string, state: string) {
   return u.toString();
 }
 
-export function exchangeOAuthCode(code: string, redirectUri: string) {
+export async function exchangeOAuthCode(code: string, redirectUri: string): Promise<RzOAuthToken> {
   const { clientId, clientSecret, mode } = requireOAuth();
-  return authPost<RzOAuthToken>("/token", {
-    client_id: clientId,
-    client_secret: clientSecret,
-    grant_type: "authorization_code",
-    redirect_uri: redirectUri,
-    code,
-    mode,
-  });
+  const ask = (m: RazorpayMode) =>
+    authPost<RzOAuthToken>("/token", {
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: "authorization_code",
+      redirect_uri: redirectUri,
+      code,
+      mode: m,
+    });
+  try {
+    return await ask(mode);
+  } catch (err) {
+    // RAZORPAY_OAUTH_MODE doesn't match the client (e.g. a Production client set to test): use the mode it accepts
+    const other = err instanceof RazorpayError ? otherModeFor(err.description, mode) : null;
+    if (!other) throw err;
+    console.warn(`[razorpay oauth] RAZORPAY_OAUTH_MODE is "${mode}" but this client needs "${other}"; retrying.`);
+    return ask(other);
+  }
 }
 
 export function refreshOAuthToken(refreshToken: string) {

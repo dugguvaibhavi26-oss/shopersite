@@ -128,7 +128,7 @@ export async function connectRazorpayOAuth(
     refreshTokenSealed: seal(tokens.refresh_token),
     accountId: tokens.razorpay_account_id,
     tokenExpiresAt: expiryFrom(tokens.expires_in),
-    mode: oauthConfig().mode,
+    mode: tokens.public_token.startsWith("rzp_live_") ? "live" : tokens.public_token.startsWith("rzp_test_") ? "test" : oauthConfig().mode,
     connectedAt: now,
     updatedAt: now,
   };
