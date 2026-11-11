@@ -4,6 +4,8 @@
  * write). Anything left empty falls back to the built-in content.
  */
 
+import { cleanFeature } from "./dashboard-features";
+
 export type DiscoverId = "season" | "design" | "templates" | "photo" | "new" | "trending" | "calendar" | "creative" | "academy";
 
 /** The image cards under "Picked for you"; the rest are the icon cards under "Explore more". */
@@ -18,7 +20,9 @@ export interface DiscoverCard {
   imageUrl: string;
   /** empty = open the built-in tips; "/path" opens in the app; "https://…" opens in a new tab */
   link: string;
-  /** button text on the season card, e.g. "Read the guide" */
+  /** the dashboard page the card opens (an id from dashboard-features); empty = the link, or the built-in tips */
+  feature: string;
+  /** button text, e.g. "Read the guide"; empty = the built-in one */
   linkLabel: string;
   enabled: boolean;
 }
@@ -71,6 +75,7 @@ export function mergeDiscover(saved: unknown): Record<DiscoverId, DiscoverCard> 
       text: str(c.text, 200),
       imageUrl: cleanImage(c.imageUrl),
       link: cleanLink(c.link),
+      feature: cleanFeature(c.feature),
       linkLabel: str(c.linkLabel, 30),
       enabled: c.enabled !== false,
     };
@@ -78,9 +83,61 @@ export function mergeDiscover(saved: unknown): Record<DiscoverId, DiscoverCard> 
   return out;
 }
 
+/** The button each built-in card shows when the admin leaves "Button text" empty. */
+export const DISCOVER_BUTTONS: Record<DiscoverId, string> = {
+  season: "See this month's ideas",
+  design: "Get design ideas",
+  templates: "Copy a template",
+  photo: "See photo tips",
+  new: "See what's new",
+  trending: "See what's trending",
+  calendar: "Open calendar",
+  creative: "Open Creative lab",
+  academy: "Start learning",
+};
+
+/* ------------------------------ the admin's own cards ------------------------------ */
+
+/** A card the admin added: a picture, a few words and a button that opens one dashboard feature. */
+export interface CustomCard {
+  id: string;
+  title: string;
+  /** the sub title under it */
+  text: string;
+  imageUrl: string;
+  /** empty = the feature's own button text */
+  buttonLabel: string;
+  /** an id from dashboard-features */
+  feature: string;
+  /** used when no feature is picked: "/path" or "https://…" */
+  link: string;
+  enabled: boolean;
+}
+
+export const MAX_CUSTOM_CARDS = 12;
+
+export function mergeCustomCards(saved: unknown): CustomCard[] {
+  const raw = (saved && typeof saved === "object" ? (saved as { custom?: unknown }).custom : null) as Record<string, unknown>[] | null;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((c) => c && typeof c === "object")
+    .slice(0, MAX_CUSTOM_CARDS)
+    .map((c, i) => ({
+      id: str(c.id, 40) || `card-${i}`,
+      title: str(c.title, 80),
+      text: str(c.text, 200),
+      imageUrl: cleanImage(c.imageUrl),
+      buttonLabel: str(c.buttonLabel, 30),
+      feature: cleanFeature(c.feature),
+      link: cleanLink(c.link),
+      enabled: c.enabled !== false,
+    }))
+    .filter((c) => c.title && (c.feature || c.link));
+}
+
 /* ------------------------------ hero slides ------------------------------ */
 
-/** A slide in the big banner at the top of Home (Admin → Discover cards → Banner slides). */
+/** A slide in the big banner at the top of Home (Admin → App banners → Top banner). */
 export interface HeroSlide {
   id: string;
   title: string;

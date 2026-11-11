@@ -62,6 +62,7 @@ import {
 import { fetchPaidOnlineOrders } from "@/lib/payments/client";
 import { BILLING_DISMISSED, BILLING_NOT_CONFIGURED, BillingError, cancelPlanSubscription, startPlanSubscription } from "@/lib/billing/client";
 import { HomeFeed } from "@/components/dashboard/home-feed";
+import { getFeature } from "@/lib/dashboard-features";
 import { PlansSection } from "@/components/dashboard/plans-page";
 import { FilterMenu } from "@/components/dashboard/filter-menu";
 import { useMaintenance } from "@/lib/maintenance";
@@ -1533,6 +1534,24 @@ function DashboardPageContent() {
     setSettingsListOpen(false);
     scrollDashTop({ top: 0 });
   };
+  /** a Home card's button: open the dashboard page the admin picked for it */
+  const openFeature = (featureId: string) => {
+    const t = getFeature(featureId)?.target;
+    if (!t) return;
+    if (t.kind === "settings") return openSettings(t.section);
+    if (t.kind === "add-product") return startAddProduct();
+    if (t.kind === "assistant") return setAssistantOpen(true);
+    if (t.kind === "plugin") {
+      setActiveTab("plugins");
+      setPluginView(t.plugin);
+    } else if (t.kind === "abandoned") {
+      setSelectedOrder(null);
+      setOrderFilter("abandoned");
+      setActiveTab("orders");
+    } else if (t.kind === "tab") setActiveTab(t.tab);
+    else return;
+    scrollDashTop({ top: 0 });
+  };
   const backToSettingsList = () => {
     if (activeTab !== "settings") setActiveTab("settings");
     setSettingsListOpen(true);
@@ -2725,6 +2744,7 @@ function DashboardPageContent() {
                   setActiveTab(page);
                   scrollDashTop({ top: 0 });
                 }}
+                onOpenFeature={openFeature}
                 onTour={() => dashTour.current?.()}
                 onStartTutorial={(t) => {
                   setAssistantOpen(false);

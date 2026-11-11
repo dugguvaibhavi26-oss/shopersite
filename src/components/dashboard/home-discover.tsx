@@ -1,13 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { ArrowRight, Check, Copy } from "lucide-react";
+import { ArrowRight, Check, Copy, ImageIcon } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { FadeScroll } from "@/components/ui/fade-scroll";
 import type { StoreData } from "@/lib/store-service";
 import type { DashPage } from "@/lib/assistant/commands";
-import { DISCOVER_DEFAULTS, type DiscoverId } from "@/lib/discover";
-import { useDiscoverCards } from "@/lib/discover-client";
+import { DISCOVER_BUTTONS, DISCOVER_DEFAULTS, EXPLORE_IDS, type DiscoverId } from "@/lib/discover";
+import { useDiscoverData } from "@/lib/discover-client";
+import { getFeature } from "@/lib/dashboard-features";
 
 /**
  * Home → Discover: ideas to grow, each with something to do next. Seasonal ideas follow the Indian
@@ -209,6 +210,7 @@ function Art({ kind }: { kind: "design" | "new" | "templates" | "photo" }) {
 /* ------------------------------ component ------------------------------ */
 
 type Open = null | "season" | "design" | "new" | "templates" | "photo";
+type ExploreId = (typeof EXPLORE_IDS)[number];
 
 export function HomeDiscover({
   store,
@@ -216,13 +218,22 @@ export function HomeDiscover({
   onNavigate,
   onAsk,
   layout = "grid",
+  exploreArt,
+  onExplore,
+  onFeature,
 }: {
   store: StoreData;
   storeLink: string;
   onNavigate: (page: DashPage) => void;
   onAsk: (text: string) => void;
-  /** grid: bento tiles; row: one swipeable row of equal cards */
+  /** grid: bento tiles; row: Home's one grid of feature cards (the admin's own cards, then the built-in ones) */
   layout?: "grid" | "row";
+  /** row only: the drawing for a growth-tool card that has no picture */
+  exploreArt?: (id: ExploreId) => React.ReactNode;
+  /** row only: open a growth tool (trending, calendar, creative lab, academy) */
+  onExplore?: (id: ExploreId) => void;
+  /** row only: open a dashboard page picked in Admin → Discover cards */
+  onFeature?: (featureId: string) => void;
 }) {
   const row = layout === "row";
   const [open, setOpen] = React.useState<Open>(null);
@@ -249,7 +260,7 @@ export function HomeDiscover({
     onAsk(text);
   };
 
-  const admin = useDiscoverCards();
+  const { cards: admin, custom } = useDiscoverData();
   const TONES: Record<"design" | "templates" | "photo" | "new", { bg: string; art: "design" | "new" | "templates" | "photo" }> = {
     design: { bg: "bg-neutral-50", art: "design" },
     templates: { bg: "bg-neutral-50", art: "templates" },
@@ -268,56 +279,110 @@ export function HomeDiscover({
   const seasonTitle = sc.title || season.title;
   const seasonText = sc.text || season.pitch;
 
+  /* ---- Home's grid: what each card shows and what its button does ---- */
+  const goLink = (link: string) => {
+    if (link.startsWith("/")) window.location.assign(link);
+    else window.open(link, "_blank", "noopener,noreferrer");
+  };
+  const goFeature = (featureId: string) => {
+    const f = getFeature(featureId);
+    if (!f) return;
+    if (f.target.kind === "tips") setOpen(f.target.tips);
+    else if (f.target.kind === "tool") onExplore?.(f.target.tool);
+    else onFeature?.(f.id);
+  };
+  const picture = (url: string) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={url} alt="" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+  );
+  interface Tile { key: string; title: string; text: string; button: string; art: React.ReactNode; dark?: boolean; badge?: string; open: () => void }
+  const tiles: Tile[] = !row
+    ? []
+    : [
+        // the admin's own cards come first
+        ...custom
+          .filter((c) => c.enabled)
+          .map((c): Tile => ({
+            key: `own-${c.id}`,
+            title: c.title,
+            text: c.text,
+            button: c.buttonLabel || getFeature(c.feature)?.button || "Open",
+            art: c.imageUrl ? picture(c.imageUrl) : (
+              <span className="flex h-full items-center justify-center text-neutral-300">
+                <ImageIcon className="h-8 w-8" strokeWidth={1.5} />
+              </span>
+            ),
+            open: () => (c.feature ? goFeature(c.feature) : goLink(c.link)),
+          })),
+        // then the built-in ones: tips first, growth tools after
+        ...(["season", ...small, ...EXPLORE_IDS] as DiscoverId[])
+          .filter((id) => admin[id].enabled)
+          .map((id): Tile => {
+            const c = admin[id];
+            const isSeason = id === "season";
+            const tool = (EXPLORE_IDS as readonly string[]).includes(id) ? (id as ExploreId) : null;
+            return {
+              key: id,
+              title: isSeason ? seasonTitle : c.title || DISCOVER_DEFAULTS[id].title,
+              text: isSeason ? seasonText : c.text || DISCOVER_DEFAULTS[id].text,
+              button: c.linkLabel || (c.feature ? getFeature(c.feature)?.button : "") || DISCOVER_BUTTONS[id],
+              dark: isSeason && !c.imageUrl,
+              badge: isSeason ? `${daysLeft} days left` : undefined,
+              art: c.imageUrl ? (
+                picture(c.imageUrl)
+              ) : isSeason ? (
+                <svg viewBox="0 0 240 135" className="h-full w-full" aria-hidden>
+                  <path d="M0 34 Q 60 70 120 34 T 240 40" fill="none" stroke="#ffffff22" strokeWidth="1" />
+                  {Array.from({ length: 11 }, (_, i) => {
+                    const x = 10 + i * 22;
+                    const y = 38 + Math.sin(i * 0.9) * 12;
+                    return <circle key={i} cx={x} cy={y} r={i % 3 === 0 ? 3 : 2} fill={i % 4 === 0 ? "#fcd34d" : "#fff"} opacity={i % 2 ? 0.55 : 0.95} />;
+                  })}
+                  <text x="18" y="112" fill="#fff" fontSize="20" fontWeight="600" fontFamily="inherit">{season.when}</text>
+                </svg>
+              ) : (
+                <span className="block h-full px-8 py-7 transition-transform duration-700 group-hover:scale-105">
+                  {tool ? exploreArt?.(tool) : <Art kind={TONES[id as keyof typeof TONES].art} />}
+                </span>
+              ),
+              open: () => {
+                if (c.feature) goFeature(c.feature);
+                else if (c.link) goLink(c.link);
+                else if (tool) onExplore?.(tool);
+                else setOpen(id as Exclude<Open, null>);
+              },
+            };
+          }),
+      ];
+
   return (
     <section className="space-y-3">
       {row ? (
-        /* three landscape cards. They never get narrower than 300px (they scroll sideways
-           instead), and the image keeps a fixed 16:9 shape, so uploaded pictures aren't squashed. */
-        <FadeScroll className="grid snap-x snap-mandatory auto-cols-[minmax(300px,1fr)] grid-flow-col gap-4 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {(["season", ...small] as const).filter((id) => id !== "season" || sc.enabled).slice(0, 3).map((id) => {
-            const c = admin[id];
-            const isSeason = id === "season";
-            const title = isSeason ? seasonTitle : c.title || DISCOVER_DEFAULTS[id].title;
-            const text = isSeason ? seasonText : c.text || DISCOVER_DEFAULTS[id].text;
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => openCard(id)}
-                className="group flex snap-start flex-col overflow-hidden rounded-[22px] border border-black/[0.06] bg-white text-left transition-shadow duration-300 hover:shadow-[0_24px_48px_-30px_rgba(0,0,0,0.45)]"
-              >
-                <span className={`relative block aspect-[16/9] w-full overflow-hidden ${c.imageUrl ? "bg-neutral-100" : isSeason ? "bg-neutral-950" : "bg-neutral-50"}`}>
-                  {c.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={c.imageUrl} alt="" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                  ) : isSeason ? (
-                    <svg viewBox="0 0 240 240" className="h-full w-full" aria-hidden>
-                      <path d="M0 60 Q 60 110 120 60 T 240 70" fill="none" stroke="#ffffff22" strokeWidth="1" />
-                      {Array.from({ length: 11 }, (_, i) => {
-                        const x = 10 + i * 22;
-                        const y = 66 + Math.sin(i * 0.9) * 16;
-                        return <circle key={i} cx={x} cy={y} r={i % 3 === 0 ? 3.4 : 2.3} fill={i % 4 === 0 ? "#fcd34d" : "#fff"} opacity={i % 2 ? 0.55 : 0.95} />;
-                      })}
-                      <text x="20" y="200" fill="#fff" fontSize="22" fontWeight="600" fontFamily="inherit">{season.when}</text>
-                    </svg>
-                  ) : (
-                    <span className="block h-full px-8 py-10 transition-transform duration-700 group-hover:scale-105">
-                      <Art kind={TONES[id as keyof typeof TONES].art} />
-                    </span>
-                  )}
-                  {isSeason && <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-neutral-900">{daysLeft} days left</span>}
-                </span>
-                <span className="flex flex-col justify-center px-4 py-3.5">
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-semibold">{title}</span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-neutral-300 transition-all group-hover:translate-x-0.5 group-hover:text-neutral-900" />
+        /* one grid of feature cards, each with a picture, a line or two and a button that opens it */
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {tiles.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={t.open}
+              className="group flex flex-col rounded-[22px] border border-black/[0.06] bg-white p-2.5 text-left transition-shadow duration-300 hover:shadow-[0_24px_48px_-30px_rgba(0,0,0,0.45)]"
+            >
+              <span className={`relative block aspect-[16/9] w-full overflow-hidden rounded-[14px] ${t.dark ? "bg-neutral-950" : "bg-neutral-50"}`}>
+                {t.art}
+                {t.badge && <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-neutral-900">{t.badge}</span>}
+              </span>
+              <span className="flex flex-1 flex-col px-2.5 pb-2.5 pt-4">
+                <span className="text-[15px] font-semibold leading-snug">{t.title}</span>
+                <span className="mt-1 line-clamp-3 text-[13px] leading-relaxed text-neutral-500">{t.text}</span>
+                <span className="mt-auto block pt-4">
+                  <span className="inline-flex h-9 items-center rounded-full border border-neutral-200 bg-white px-3.5 text-[13px] font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition-colors group-hover:border-neutral-900">
+                    {t.button}
                   </span>
-                  <span className="mt-0.5 line-clamp-1 text-xs text-neutral-500">{text}</span>
                 </span>
-              </button>
-            );
-          })}
-        </FadeScroll>
+              </span>
+            </button>
+          ))}
+        </div>
       ) : (
       <div className="m-stagger grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
         {/* seasonal: the big one */}

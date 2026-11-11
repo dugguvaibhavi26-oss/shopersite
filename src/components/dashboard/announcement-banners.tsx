@@ -13,7 +13,7 @@ export function dashboardTabFromLink(link?: string): string | null {
 }
 
 /**
- * Image carousel above Quick actions (2:1 on phones, 3:1 on desktop). It shows only the banner
+ * Image carousel above Quick actions. One shape everywhere (1600 x 600, 8:3), so the whole image shows on phones and computers. It shows only the banner
  * images the platform admin uploads: no text, no buttons. Each image opens its redirect path or URL.
  * Slides auto-advance and loop, pause while touched or hovered, and swipe on phones.
  * With no banners published it shows an empty image placeholder of the same size.
@@ -43,7 +43,7 @@ export function AnnouncementBanners({ onOpenTab }: { onOpenTab?: (tab: string) =
     return () => window.clearTimeout(id);
   }, [current, count, paused, go]);
 
-  const frame = "relative block w-full shrink-0 aspect-[2/1] md:aspect-[3/1] overflow-hidden";
+  const frame = "relative block w-full shrink-0 aspect-[8/3] overflow-hidden";
 
   if (count === 0) {
     return (

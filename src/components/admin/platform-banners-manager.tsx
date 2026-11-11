@@ -61,8 +61,8 @@ export function PlatformBannersManager() {
       <div>
         <h2 className="text-xl sm:text-2xl font-black tracking-tight text-neutral-900">Dashboard banners</h2>
         <p className="mt-1 text-sm text-neutral-500">
-          Images shown on every seller&apos;s dashboard overview. Upload 1600 × 800 px (2:1): phones show the whole image,
-          desktop shows the middle band inside the dashed outline, so keep text and logos there.
+          Images shown on every seller&apos;s dashboard overview, on phones and computers. Upload 1600 × 600 px: the
+          whole image shows on both, nothing is cut off.
         </p>
       </div>
 
@@ -78,7 +78,7 @@ export function PlatformBannersManager() {
             e.preventDefault();
             pick(e.dataTransfer.files?.[0]);
           }}
-          className={`relative aspect-[2/1] w-full overflow-hidden rounded-xl border-2 border-dashed transition-colors cursor-pointer ${
+          className={`relative aspect-[8/3] w-full overflow-hidden rounded-xl border-2 border-dashed transition-colors cursor-pointer ${
             preview ? "border-transparent" : "border-neutral-300 hover:border-neutral-500 bg-neutral-50"
           }`}
         >
@@ -86,14 +86,6 @@ export function PlatformBannersManager() {
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={preview} alt="Banner preview" className="absolute inset-0 w-full h-full object-cover" />
-              {/* the band desktop shows (3:1 out of the 2:1 image) */}
-              <span
-                aria-hidden
-                className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 h-[66.7%] border-y-2 border-dashed border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.25)]"
-              />
-              <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white">
-                Desktop shows the outlined band
-              </span>
               <button
                 type="button"
                 aria-label="Remove image"
@@ -175,7 +167,7 @@ function BannerRow({ banner }: { banner: PlatformBanner }) {
   return (
     <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={banner.imageUrl} alt="" className="aspect-[2/1] w-full object-cover bg-neutral-100" />
+      <img src={banner.imageUrl} alt="" className="aspect-[8/3] w-full object-cover bg-neutral-100" />
       <div className="p-3 flex items-center gap-2">
         <span className="flex flex-1 items-center gap-2 rounded-lg border border-neutral-200 px-2.5">
           <Link2 className="w-3.5 h-3.5 text-neutral-400 shrink-0" />

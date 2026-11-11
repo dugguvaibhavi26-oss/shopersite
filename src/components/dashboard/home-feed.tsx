@@ -16,8 +16,8 @@ import { TUTORIALS, type Tutorial } from "./tutorials";
 
 /**
  * Home: a featured image banner, a big chat box for the assistant, a clear Today card, then rows of
- * ideas (picked for you, explore, tutorials). Banner images and cards are set in Admin →
- * Discover cards; their links can point to docs pages.
+ * ideas (picked for you, explore, tutorials). Banner images are set in Admin → App banners and
+ * cards in Admin → Discover cards; their links can point to docs pages.
  */
 
 const DAY = 86400_000;
@@ -30,7 +30,7 @@ const rowScroll = "flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [scroll
 
 /* ------------------------------ banner ------------------------------ */
 
-/** Example slides shown until the admin adds their own (Admin → Discover cards → Banner slides). */
+/** Example slides shown until the admin adds their own (Admin → App banners → Top banner). */
 const EXAMPLE_SLIDES: HeroSlide[] = [
   { id: "example-welcome", title: "Your shop, beautifully simple", text: "", imageUrl: "/banners/welcome.svg", tag: "", ctaLabel: "", link: "", enabled: true },
   { id: "example-season", title: "Make this season your best yet", text: "", imageUrl: "/banners/season.svg", tag: "", ctaLabel: "", link: "", enabled: true },
@@ -54,15 +54,15 @@ function HeroBanner({ slides }: { slides: HeroSlide[] }) {
   // nothing set yet: a clean image placeholder
   if (!n)
     return (
-      <div className="relative flex aspect-[16/6] max-h-[300px] w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-[28px] border border-dashed border-neutral-300 bg-white text-neutral-400">
+      <div className="relative flex aspect-[8/3] w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-[28px] border border-dashed border-neutral-300 bg-white text-neutral-400">
         <ImageIcon className="h-8 w-8" />
         <span className="text-sm font-medium">Banner image</span>
-        <span className="text-xs">1600 × 600 · set in Admin → Discover cards</span>
+        <span className="text-xs">1600 × 600 · set in Admin → App banners</span>
       </div>
     );
 
   return (
-    <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} className="group relative aspect-[16/6] max-h-[300px] w-full overflow-hidden rounded-[28px] bg-neutral-100">
+    <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} className="group relative aspect-[8/3] w-full overflow-hidden rounded-[28px] bg-neutral-100">
       {slides.map((s, k) => (
         <button
           key={s.id}
@@ -587,6 +587,7 @@ export function HomeFeed({
   onToggleShop,
   onAsk,
   onNavigate,
+  onOpenFeature,
   onTour,
   onStartTutorial,
 }: {
@@ -601,10 +602,12 @@ export function HomeFeed({
   onToggleShop: () => void;
   onAsk: (text: string) => void;
   onNavigate: (page: DashPage) => void;
+  /** a card whose button opens a dashboard page picked by the admin (an id from dashboard-features) */
+  onOpenFeature: (featureId: string) => void;
   onTour: () => void;
   onStartTutorial: (t: Tutorial) => void;
 }) {
-  const { cards, slides } = useDiscoverData();
+  const { slides } = useDiscoverData();
   const [text, setText] = React.useState("");
   const typedHint = useTypedHint(text === "");
   const [explore, setExplore] = React.useState<GrowthTab | null>(null);
@@ -715,43 +718,22 @@ export function HomeFeed({
       {/* today */}
       <TodayCard store={store} onNavigate={onNavigate} />
 
-      {/* picked for you */}
+      {/* discover: every idea and tool in one grid (set in Admin → Discover cards) */}
       <section>
-        <div className="mb-4 flex items-end justify-between">
-          <h2 className="text-lg font-semibold tracking-tight">Picked for you</h2>
-          <span className="text-sm text-neutral-400">Ideas to grow your shop</span>
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <h2 className="text-lg font-semibold tracking-tight">Discover</h2>
+          <span className="text-sm text-neutral-400">Ideas and tools to grow your shop</span>
         </div>
-        <HomeDiscover store={store} storeLink={storeLink} onNavigate={onNavigate} onAsk={onAsk} layout="row" />
-      </section>
-
-      {/* explore */}
-      <section>
-        <h2 className="mb-4 text-lg font-semibold tracking-tight">Explore</h2>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {EXPLORE_IDS.filter((id) => cards[id].enabled).map((id) => {
-            const c = cards[id];
-            const dft = DISCOVER_DEFAULTS[id];
-            const open = () => {
-              if (!c.link) return setExplore(EXPLORE_TAB[id]);
-              if (c.link.startsWith("/")) window.location.assign(c.link);
-              else window.open(c.link, "_blank", "noopener,noreferrer");
-            };
-            return (
-              <button key={id} type="button" onClick={open} className="group flex flex-col overflow-hidden rounded-[22px] border border-black/[0.06] bg-white text-left transition-shadow duration-300 hover:shadow-[0_24px_48px_-30px_rgba(0,0,0,0.45)]">
-                <span className="block h-28 bg-neutral-50 px-4 py-3 transition-colors group-hover:bg-neutral-100 sm:h-32">
-                  <ExplorePreview id={id} />
-                </span>
-                <span className="block p-4">
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="text-[15px] font-semibold">{c.title || dft.title}</span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-neutral-300 transition-all group-hover:translate-x-0.5 group-hover:text-neutral-900" />
-                  </span>
-                  <span className="mt-0.5 line-clamp-2 block text-xs leading-relaxed text-neutral-500">{c.text || dft.text}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        <HomeDiscover
+          store={store}
+          storeLink={storeLink}
+          onNavigate={onNavigate}
+          onAsk={onAsk}
+          layout="row"
+          exploreArt={(id) => <ExplorePreview id={id} />}
+          onExplore={(id) => setExplore(EXPLORE_TAB[id])}
+          onFeature={onOpenFeature}
+        />
       </section>
 
       {/* tutorials */}

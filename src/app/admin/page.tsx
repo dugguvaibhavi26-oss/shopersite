@@ -22,6 +22,7 @@ import { Modal } from "@/components/ui/modal";
 import { ShopperLogo } from "@/components/brand/shopper-logo";
 import { getStoreDomain, getStoreUrl } from "@/lib/config/site";
 import { PlatformBannersManager } from "@/components/admin/platform-banners-manager";
+import { HeroSlidesSettings } from "@/components/admin/hero-slides-settings";
 import { PlansManager } from "@/components/admin/plans-manager";
 import { PlatformPaymentSettings } from "@/components/admin/platform-payment-settings";
 import { ThemesManager } from "@/components/admin/themes-manager";
@@ -2647,7 +2648,14 @@ function AdminDashboardContent() {
         )}
 
         {/* 5. CLOUD SYNC & INFRASTRUCTURE (LIGHT THEME) */}
-        {activeTab === "banners" && <PlatformBannersManager />}
+        {activeTab === "banners" && (
+          <div className="space-y-10">
+            {/* both carousels sellers see, in one place: the top one on Home, then the dashboard banners */}
+            <HeroSlidesSettings myEmail={myEmail} />
+            <hr className="border-neutral-200" />
+            <PlatformBannersManager />
+          </div>
+        )}
 
         {activeTab === "themes" && <ThemesManager stores={stores} />}
         {activeTab === "landing" && <LandingSettings myEmail={myEmail} />}

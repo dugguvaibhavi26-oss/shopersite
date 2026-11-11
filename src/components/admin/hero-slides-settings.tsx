@@ -6,7 +6,7 @@ import { storeService } from "@/lib/store-service";
 import { MAX_SLIDES, cleanLink, type HeroSlide } from "@/lib/discover";
 import { saveDiscoverSlides, useDiscoverData } from "@/lib/discover-client";
 
-/** Admin → Discover cards → Banner slides: the big rotating banner at the top of every seller's Home. */
+/** Admin → App banners → Top banner: the big rotating banner at the top of every seller's Home. */
 export function HeroSlidesSettings({ myEmail }: { myEmail: string }) {
   const { slides: live, loaded } = useDiscoverData();
   const [form, setForm] = React.useState<HeroSlide[] | null>(null);
@@ -72,8 +72,8 @@ export function HeroSlidesSettings({ myEmail }: { myEmail: string }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h3 className="text-base font-semibold">Banner slides</h3>
-          <p className="text-sm text-neutral-500">The big rotating banner at the top of Home. Wide images look best (about 1600×600). With no slides, sellers see the built-in ones (season, Shiprocket, academy).</p>
+          <h3 className="text-xl font-black tracking-tight text-neutral-900 sm:text-2xl">Top banner</h3>
+          <p className="text-sm text-neutral-500">The big rotating banner at the top of every seller&apos;s Home on computers. Upload 1600 × 600 px, the same size as the dashboard banners below. With no slides, sellers see the built-in ones.</p>
         </div>
         <div className="flex gap-2">
           {form.length < MAX_SLIDES && (
@@ -92,14 +92,14 @@ export function HeroSlidesSettings({ myEmail }: { myEmail: string }) {
 
       <div className="space-y-3">
         {form.map((s, i) => (
-          <div key={s.id} className={`grid gap-4 rounded-2xl border bg-white p-4 md:grid-cols-[260px_1fr] ${s.enabled ? "border-neutral-200" : "border-dashed border-neutral-300 opacity-70"}`}>
-            <label className="group relative block h-32 cursor-pointer overflow-hidden rounded-xl bg-neutral-100 md:h-full md:min-h-[150px]">
+          <div key={s.id} className={`grid gap-4 rounded-2xl border bg-white p-4 md:grid-cols-[280px_1fr] ${s.enabled ? "border-neutral-200" : "border-dashed border-neutral-300 opacity-70"}`}>
+            <label className="group relative block aspect-[8/3] cursor-pointer self-start overflow-hidden rounded-xl bg-neutral-100">
               {s.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={s.imageUrl} alt="" className="h-full w-full object-cover" />
               ) : (
                 <span className="flex h-full flex-col items-center justify-center gap-1 text-xs text-neutral-500">
-                  <ImagePlus className="h-5 w-5" /> Add a wide image
+                  <ImagePlus className="h-5 w-5" /> Add image (1600 × 600)
                 </span>
               )}
               <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-xs font-semibold text-white opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
