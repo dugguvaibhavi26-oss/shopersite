@@ -12,7 +12,7 @@ export const APP_VERSION = "1.0.0";
  * "Install the Android app" on the landing page: phones only (hidden from md up), never inside the
  * app itself, and not on iPhones (an APK can't be installed there).
  */
-export function InstallAndroidApp({ className = "" }: { className?: string }) {
+export function InstallAndroidApp({ className = "", compact = false }: { className?: string; compact?: boolean }) {
   const [show, setShow] = React.useState(false);
   React.useEffect(() => {
     const ua = navigator.userAgent;
@@ -20,6 +20,22 @@ export function InstallAndroidApp({ className = "" }: { className?: string }) {
     setShow(!isNativeApp() && !ios);
   }, []);
   if (!show) return null;
+  // a small one-line pill, for tight spots like the hero card
+  if (compact) {
+    return (
+      <a
+        href={APK_URL}
+        download={`shopersite-${APP_VERSION}.apk`}
+        className={`md:hidden inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5 text-[12px] font-medium text-neutral-700 active:scale-[0.97] transition-transform hover:bg-neutral-200 ${className}`}
+      >
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="#1a9e55" aria-hidden>
+          <path d="M17.6 9.48l1.84-3.18a.38.38 0 00-.66-.38l-1.86 3.22a11.4 11.4 0 00-9.84 0L5.22 5.92a.38.38 0 10-.66.38L6.4 9.48A10.8 10.8 0 001 18h22a10.8 10.8 0 00-5.4-8.52zM7 15.25a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm10 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z" />
+        </svg>
+        Get the Android app
+        <Download className="h-3.5 w-3.5 text-neutral-400" />
+      </a>
+    );
+  }
   return (
     <a
       href={APK_URL}

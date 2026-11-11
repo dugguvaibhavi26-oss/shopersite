@@ -18,9 +18,9 @@ export const MOCK_PRODUCTS = [
 /**
  * Browser-window mockup of a live storefront.
  * `autoplay` walks a highlight across the products (and fills the bag) so the
- * hover effects play on touch screens too.
+ * hover effects play on touch screens too. `compact` keeps it short on phones.
  */
-export function StoreMockup({ className, autoplay = false }: { className?: string; autoplay?: boolean }) {
+export function StoreMockup({ className, autoplay = false, compact = false }: { className?: string; autoplay?: boolean; compact?: boolean }) {
   const [active, setActive] = React.useState(-1);
   const [bag, setBag] = React.useState(0);
 
@@ -36,7 +36,7 @@ export function StoreMockup({ className, autoplay = false }: { className?: strin
   return (
     <div className={cn("rounded-[11px] bg-white border border-neutral-200 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.25)] overflow-hidden", className)}>
       {/* Browser chrome */}
-      <div className="flex items-center gap-2 px-4 h-10 border-b border-neutral-200 bg-neutral-50">
+      <div className={cn("flex items-center gap-2 px-4 border-b border-neutral-200 bg-neutral-50", compact ? "h-8 sm:h-10" : "h-10")}>
         <span className="w-2.5 h-2.5 rounded-full bg-neutral-300" />
         <span className="w-2.5 h-2.5 rounded-full bg-neutral-300" />
         <span className="w-2.5 h-2.5 rounded-full bg-neutral-300" />
@@ -46,7 +46,7 @@ export function StoreMockup({ className, autoplay = false }: { className?: strin
       </div>
 
       {/* Store header */}
-      <div className="flex items-center justify-between px-5 sm:px-7 h-12 border-b border-neutral-100">
+      <div className={cn("flex items-center justify-between px-5 sm:px-7 border-b border-neutral-100", compact ? "h-10 sm:h-12" : "h-12")}>
         <span className="font-bold tracking-tight text-sm">LUME</span>
         <div className="hidden sm:flex gap-5 text-[11px] text-neutral-500">
           <span>New In</span>
@@ -71,7 +71,7 @@ export function StoreMockup({ className, autoplay = false }: { className?: strin
       </div>
 
       {/* Store hero banner */}
-      <div className="group/banner relative h-36 sm:h-48 overflow-hidden cursor-pointer">
+      <div className={cn("group/banner relative sm:h-48 overflow-hidden cursor-pointer", compact ? "h-28" : "h-36")}>
         <img
           src={unsplash("photo-1490481651871-ab68de25d43d", 1200)}
           alt=""
@@ -81,21 +81,21 @@ export function StoreMockup({ className, autoplay = false }: { className?: strin
         <div className="relative h-full flex flex-col justify-center px-5 sm:px-7 text-white">
           <span className="text-[10px] uppercase tracking-[0.2em] opacity-80">Autumn Edit</span>
           <span className="text-xl sm:text-3xl font-bold tracking-tight mt-1 transition-transform duration-500 group-hover/banner:translate-x-1">The New Season</span>
-          <span className="mt-3 inline-flex w-fit text-[10px] font-semibold bg-white text-black px-3 py-1.5 rounded-[7px] transition-all duration-300 hover:bg-black hover:text-white hover:scale-105">
+          <span className="mt-2 sm:mt-3 inline-flex w-fit text-[10px] font-semibold bg-white text-black px-3 py-1.5 rounded-[7px] transition-all duration-300 hover:bg-black hover:text-white hover:scale-105">
             Shop now
           </span>
         </div>
       </div>
 
       {/* Product grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 p-4 sm:p-6">
+      <div className={cn("grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 p-4 sm:p-6", compact && "pb-9 sm:pb-6")}>
         {MOCK_PRODUCTS.map((p, i) => (
           <div
             key={p.name}
             data-on={i === active}
             className="group/prod cursor-pointer rounded-[8px] p-1.5 -m-1.5 transition-all duration-300 hover:-translate-y-1.5 hover:bg-white hover:shadow-[0_18px_40px_-18px_rgba(0,0,0,0.35)] data-[on=true]:-translate-y-1.5 data-[on=true]:bg-white data-[on=true]:shadow-[0_18px_40px_-18px_rgba(0,0,0,0.35)]"
           >
-            <div className="relative aspect-[4/5] rounded-[6px] overflow-hidden bg-neutral-100">
+            <div className={cn("relative rounded-[6px] overflow-hidden bg-neutral-100", compact ? "aspect-[5/4] sm:aspect-[4/5]" : "aspect-[4/5]")}>
               <img
                 src={unsplash(p.img, 400)}
                 alt=""
@@ -128,13 +128,13 @@ export function PaymentCard({ className }: { className?: string }) {
           <Check className="w-4 h-4" />
         </div>
         <div className="min-w-0">
-          <div className="text-[11px] text-neutral-500">UPI payment received</div>
+          <div className="text-[11px] text-neutral-500">Payment received</div>
           <div className="text-lg font-bold tracking-tight">₹4,999.00</div>
         </div>
       </div>
       <div className="mt-3 pt-3 border-t border-neutral-100 flex justify-between text-[11px] text-neutral-500">
-        <span>Direct to your bank</span>
-        <span className="font-semibold text-black">0% fee</span>
+        <span>Paid online</span>
+        <span className="font-semibold text-black">0% commission</span>
       </div>
     </div>
   );

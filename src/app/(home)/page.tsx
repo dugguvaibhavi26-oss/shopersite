@@ -169,7 +169,7 @@ function ClaimForm({ onClaim, dark = false }: { onClaim: (v: string) => void; da
         onClaim(value);
       }}
       className={cn(
-        "flex items-center gap-2 rounded-[20px] p-1.5 pl-5 w-full max-w-lg",
+        "flex items-center gap-2 rounded-[16px] p-1 pl-4 sm:rounded-[20px] sm:p-1.5 sm:pl-5 w-full max-w-md",
         dark
           ? "bg-white/10 border border-white/20 focus-within:border-white/60"
           : "bg-white border border-neutral-300 shadow-lg shadow-black/5 focus-within:border-black focus-within:shadow-xl focus-within:shadow-black/10",
@@ -195,7 +195,7 @@ function ClaimForm({ onClaim, dark = false }: { onClaim: (v: string) => void; da
       <button
         type="submit"
         className={cn(
-          "group/btn shrink-0 inline-flex items-center gap-1.5 rounded-[14px] px-5 py-3 text-sm font-semibold transition-all duration-300 active:scale-95",
+          "group/btn shrink-0 inline-flex items-center gap-1.5 rounded-[12px] px-4 py-2.5 sm:rounded-[14px] sm:px-5 sm:py-3 text-sm font-semibold transition-all duration-300 active:scale-95",
           dark ? "bg-white text-black hover:bg-neutral-200" : "bg-black text-white hover:bg-neutral-800"
         )}
       >
@@ -287,12 +287,12 @@ function Hero({ onClaim }: { onClaim: (v: string) => void }) {
         </div>
 
         <HeroStage>
-          <div className="animate-float-gentle relative w-full max-w-2xl [transform-style:preserve-3d]">
+          <div className="animate-float-gentle relative w-full max-w-[340px] sm:max-w-[560px] [transform-style:preserve-3d]">
           {/* soft colour glow behind the card */}
           <div aria-hidden className="hero-ring absolute -inset-2 rounded-[44px] blur-2xl opacity-50" />
           {/* slowly rotating pastel border */}
-          <div className="hero-ring relative rounded-[26px] sm:rounded-[38px] p-[2px] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.45),0_20px_40px_-20px_rgba(0,0,0,0.3)]">
-          <div className="hero-rise w-full rounded-[24px] sm:rounded-[36px] bg-white px-5 py-8 sm:px-10 sm:py-11 flex flex-col items-center text-center">
+          <div className="hero-ring relative rounded-[24px] sm:rounded-[32px] p-[2px] shadow-[0_40px_80px_-24px_rgba(0,0,0,0.45),0_16px_32px_-20px_rgba(0,0,0,0.3)]">
+          <div className="hero-rise w-full rounded-[22px] sm:rounded-[30px] bg-white px-5 py-6 sm:px-10 sm:py-9 flex flex-col items-center text-center">
           <a
             href="#pricing"
             className="hero-rise hidden sm:inline-flex items-center gap-2 rounded-[10px] border border-neutral-200 bg-white pl-1.5 pr-3 py-1 text-xs font-medium text-neutral-700 hover:border-neutral-400 transition-colors group/pill"
@@ -302,7 +302,7 @@ function Hero({ onClaim }: { onClaim: (v: string) => void }) {
             <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover/pill:translate-x-0.5" />
           </a>
 
-          <h1 style={{ animationDelay: "90ms" }} className="hero-rise mt-4 sm:mt-6 text-[1.95rem] leading-[1.08] sm:text-5xl lg:text-[3.6rem] font-medium !tracking-[-0.04em] mx-auto text-neutral-950 text-balance">
+          <h1 style={{ animationDelay: "90ms" }} className="hero-rise sm:mt-5 text-[1.65rem] leading-[1.1] sm:text-[2.5rem] lg:text-[2.9rem] font-medium !tracking-[-0.04em] mx-auto text-neutral-950 text-balance">
             Your shop, online
             <br />
             in{" "}
@@ -329,21 +329,21 @@ function Hero({ onClaim }: { onClaim: (v: string) => void }) {
             .
           </h1>
 
-          <p style={{ animationDelay: "180ms" }} className="hero-rise mt-3 sm:mt-5 text-[14px] sm:text-[17px] text-neutral-500 max-w-sm mx-auto leading-relaxed text-balance">
-            For Instagram &amp; WhatsApp sellers — payments straight to your UPI.
+          <p style={{ animationDelay: "180ms" }} className="hero-rise mt-3 sm:mt-4 text-[13px] sm:text-[15px] text-neutral-500 max-w-xs mx-auto leading-relaxed text-balance">
+            For Instagram &amp; WhatsApp sellers. No coding, no commission.
           </p>
 
-          <div style={{ animationDelay: "270ms" }} className="hero-rise mt-6 sm:mt-8 w-full flex flex-col items-center gap-3 sm:gap-4">
+          <div style={{ animationDelay: "270ms" }} className="hero-rise mt-5 sm:mt-7 w-full flex flex-col items-center gap-3 sm:gap-3.5">
             <ClaimForm onClaim={onClaim} />
-            <ul className="flex items-center justify-center gap-x-4 text-[12px] sm:text-[13px] text-neutral-500">
-              {["Free plan", "0% commission", "Direct UPI"].map((t) => (
-                <li key={t} className="flex items-center gap-1">
-                  <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-neutral-900" strokeWidth={2.5} />
+            <ul className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 sm:gap-x-4 text-[11px] sm:text-[12.5px] text-neutral-500">
+              {["Free plan", "0% commission", "No card needed"].map((t, i) => (
+                <li key={t} className={cn("items-center gap-1 whitespace-nowrap", i === 2 ? "hidden sm:flex" : "flex")}>
+                  <Check className="w-3 h-3 text-neutral-900" strokeWidth={2.5} />
                   {t}
                 </li>
               ))}
             </ul>
-            <InstallAndroidApp className="w-full max-w-[260px]" />
+            <InstallAndroidApp compact />
           </div>
           </div>
           </div>
@@ -361,7 +361,7 @@ function Hero({ onClaim }: { onClaim: (v: string) => void }) {
 
 function StorefrontStage() {
   return (
-    <section id="storefront" className="scroll-mt-20 max-w-7xl mx-auto px-4 sm:px-6 py-24 sm:py-32">
+    <section id="storefront" className="scroll-mt-20 max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-32">
       <SectionIntro
         center
         eyebrow="Your storefront"
@@ -371,15 +371,17 @@ function StorefrontStage() {
         text="Every store comes with a beautiful theme, fast checkout and order alerts — ready the moment you sign up."
       />
 
-      <Reveal delay={120} variant="zoom" className="group/stage relative mt-16 sm:mt-20 mx-auto max-w-5xl">
+      <Reveal delay={120} variant="zoom" className="group/stage relative mt-10 sm:mt-20 mx-auto max-w-5xl">
         <div className="scroll-stage">
-          <div className="absolute inset-x-0 -bottom-10 top-16 rounded-[28px] bg-neutral-100" aria-hidden />
-          <div className="relative px-2 sm:px-10">
-            <StoreMockup autoplay className="text-left transition-transform duration-700 ease-out group-hover/stage:-translate-y-2" />
+          <div className="absolute inset-x-0 -bottom-5 md:-bottom-10 top-10 md:top-16 rounded-[24px] md:rounded-[28px] bg-neutral-100" aria-hidden />
+          <div className="relative px-3 sm:px-10">
+            <StoreMockup compact autoplay className="text-left transition-transform duration-700 ease-out group-hover/stage:-translate-y-2" />
 
-            {/* smaller and tucked into the corners on phones */}
-            <PaymentCard className="absolute -left-1 -top-12 scale-[0.62] origin-top-left md:scale-100 md:-left-6 lg:-left-16 md:top-24 text-left animate-float-gentle z-10" />
-            <OrderCard className="absolute -right-1 -bottom-10 scale-[0.62] origin-bottom-right md:scale-100 md:-right-6 lg:-right-16 md:top-52 md:bottom-auto text-left animate-float-gentle [animation-delay:1.2s] z-10" />
+            {/* phones: the two alerts sit under the store as a small stack; from md up they float off its sides */}
+            <div className="relative z-10 -mt-5 flex flex-col gap-2.5 px-1 md:contents">
+              <PaymentCard className="w-[80%] max-w-[260px] self-start md:w-60 md:max-w-none md:absolute md:-left-6 lg:-left-16 md:top-24 text-left animate-float-gentle md:z-10" />
+              <OrderCard className="w-[88%] max-w-[290px] self-end md:w-64 md:max-w-none md:absolute md:-right-6 lg:-right-16 md:top-52 text-left animate-float-gentle [animation-delay:1.2s] md:z-10" />
+            </div>
           </div>
         </div>
       </Reveal>
