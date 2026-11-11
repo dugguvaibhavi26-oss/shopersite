@@ -130,7 +130,7 @@ export function OrderActions({ store, order, onChange }: { store: StoreData; ord
   const rr = order.returnRequest;
   const waDigits = order.customer.phone.replace(/\D/g, "").slice(-10);
   const canEmail = canUseEmail(store.planId) && !!order.customer.email;
-  const card = "rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5";
+  const card = "rounded-[24px] bg-white ring-1 ring-black/[0.04] p-4 sm:p-5";
 
   return (
     <div className="space-y-4">

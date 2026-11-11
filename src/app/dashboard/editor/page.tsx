@@ -1,5 +1,5 @@
 "use client";
-import { cropImage } from "@/components/ui/image-cropper";
+import { CROP, cropImage, type CropSpec } from "@/components/ui/image-cropper";
 import { Tour, type TourStep } from "@/components/ui/tour";
 import type { ProbeReport } from "@/components/storefront/site/field-probe";
 import { POLICY_IDS, POLICY_INFO, type PolicyId } from "@/lib/policies";
@@ -805,6 +805,7 @@ function ThemeEditor() {
                   <ImageField
                     label="Photo"
                     help="Shows on themes whose pages have a photo."
+                    spec={SITE_THEME_STYLE[toSiteTheme(themeSlug)]?.pageStyle === "banner" ? CROP.banner : CROP.portrait}
                     store={store}
                     value={content.pages[selection.id].image || ""}
                     onChange={(v) => {
@@ -1105,7 +1106,7 @@ function SectionFields({
 }
 
 function SettingField({ field, store, value, onChange }: { field: SectionField; store: StoreData; value: string; onChange: (v: string) => void }) {
-  if (field.kind === "image") return <ImageField label={field.label} help={field.help} store={store} value={value} onChange={onChange} aspect={/^slide\d/.test(field.key) ? 3 : undefined} />;
+  if (field.kind === "image") return <ImageField label={field.label} help={field.help} store={store} value={value} onChange={onChange} spec={cropFor(field.key, field.label)} />;
   if (field.kind === "link") return <LinkField label={field.label} store={store} value={value} onChange={onChange} />;
   if (field.kind === "source") {
     const cats = (store.categories || []).filter((c) => c.isActive ?? true);
@@ -1182,7 +1183,17 @@ function fieldShown(f: SectionField, sectionId: string, probe: ProbeReport | nul
   return !reads || reads.includes(f.key);
 }
 
-function ImageField({ label: text, help, store, value, onChange, aspect }: { label: string; help?: string; store: StoreData; value: string; onChange: (v: string) => void; aspect?: number }) {
+/** The locked crop for a website photo, from what the field is: slides are banners, tiles and gallery photos square, "wide" photos 16:9, the rest portrait. */
+function cropFor(key: string, label: string): CropSpec {
+  const l = label.toLowerCase();
+  if (/^slide\d/.test(key)) return CROP.banner;
+  if (/logo/.test(key)) return CROP.logo;
+  if (/^tile\d|^g\dImage/.test(key)) return CROP.square;
+  if (/wide|background/.test(l) || key === "panelImage") return CROP.wide;
+  return CROP.portrait;
+}
+
+function ImageField({ label: text, help, store, value, onChange, spec }: { label: string; help?: string; store: StoreData; value: string; onChange: (v: string) => void; spec: CropSpec }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [showUrl, setShowUrl] = useState(false);
@@ -1248,7 +1259,7 @@ function ImageField({ label: text, help, store, value, onChange, aspect }: { lab
             setError("Choose a photo under 12 MB.");
             return;
           }
-          const cropped = await cropImage(file, { aspect });
+          const cropped = await cropImage(file, spec);
           if (!cropped) return;
           setBusy(true);
           setError("");

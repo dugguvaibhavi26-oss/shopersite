@@ -15,8 +15,10 @@ const Body = z.object({
     .min(1)
     .max(50),
   couponCode: z.string().max(40).optional(),
-  customer: z.object({ name: z.string().trim().min(2).max(80), phone: z.string().max(20), email: z.string().trim().max(200).optional() }),
+  customer: z.object({ name: z.string().trim().min(2).max(80), phone: z.string().max(20), email: z.string().trim().max(200).optional(), altPhone: z.string().max(20).optional() }),
+  marketingOptIn: z.boolean().optional(),
   address: z.object({
+    landmark: z.string().trim().max(120).optional(),
     street: z.string().trim().min(5).max(200),
     city: z.string().trim().min(2).max(60),
     state: z.string().trim().min(2).max(60),
@@ -54,8 +56,9 @@ export async function POST(req: Request) {
       method: b.method,
       items: b.items,
       couponCode: b.couponCode || undefined,
-      customer: { name: b.customer.name, phone, ...(email ? { email } : {}) },
+      customer: { name: b.customer.name, phone, ...(email ? { email } : {}), ...(b.customer.altPhone ? { altPhone: cleanPhone(b.customer.altPhone) } : {}) },
       address: b.address,
+      ...(b.marketingOptIn ? { marketingOptIn: true } : {}),
       notes: b.notes || undefined,
       utr: b.utr ? b.utr.replace(/\s/g, "") : undefined,
     });

@@ -5,7 +5,7 @@ import { RAIL_WIDTH, SidebarRail } from "./sidebar-rail";
 import { MobileDock } from "./mobile-dock";
 import { EmailPanel, sendNewProductAlert } from "@/components/dashboard/email-panel";
 import { SITE_THEME_STYLE, toSiteTheme } from "@/lib/site-content";
-import { cropImage } from "@/components/ui/image-cropper";
+import { cropImage, CROP, type CropSpec } from "@/components/ui/image-cropper";
 import { Tour, type TourStep } from "@/components/ui/tour";
 import { LiveShopFrame } from "@/components/dashboard/live-shop-frame";
 import { OrderActions } from "@/components/dashboard/order-actions";
@@ -50,7 +50,7 @@ import { ReviewsPanel } from "@/components/dashboard/reviews-panel";
 import { IAnalytics, IHome, IOrders, IProducts, ICategories, ICustomers, IReviews, IDiscounts, IThemes, IPlugins, ISettings, INotifications, IProfile, IRupee, IRepeat, IStar, ITrend, ISparkle, IPercent, ITruck, ICard, ICollections, ICheck, IWarning, ISoldOut, IStore, IImage, IGlobe, ICart, IActivity, ILock, IPolicies, IMail, IEye, IChat } from "@/components/icons";
 import { WorkplaceChat } from "@/components/staff/workplace-chat";
 import { Pager, pageOf } from "@/components/dashboard/pager";
-import { EmptyState, Illustration, PageHero, SectionIcon, StatChips, StatStrip, dailyCounts, type Section } from "@/components/dashboard/ui-kit";
+import { ActionTiles, Avatar, CARD, EmptyState, Illustration, PageHero, SectionIcon, Segmented, StatChips, StatStrip, StatusChip, dailyCounts, type Section, type Tint } from "@/components/dashboard/ui-kit";
 import {
   AccountSettings,
   CheckoutSettings,
@@ -152,6 +152,7 @@ import {
   ArrowLeft,
   MapPin,
   Wrench,
+  CalendarDays,
 } from "lucide-react";
 
 // On desktop the dashboard scrolls inside its rounded panel, on phones the page itself scrolls; this moves both.
@@ -380,6 +381,9 @@ function DashboardPageContent() {
   const [pPrice, setPPrice] = useState("");
   const [pComparePrice, setPComparePrice] = useState("");
   const [pGst, setPGst] = useState("");
+  // most a buyer can order in one go ("" = no limit), and whether cash on delivery is offered
+  const [pMaxPerOrder, setPMaxPerOrder] = useState("");
+  const [pCodBlocked, setPCodBlocked] = useState(false);
   const [pErrors, setPErrors] = useState<{ title?: string; category?: string; price?: string; mrp?: string; stock?: string; form?: string }>({});
   // "+ New category" inside the product form: created when the product is saved
   const [pNewCategory, setPNewCategory] = useState("");
@@ -807,10 +811,10 @@ function DashboardPageContent() {
   // Handle Product Save
   /** Crop, then upload to storage (never kept inside the store record), then use its link. */
   const [photoUploading, setPhotoUploading] = useState(false);
-  const uploadPhoto = async (file: File, aspect: number | undefined, use: (url: string) => void) => {
+  const uploadPhoto = async (file: File, spec: CropSpec, use: (url: string) => void) => {
     if (!store) return;
     if (file.size > 12 * 1024 * 1024) return appAlert("Choose a photo under 12 MB.", { danger: true });
-    const cropped = await cropImage(file, { aspect });
+    const cropped = await cropImage(file, spec);
     if (!cropped) return;
     setPhotoUploading(true);
     try {
@@ -873,6 +877,8 @@ function DashboardPageContent() {
         stock: stockNum,
         description: pDesc,
         images: pImageUrl ? [pImageUrl] : undefined,
+        maxPerOrder: Number(pMaxPerOrder) > 0 ? Number(pMaxPerOrder) : undefined,
+        codBlocked: pCodBlocked || undefined,
       });
     } else {
       const res = storeService.addProduct(store.subdomain, {
@@ -882,6 +888,8 @@ function DashboardPageContent() {
         price: pricePaise,
         compareAtPrice: comparePricePaise,
         ...(pGst ? { gstRate: Number(pGst) } : {}),
+        ...(Number(pMaxPerOrder) > 0 ? { maxPerOrder: Number(pMaxPerOrder) } : {}),
+        ...(pCodBlocked ? { codBlocked: true } : {}),
         stock: stockNum,
         category: categoryName,
         images: [
@@ -920,6 +928,8 @@ function DashboardPageContent() {
     setPPrice("");
     setPComparePrice("");
     setPGst("");
+    setPMaxPerOrder("");
+    setPCodBlocked(false);
     setPStock("10");
     setPDesc("");
     setPImageUrl("");
@@ -932,6 +942,8 @@ function DashboardPageContent() {
     setPPrice((prod.price / 100).toString());
     setPComparePrice(prod.compareAtPrice ? (prod.compareAtPrice / 100).toString() : "");
     setPGst(typeof prod.gstRate === "number" ? String(prod.gstRate) : "");
+    setPMaxPerOrder(prod.maxPerOrder ? String(prod.maxPerOrder) : "");
+    setPCodBlocked(!!prod.codBlocked);
     setPStock(prod.stock.toString());
     setPDesc(prod.description);
     setPImageUrl(prod.images[0] || "");
@@ -1891,7 +1903,7 @@ function DashboardPageContent() {
                               <span className="block text-[11px] text-neutral-500 truncate">{n.desc}</span>
                               <span className="block mt-0.5 text-[10px] text-neutral-400">{n.time}</span>
                             </span>
-                            {n.unread && <span className="mt-1.5 w-2 h-2 rounded-full bg-indigo-500 shrink-0" />}
+                            {n.unread && <span className="mt-1.5 w-2 h-2 rounded-full bg-neutral-950 shrink-0" />}
                           </button>
                         );
                       })}
@@ -1988,7 +2000,7 @@ function DashboardPageContent() {
       <div className={`${showPhoneChrome ? "pt-16" : "pt-[env(safe-area-inset-top)]"} md:pt-3 md:pb-3 md:pl-[var(--dash-rail,var(--rail))] ${inSettings && !inEditor ? "lg:pl-[calc(var(--dash-rail,var(--rail))+244px)]" : ""} md:pr-3 ${assistantOpen && assistantSide ? "md:pr-[calc(var(--aw)+1.5rem)]" : ""} md:transition-[padding] md:duration-500 md:ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col min-h-screen md:h-screen md:min-h-0 overflow-x-clip`} style={{ "--rail": `${RAIL_WIDTH}px`, "--aw": `${ASSISTANT_WIDTH}px` } as React.CSSProperties}>
         <div id="dash-scroll" className="flex-1 flex flex-col md:min-h-0 md:overflow-y-auto md:overscroll-contain md:rounded-[28px] md:bg-[#F0F0F0] dash-panel-scroll">
         {/* Main Workspace Area (Scrolls smoothly under the fixed top header) */}
-        <main className={workplaceFull ? "flex-1 min-w-0 w-full bg-white" : `flex-1 min-w-0 px-5 pt-5 sm:px-10 sm:pt-8 lg:px-16 lg:pt-10 ${showDock ? "pb-28" : "pb-10"} md:pb-14 max-w-6xl w-full mx-auto`}>
+        <main data-dash-forms={activeTab === "overview" || workplaceFull ? undefined : ""} className={workplaceFull ? "flex-1 min-w-0 w-full bg-white" : `flex-1 min-w-0 px-5 pt-5 sm:px-10 sm:pt-8 lg:px-16 lg:pt-10 ${showDock ? "pb-28" : "pb-10"} md:pb-14 max-w-6xl w-full mx-auto`}>
           {unseenPlanUpdate && (
             <div
               className={`mb-5 flex items-start gap-3 rounded-2xl p-4 ${
@@ -2122,7 +2134,6 @@ function DashboardPageContent() {
                     aria-hidden
                     className="absolute -right-6 -bottom-8 w-40 h-40 text-white/[0.06] transition-transform duration-700 group-hover:-rotate-12 group-hover:scale-110"
                   />
-                  <span aria-hidden className="absolute -top-16 -left-10 w-40 h-40 rounded-full bg-emerald-400/20 blur-3xl" />
                   <span className="relative flex items-center justify-between">
                     <span className="text-xs font-medium text-white/60">Revenue · {analyticsData.label.toLowerCase()}</span>
                     <span
@@ -2429,8 +2440,6 @@ function DashboardPageContent() {
                 <div style={{ animationDelay: "420ms" }} className="hero-rise space-y-6">
                   {/* Your store */}
                   <div className="relative overflow-hidden rounded-2xl bg-black text-white p-5">
-                    <span aria-hidden className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-white/10 blur-3xl animate-float-gentle" />
-                    <span aria-hidden className="absolute -bottom-20 -left-12 w-44 h-44 rounded-full bg-fuchsia-500/25 blur-3xl animate-float-gentle [animation-delay:1.5s]" />
                     <div className="relative flex items-center justify-between">
                       <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">Your store</span>
                       <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-white/80">
@@ -2485,7 +2494,7 @@ function DashboardPageContent() {
                     </p>
                     <div className="mt-2 w-full h-1.5 rounded-full bg-neutral-100 overflow-hidden">
                       <div
-                        className="bar-grow h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
+                        className="bar-grow h-full rounded-full bg-neutral-950"
                         style={{
                           width: `${Math.min(100, Math.max(4, (store.products.length / currentPlan.maxProducts) * 100))}%`,
                         }}
@@ -2519,7 +2528,6 @@ function DashboardPageContent() {
                     onClick={startAddProduct}
                     className="group relative overflow-hidden col-span-3 text-left rounded-2xl bg-neutral-950 text-white px-5 sm:px-7 flex items-center justify-between gap-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-24px_rgba(0,0,0,0.6)]"
                   >
-                    <span aria-hidden className="pointer-events-none absolute -left-16 -top-20 w-64 h-64 rounded-full bg-white/10 blur-3xl transition-opacity duration-500 group-hover:opacity-100 opacity-60" />
                     <span className="relative min-w-0">
                       <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">Catalogue</span>
                       <span className="mt-1 block text-lg sm:text-xl font-semibold">Add product</span>
@@ -2676,7 +2684,7 @@ function DashboardPageContent() {
                 const doneCount = steps.filter((st) => st.done).length;
                 const allDone = doneCount === steps.length;
                 return (
-                  <section className="hero-rise rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6" style={{ animationDelay: "600ms" }}>
+                  <section className="hero-rise rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 sm:p-6" style={{ animationDelay: "600ms" }}>
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <h2 className="text-sm font-semibold">{allDone ? "Your store is fully set up" : "Finish setting up your store"}</h2>
@@ -2776,7 +2784,7 @@ function DashboardPageContent() {
                 const allDone = doneCount === steps.length;
                 if (allDone) return null;
                 return (
-                  <section className="hero-rise rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6" style={{ animationDelay: "600ms" }}>
+                  <section className="hero-rise rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 sm:p-6" style={{ animationDelay: "600ms" }}>
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <h2 className="text-sm font-semibold">{allDone ? "Your store is fully set up" : "Finish setting up your store"}</h2>
@@ -2839,21 +2847,25 @@ function DashboardPageContent() {
         {/* NOTIFICATIONS PAGE */}
         {activeTab === "notifications" && (
           <div className="space-y-4 animate-enter-blur">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-neutral-500">
-                {unreadCount > 0 ? `${unreadCount} unread of ${notifications.length}` : `All ${notifications.length} caught up`}
-              </span>
+            {/* a dark summary: how many are new, and one tap to clear them */}
+            <div className="hero-rise flex items-end justify-between gap-4 rounded-[28px] bg-neutral-950 p-5 text-white sm:p-6">
+              <div className="min-w-0">
+                <p className="text-[13px] font-medium text-white/60">{unreadCount > 0 ? "Unread" : "All caught up"}</p>
+                <p className="mt-1 text-[34px] font-semibold leading-none tracking-tight tabular-nums">{unreadCount}</p>
+                <p className="mt-2 text-xs text-white/55">of {notifications.length} notification{notifications.length === 1 ? "" : "s"}</p>
+              </div>
               {unreadCount > 0 && (
                 <button
                   type="button"
                   onClick={markAllNotificationsRead}
-                  className="h-9 px-3.5 rounded-[10px] border border-neutral-200 bg-white text-xs font-semibold hover:border-neutral-900 transition-colors"
+                  style={{ minHeight: 0 }}
+                  className="h-10 shrink-0 rounded-full bg-white px-4 text-sm font-semibold text-neutral-950 transition-colors hover:bg-neutral-100"
                 >
                   Mark all as read
                 </button>
               )}
             </div>
-            <div className="rounded-2xl border border-neutral-200 bg-white divide-y divide-neutral-100 overflow-hidden">
+            <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04] divide-y divide-neutral-100 overflow-hidden">
               {notifications.map((n) => {
                 const { icon: Icon, tone } = notificationIcon(n.type, n.id);
                 return (
@@ -2861,7 +2873,7 @@ function DashboardPageContent() {
                     key={n.id}
                     type="button"
                     onClick={() => openNotification(n)}
-                    className={`w-full flex items-start gap-4 px-4 sm:px-5 py-4 text-left transition-colors hover:bg-neutral-50 ${n.unread ? "bg-indigo-50/30" : ""}`}
+                    className={`w-full flex items-start gap-4 px-4 sm:px-5 py-4 text-left transition-colors hover:bg-neutral-50 ${n.unread ? "bg-neutral-50" : ""}`}
                   >
                     <span className={`w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 ${tone}`}>
                       <Icon className="w-[18px] h-[18px]" />
@@ -2873,7 +2885,7 @@ function DashboardPageContent() {
                       </span>
                       <span className="mt-0.5 block text-[13px] text-neutral-500">{n.desc}</span>
                     </span>
-                    {n.unread && <span className="mt-2 w-2 h-2 rounded-full bg-indigo-500 shrink-0" />}
+                    {n.unread && <span className="mt-2 w-2 h-2 rounded-full bg-neutral-950 shrink-0" />}
                   </button>
                 );
               })}
@@ -2885,13 +2897,11 @@ function DashboardPageContent() {
         {activeTab === "profile" && (
           <div className="space-y-6 animate-enter-blur">
             {/* Hero: cover, avatar, identity, quick actions and lifetime stats */}
-            <section className="hero-rise overflow-hidden rounded-[22px] border border-neutral-200 bg-white">
-              <div className="relative h-28 sm:h-36 overflow-hidden bg-gradient-to-br from-indigo-200 via-violet-100 to-rose-100">
-                <span aria-hidden className="absolute -top-16 -left-10 w-64 h-64 rounded-full bg-indigo-400/40 blur-3xl" />
-                <span aria-hidden className="absolute -bottom-20 right-10 w-72 h-72 rounded-full bg-fuchsia-300/40 blur-3xl" />
+            <section className="hero-rise overflow-hidden rounded-[24px] bg-white ring-1 ring-black/[0.04]">
+              <div className="relative h-28 sm:h-36 overflow-hidden bg-neutral-950">
                 <span
                   aria-hidden
-                  className="absolute inset-0 opacity-[0.25]"
+                  className="absolute inset-0 opacity-[0.12]"
                   style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1px)", backgroundSize: "16px 16px" }}
                 />
               </div>
@@ -2965,7 +2975,7 @@ function DashboardPageContent() {
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
               {/* Account details */}
-              <section style={{ animationDelay: "100ms" }} className="hero-rise lg:col-span-3 rounded-2xl border border-neutral-200 bg-white">
+              <section style={{ animationDelay: "100ms" }} className="hero-rise lg:col-span-3 rounded-[24px] bg-white ring-1 ring-black/[0.04]">
                 <div className="flex items-center justify-between px-5 pt-5">
                   <h3 className="text-sm font-semibold">Account details</h3>
                   <button
@@ -3004,7 +3014,6 @@ function DashboardPageContent() {
               <div className="lg:col-span-2 space-y-6">
                 {/* Plan and usage */}
                 <section style={{ animationDelay: "160ms" }} className="hero-rise relative overflow-hidden rounded-2xl bg-neutral-950 text-white p-5">
-                  <span aria-hidden className="absolute -top-16 -right-10 w-48 h-48 rounded-full bg-violet-500/30 blur-3xl" />
                   <span className="relative block text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">Your plan</span>
                   <span className="relative mt-1 block text-lg font-semibold">{currentPlan.name}</span>
                   <span className="relative block text-xs text-white/55">{currentPlan.priceFormatted}</span>
@@ -3017,7 +3026,7 @@ function DashboardPageContent() {
                     </div>
                     <div className="mt-2 h-1.5 rounded-full bg-white/15 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-indigo-400 to-fuchsia-400 origin-left bar-grow"
+                        className="h-full rounded-full bg-lime-200 origin-left bar-grow"
                         style={{
                           width: `${Math.min(100, Math.max(4, (totalProducts / (currentPlan.maxProducts >= 9999 ? 100 : currentPlan.maxProducts)) * 100))}%`,
                         }}
@@ -3046,7 +3055,7 @@ function DashboardPageContent() {
                       key={label}
                       type="button"
                       onClick={() => setActiveTab(tab)}
-                      className="group rounded-2xl border border-neutral-200 bg-white p-4 text-left transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-22px_rgba(0,0,0,0.3)]"
+                      className="group rounded-[24px] bg-white ring-1 ring-black/[0.04] p-4 text-left transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-22px_rgba(0,0,0,0.3)]"
                     >
                       <span className={`w-9 h-9 rounded-[10px] flex items-center justify-center transition-transform duration-300 group-hover:scale-110 ${tone}`}>
                         <Icon className="w-4 h-4" />
@@ -3057,7 +3066,7 @@ function DashboardPageContent() {
                 </section>
 
                 {userStores.length > 1 && (
-                  <section className="rounded-2xl border border-neutral-200 bg-white p-5">
+                  <section className="rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5">
                     <label className="block text-sm font-semibold">Switch store</label>
                     <select
                       value={store.subdomain}
@@ -3098,7 +3107,7 @@ function DashboardPageContent() {
           isProductModalOpen ? (
             <div className="mt-6 space-y-6 animate-enter-scale">
               {/* Top Navigation & Actions Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl bg-white border border-neutral-200 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-[24px] bg-white ring-1 ring-black/[0.04]">
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
@@ -3106,7 +3115,7 @@ function DashboardPageContent() {
                       setIsProductModalOpen(false);
                       resetProductForm();
                     }}
-                    className="-ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900 transition-colors cursor-pointer"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700 hover:bg-neutral-200 hover:text-neutral-950 transition-colors cursor-pointer !min-h-0"
                     title="Back to Catalog"
                   >
                     <ChevronLeft className="w-4 h-4" />
@@ -3165,7 +3174,7 @@ function DashboardPageContent() {
                 {/* Left 7 Columns: Product Information & Pricing */}
                 <div className="lg:col-span-7 space-y-6">
                   {/* Card 1: Product Basics */}
-                  <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-4">
+                  <div className="p-6 rounded-[24px] bg-white ring-1 ring-black/[0.04] space-y-4">
                     <h3 className="flex items-center gap-2 border-b border-neutral-100 pb-3 text-sm font-semibold text-neutral-900">
                       <SectionIcon section="products" icon={IProducts} size="sm" />
                       Basic information
@@ -3209,7 +3218,7 @@ function DashboardPageContent() {
                   </div>
 
                   {/* Card 2: Pricing & Inventory */}
-                  <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-4">
+                  <div className="p-6 rounded-[24px] bg-white ring-1 ring-black/[0.04] space-y-4">
                     <h3 className="flex items-center gap-2 border-b border-neutral-100 pb-3 text-sm font-semibold text-neutral-900">
                       <SectionIcon section="reviews" icon={IRupee} size="sm" />
                       Price & stock
@@ -3305,13 +3314,39 @@ function DashboardPageContent() {
                         </div>
                       </div>
                     </div>
+                    <div className="grid grid-cols-1 gap-4 border-t border-neutral-100 pt-2 sm:grid-cols-2">
+                      <div>
+                        <label className="font-bold block mb-1 text-xs text-neutral-800">Most per order</label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="No limit"
+                          value={pMaxPerOrder}
+                          onChange={(e) => setPMaxPerOrder(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                          className="text-xs rounded-lg"
+                        />
+                        <p className="text-[10px] text-neutral-400 mt-1">The most one buyer can add to one order. Leave empty for no limit.</p>
+                      </div>
+                      <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-neutral-50 p-3">
+                        <input
+                          type="checkbox"
+                          checked={pCodBlocked}
+                          onChange={(e) => setPCodBlocked(e.target.checked)}
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-neutral-950"
+                        />
+                        <span>
+                          <span className="block text-xs font-bold text-neutral-800">Online payment only</span>
+                          <span className="mt-0.5 block text-[10px] text-neutral-500">No cash on delivery when this is in the bag (only if you take online payment).</span>
+                        </span>
+                      </label>
+                    </div>
                   </div>
                 </div>
 
                 {/* Right 5 Columns: Photography & Storefront Preview */}
                 <div className="lg:col-span-5 space-y-6">
                   {/* Card 3: Media Upload */}
-                  <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-4">
+                  <div className="p-6 rounded-[24px] bg-white ring-1 ring-black/[0.04] space-y-4">
                     <h3 className="flex items-center gap-2 border-b border-neutral-100 pb-3 text-sm font-semibold text-neutral-900">
                       <SectionIcon section="themes" icon={IImage} size="sm" />
                       Photos
@@ -3334,7 +3369,7 @@ function DashboardPageContent() {
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               e.target.value = "";
-                              if (file) uploadPhoto(file, 4 / 5, setPImageUrl);
+                              if (file) uploadPhoto(file, CROP.product, setPImageUrl);
                             }}
                           />
                           <Button type="button" variant="outline" size="md" className="cursor-pointer gap-1.5 text-xs rounded-lg">
@@ -3378,46 +3413,29 @@ function DashboardPageContent() {
                       </div>
                     </div>
 
-                    {/* Live Storefront Product Card Preview */}
-                    <div className="pt-2">
-                      <span className="text-xs font-bold text-neutral-800 block mb-2">Storefront Preview:</span>
-                      <div className="max-w-xs mx-auto rounded-xl border border-neutral-200 overflow-hidden bg-white shadow-sm">
-                        <div className="relative aspect-[3/4] w-full bg-neutral-100 overflow-hidden">
-                          <img
-                            src={pImageUrl || "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"}
-                            alt="Preview"
-                            className="w-full h-full object-cover"
-                          />
-                          {Number(pComparePrice) > Number(pPrice) && Number(pPrice) > 0 && (
-                            <span className="absolute top-2 left-2 bg-black text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                              SAVE {Math.round(((Number(pComparePrice) - Number(pPrice)) / Number(pComparePrice)) * 100)}%
-                            </span>
-                          )}
-                        </div>
-                        <div className="p-3 space-y-1">
-                          <span className="text-[10px] text-neutral-400 uppercase tracking-wider font-semibold">
-                            {pCategory || "Category"}
-                          </span>
-                          <h4 className="text-xs font-bold text-neutral-900 truncate">
-                            {pTitle || "Untitled Product"}
-                          </h4>
-                          <div className="flex items-center gap-2 pt-0.5">
-                            <span className="text-xs font-extrabold text-neutral-900">
-                              ₹{Number(pPrice || 0).toLocaleString("en-IN")}
-                            </span>
-                            {Number(pComparePrice) > 0 && (
-                              <span className="text-[10px] text-neutral-400 line-through">
-                                ₹{Number(pComparePrice).toLocaleString("en-IN")}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    {/* the photo itself, or an image icon until there is one; tap to upload */}
+                    <label className="relative mx-auto flex aspect-[4/5] w-full max-w-[220px] cursor-pointer items-center justify-center overflow-hidden rounded-2xl bg-neutral-100 text-neutral-300 transition-colors hover:bg-neutral-200/70">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (file) uploadPhoto(file, CROP.product, setPImageUrl);
+                        }}
+                      />
+                      {pImageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={pImageUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <ImageIcon className="h-10 w-10" strokeWidth={1.5} />
+                      )}
+                    </label>
                   </div>
 
                   {/* Bottom Save Action */}
-                  <div className="p-5 rounded-xl bg-white border border-neutral-200 shadow-xs flex items-center justify-between">
+                  <div className="p-5 rounded-[24px] bg-white ring-1 ring-black/[0.04] flex items-center justify-between">
                     <Button
                       type="button"
                       variant="outline"
@@ -3492,33 +3510,40 @@ function DashboardPageContent() {
                 ];
                 return (
                   <>
-                    <div className="m-stagger hidden grid-cols-2 gap-3 md:grid lg:grid-cols-4">
-                      {[
-                        { id: "all" as const, label: "All products", icon: IProducts, tile: "bg-neutral-100 text-neutral-900", on: "border-neutral-900 ring-2 ring-neutral-100", hint: `₹${Math.round(store.products.reduce((n, p) => n + p.price * Math.max(0, p.stock), 0) / 100).toLocaleString("en-IN")} in stock value` },
-                        { id: "in" as const, label: "In stock", icon: ICheck, tile: "bg-neutral-100 text-neutral-900", on: "border-neutral-900 ring-2 ring-neutral-100", hint: "Ready to sell" },
-                        { id: "low" as const, label: "Low stock", icon: IWarning, tile: "bg-neutral-100 text-neutral-900", on: "border-neutral-900 ring-2 ring-neutral-100", hint: counts.low ? "Restock soon" : "Nothing running low" },
-                        { id: "out" as const, label: "Sold out", icon: ISoldOut, tile: "bg-neutral-100 text-neutral-900", on: "border-neutral-900 ring-2 ring-neutral-100", hint: counts.out ? "Buyers can't order these" : "None sold out" },
-                      ].map((f) => (
-                        <button
-                          key={f.id}
-                          type="button"
-                          onClick={() => setProductFilter(f.id)}
-                          className={`group rounded-2xl border bg-white p-4 text-left transition-all duration-300 hover:-translate-y-0.5 ${
-                            productFilter === f.id ? f.on : "border-neutral-200 hover:border-neutral-300"
-                          }`}
-                        >
-                          <f.icon className="h-5 w-5 text-neutral-900" />
-                          <span className="mt-3 block text-xs font-medium text-neutral-500">{f.label}</span>
-                          <span className="mt-0.5 block text-[1.45rem] font-semibold leading-tight tracking-tight tabular-nums">{counts[f.id]}</span>
-                          <span className="mt-0.5 block truncate text-xs text-neutral-500">{f.hint}</span>
-                        </button>
-                      ))}
-                    </div>
+                    <StatStrip
+                      stats={[
+                        { label: "Products", value: counts.all, icon: IProducts, section: "products", hint: `₹${Math.round(store.products.reduce((n, p) => n + p.price * Math.max(0, p.stock), 0) / 100).toLocaleString("en-IN")} in stock value` },
+                        { label: "In stock", value: counts.in, icon: ICheck, section: "products", hint: "Ready to sell" },
+                        { label: "Low stock", value: counts.low, icon: IWarning, section: "products", hint: counts.low ? "Restock soon" : "Nothing running low" },
+                        { label: "Sold out", value: counts.out, icon: ISoldOut, section: "products", hint: counts.out ? "Buyers can't order these" : "None sold out" },
+                      ]}
+                    />
 
-                    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:gap-3">
+                    <ActionTiles
+                      items={[
+                        { label: "Add product", icon: Plus, tint: "violet", onClick: startAdd },
+                        {
+                          label: "Bulk upload",
+                          icon: Upload,
+                          tint: "blue",
+                          badge: planHas(store.planId, "bulkUpload") ? undefined : "Growth",
+                          onClick: () => (!planHas(store.planId, "bulkUpload") ? openSettings("billing") : productQuota.allowed ? setBulkOpen(true) : setActiveTab("billing")),
+                        },
+                        { label: "Categories", icon: Layers, tint: "green", badge: (store.categories || []).filter((c) => !c.isParent).length || undefined, onClick: () => setActiveTab("categories") },
+                        { label: "Running low", icon: AlertTriangle, tint: "amber", badge: counts.low + counts.out || undefined, onClick: () => setProductFilter("low") },
+                      ]}
+                    />
+
+                    <Segmented
+                      items={chips.map((c) => ({ ...c, count: counts[c.id] }))}
+                      value={productFilter}
+                      onChange={setProductFilter}
+                    />
+
+                    <div className="flex">
                       {/* search with one Filters button beside it */}
-                      <div className="col-span-2 flex min-w-0 flex-1 gap-2">
-                      <label className="flex min-w-0 flex-1 items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors">
+                      <div className="flex min-w-0 flex-1 gap-2">
+                      <label className="flex min-w-0 flex-1 items-center gap-2 h-11 px-4 rounded-full bg-white ring-1 ring-black/[0.05] focus-within:ring-neutral-900 transition-shadow">
                         <Search className="w-4 h-4 text-neutral-400 shrink-0" />
                         <input
                           value={productSearch}
@@ -3584,24 +3609,6 @@ function DashboardPageContent() {
                         ]}
                       />
                       </div>
-                      <button
-                        type="button"
-                        onClick={startAdd}
-                        className="h-11 px-4 sm:px-5 rounded-xl bg-neutral-950 text-white text-sm font-semibold inline-flex items-center justify-center gap-2 hover:bg-black transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Add product
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => (!planHas(store.planId, "bulkUpload") ? openSettings("billing") : productQuota.allowed ? setBulkOpen(true) : setActiveTab("billing"))}
-                        title={planHas(store.planId, "bulkUpload") ? undefined : "Bulk upload is part of Growth"}
-                        className="h-11 px-4 sm:px-5 rounded-xl border border-neutral-300 bg-white text-sm font-semibold inline-flex items-center justify-center gap-2 hover:border-neutral-900 transition-colors"
-                      >
-                        <Upload className="w-4 h-4" />
-                        Bulk upload
-                        {!planHas(store.planId, "bulkUpload") && <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-500">Growth</span>}
-                      </button>
                     </div>
                     {bulkOpen && (
                       <BulkUploadPanel
@@ -3646,7 +3653,7 @@ function DashboardPageContent() {
 
                     {list.length === 0 ? (
                       store.products.length ? (
-                        <div className="rounded-2xl border border-dashed border-neutral-300 bg-white px-6 py-10 text-center text-sm text-neutral-500">
+                        <div className={`px-6 py-10 text-center text-sm text-neutral-500 ${CARD}`}>
                           No products match. Try a different search or filter.
                         </div>
                       ) : (
@@ -3663,7 +3670,7 @@ function DashboardPageContent() {
                       (() => {
                         const pg = pageOf(list, productPage);
                         return (
-                      <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+                      <div className={`overflow-hidden ${CARD}`}>
                         {/* column titles (computers) */}
                         <div className="hidden md:grid-cols-[minmax(0,1fr)_96px_120px_120px_128px] items-center gap-4 border-b border-neutral-100 bg-neutral-50/70 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 md:grid">
                           <span>Product</span>
@@ -3782,7 +3789,7 @@ function DashboardPageContent() {
                   type="button"
                   onClick={closeCategoryEditor}
                   aria-label="Back"
-                  className="-ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900 transition-colors cursor-pointer"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700 hover:bg-neutral-200 hover:text-neutral-950 transition-colors cursor-pointer !min-h-0"
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </button>
@@ -3830,7 +3837,7 @@ function DashboardPageContent() {
               )}
 
               {/* details */}
-              <section className="mt-5 rounded-2xl border border-neutral-200 bg-white p-5 space-y-4">
+              <section className="mt-5 rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 space-y-4">
                 <div>
                   <label htmlFor="cat-name" className="block text-sm font-medium">Name</label>
                   <input
@@ -3944,7 +3951,7 @@ function DashboardPageContent() {
               </section>
 
               {/* picture */}
-              <section className="mt-4 rounded-2xl border border-neutral-200 bg-white p-5">
+              <section className="mt-4 rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5">
                 <span className="block text-sm font-medium">
                   Picture {cIsParent ? null : <span className="font-normal text-neutral-400">(optional)</span>}
                 </span>
@@ -3968,7 +3975,7 @@ function DashboardPageContent() {
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           e.target.value = "";
-                          if (file) uploadPhoto(file, 4 / 5, (url) => (setCImageUrl(url), setCError("")));
+                          if (file) uploadPhoto(file, CROP.category, (url) => (setCImageUrl(url), setCError("")));
                         }}
                       />
                     </label>
@@ -3995,7 +4002,7 @@ function DashboardPageContent() {
 
               {/* wide banner: only for themes that put a photo across the top of the category page */}
               {!cIsParent && (SITE_THEME_STYLE[toSiteTheme(store.activeThemeSlug)]?.catalogLayout || "chips") !== "banner" && (
-                <section className="mt-4 rounded-2xl border border-neutral-200 bg-white p-5">
+                <section className="mt-4 rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5">
                   <span className="block text-sm font-medium">
                     Banner for the category page <span className="font-normal text-neutral-400">(optional)</span>
                   </span>
@@ -4020,7 +4027,7 @@ function DashboardPageContent() {
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           e.target.value = "";
-                          if (file) uploadPhoto(file, 3, setCBannerUrl);
+                          if (file) uploadPhoto(file, CROP.banner, setCBannerUrl);
                         }}
                       />
                     </label>
@@ -4034,7 +4041,7 @@ function DashboardPageContent() {
               )}
 
               {/* link + visibility */}
-              <section className="mt-4 rounded-2xl border border-neutral-200 bg-white divide-y divide-neutral-100">
+              <section className="mt-4 rounded-[24px] bg-white ring-1 ring-black/[0.04] divide-y divide-neutral-100">
                 <div className="p-5">
                   <label htmlFor="cat-slug" className="block text-sm font-medium">Page link</label>
                   <div className="mt-1.5 flex h-11 items-center rounded-xl border border-neutral-300 bg-white focus-within:border-neutral-900 overflow-hidden">
@@ -4105,30 +4112,21 @@ function DashboardPageContent() {
 
               {/* Sub-navigation & add */}
               <div className="flex items-center gap-2">
-                <div className="grid flex-1 grid-cols-2 gap-1 rounded-2xl bg-neutral-100 p-1 sm:max-w-sm">
-                  {([
-                    { id: "categories", label: "Categories", count: (store.categories || []).filter((c) => !c.isParent).length },
-                    { id: "collections", label: "Collections", count: (store.categories || []).filter((c) => c.isParent).length },
-                  ] as const).map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setCategoryViewTab(t.id)}
-                      style={{ minHeight: 0 }}
-                      className={`h-10 rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-1.5 transition-all ${
-                        categoryViewTab === t.id ? "bg-white text-neutral-950 shadow-sm" : "text-neutral-500 hover:text-neutral-900"
-                      }`}
-                    >
-                      {t.label}
-                      <span className="text-xs font-medium text-neutral-400 tabular-nums">{t.count}</span>
-                    </button>
-                  ))}
-                </div>
+                <Segmented
+                  className="flex-1 sm:max-w-sm"
+                  items={[
+                    { id: "categories" as const, label: "Categories", count: (store.categories || []).filter((c) => !c.isParent).length },
+                    { id: "collections" as const, label: "Collections", count: (store.categories || []).filter((c) => c.isParent).length },
+                  ]}
+                  value={categoryViewTab}
+                  onChange={setCategoryViewTab}
+                />
                 <button
                   type="button"
                   onClick={categoryViewTab === "categories" ? openAddCategory : openAddParentCollection}
                   aria-label={categoryViewTab === "categories" ? "Add category" : "Add collection"}
-                  className="h-12 w-12 sm:w-auto sm:px-5 shrink-0 rounded-2xl bg-neutral-950 text-white text-sm font-semibold inline-flex items-center justify-center gap-2 hover:bg-black"
+                  style={{ minHeight: 0 }}
+                  className="h-11 w-11 sm:w-auto sm:px-5 shrink-0 rounded-full bg-neutral-950 text-white text-sm font-semibold inline-flex items-center justify-center gap-2 hover:bg-black"
                 >
                   <Plus className="w-5 h-5 sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">{categoryViewTab === "categories" ? "Add category" : "Add collection"}</span>
@@ -4139,7 +4137,7 @@ function DashboardPageContent() {
               {categoryViewTab === "categories" && (
                 <div className="space-y-3">
                   {(store.categories || []).filter((c) => !c.isParent).length > 0 && (
-                    <label className="flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors">
+                    <label className="flex items-center gap-2 h-11 px-4 rounded-full bg-white ring-1 ring-black/[0.05] focus-within:ring-neutral-900 transition-shadow">
                       <Search className="w-4 h-4 text-neutral-400 shrink-0" />
                       <input
                         value={catSearchQuery}
@@ -4159,7 +4157,7 @@ function DashboardPageContent() {
                       action={{ label: "Add category", onClick: openAddCategory, icon: Plus }}
                     />
                   ) : (
-                    <div className="rounded-2xl border border-neutral-200 bg-white divide-y divide-neutral-100">
+                    <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04] divide-y divide-neutral-100">
                       {(() => {
                         const visibleCats = (store.categories || [])
                           .filter((cat) => !cat.isParent)
@@ -4306,7 +4304,7 @@ function DashboardPageContent() {
                       );
                     }
                     return (
-                      <div className="rounded-2xl border border-neutral-200 bg-white divide-y divide-neutral-100">
+                      <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04] divide-y divide-neutral-100">
                         {cols.map((pCat) => {
                           const childCount = (store.categories || []).filter((c) => !c.isParent && c.parentId === pCat.id).length;
                           const live = pCat.isActive ?? true;
@@ -4407,23 +4405,22 @@ function DashboardPageContent() {
         {/* TAB 3: ORDERS */}
         {activeTab === "orders" && (() => {
           const rupees = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN")}`;
-          const STATUS: Record<string, { label: string; tone: string }> = {
-            placed: { label: "New", tone: "bg-indigo-50 text-indigo-700" },
-            confirmed: { label: "Confirmed", tone: "bg-sky-50 text-sky-700" },
-            packed: { label: "Packed", tone: "bg-violet-50 text-violet-700" },
-            shipped: { label: "Shipped", tone: "bg-amber-50 text-amber-800" },
-            delivered: { label: "Delivered", tone: "bg-emerald-50 text-emerald-700" },
-            cancelled: { label: "Cancelled", tone: "bg-rose-50 text-rose-700" },
+          const STATUS: Record<string, { label: string; tint: Tint }> = {
+            placed: { label: "New", tint: "violet" },
+            confirmed: { label: "Confirmed", tint: "blue" },
+            packed: { label: "Packed", tint: "violet" },
+            shipped: { label: "Shipped", tint: "amber" },
+            delivered: { label: "Delivered", tint: "green" },
+            cancelled: { label: "Cancelled", tint: "rose" },
           };
-          const PAYMENT: Record<string, { label: string; tone: string }> = {
-            awaiting_verification: { label: "Verify payment", tone: "bg-amber-50 text-amber-800" },
-            verified: { label: "Paid", tone: "bg-emerald-50 text-emerald-700" },
-            paid: { label: "Paid", tone: "bg-emerald-50 text-emerald-700" },
-            cod_pending: { label: "Cash on delivery", tone: "bg-neutral-100 text-neutral-700" },
-            rejected: { label: "Payment rejected", tone: "bg-rose-50 text-rose-700" },
+          const PAYMENT: Record<string, { label: string; tint: Tint }> = {
+            awaiting_verification: { label: "Verify payment", tint: "amber" },
+            verified: { label: "Paid", tint: "green" },
+            paid: { label: "Paid", tint: "green" },
+            cod_pending: { label: "Cash on delivery", tint: "grey" },
+            rejected: { label: "Payment rejected", tint: "rose" },
           };
-          const pill = (s?: { label: string; tone: string }) =>
-            s ? <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${s.tone}`}>{s.label}</span> : null;
+          const pill = (s?: { label: string; tint: Tint }) => (s ? <StatusChip label={s.label} tint={s.tint} /> : null);
           const phoneDigits = (p: string) => p.replace(/[^0-9]/g, "");
           const itemCount = (x: OrderData) => x.items.reduce((n, i) => n + i.quantity, 0);
           // Saving tracking for an order that hasn't left yet also marks it shipped
@@ -4446,38 +4443,41 @@ function DashboardPageContent() {
               ...(o.delivery ? [{ label: "Delivery", value: o.delivery }] : []),
               ...(o.codFee ? [{ label: "COD fee", value: o.codFee }] : []),
             ];
-            const card = "rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5";
+            const card = `${CARD} p-4 sm:p-5`;
             return (
               <div className="w-full min-w-0 space-y-4">
-                {/* Header */}
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedOrder(null)}
-                    aria-label="Back to orders"
-                    className="-ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900 transition-colors cursor-pointer"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-lg font-semibold tracking-tight">Order {o.number}</h2>
-                    <p className="truncate text-xs text-neutral-500">
-                      {new Date(o.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
-                    </p>
+                {/* Header: one dark block with the order, its total and where it stands */}
+                <div className="hero-rise rounded-[28px] bg-neutral-950 p-5 text-white sm:p-6">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOrder(null)}
+                      aria-label="Back to orders"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 cursor-pointer !min-h-0"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate text-base font-semibold tracking-tight">Order {o.number}</h2>
+                      <p className="truncate text-xs text-white/55">
+                        {new Date(o.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                      </p>
+                    </div>
                   </div>
-                  <span className="shrink-0 text-lg font-semibold tabular-nums">{rupees(o.total)}</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
+                  <p className="mt-5 text-[13px] text-white/60">Order total</p>
+                  <p className="mt-0.5 text-[34px] font-semibold leading-none tracking-tight tabular-nums">{rupees(o.total)}</p>
+                <div className="mt-4 flex flex-wrap gap-1.5">
                   {pill(STATUS[o.fulfilmentStatus])}
                   {pill(PAYMENT[o.paymentStatus])}
-                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-neutral-600">{o.paymentMethod === "cashfree" || o.paymentMethod === "razorpay" ? "online" : o.paymentMethod}</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold uppercase text-white/80">{o.paymentMethod === "cashfree" || o.paymentMethod === "razorpay" ? "online" : o.paymentMethod}</span>
+                </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
                   <div className="min-w-0 space-y-4 lg:col-span-7">
                     {/* Progress */}
                     <div className={card}>
-                      <h3 className="flex items-center gap-2 text-sm font-semibold"><SectionIcon section="orders" icon={IActivity} size="sm" />Progress</h3>
+                      <h3 className="flex items-center gap-2.5 text-[15px] font-semibold"><SectionIcon section="orders" icon={IActivity} size="sm" />Progress</h3>
                       <p className="mt-0.5 text-xs text-neutral-500">Tap a step to update the buyer&apos;s tracking page.</p>
                       <div className="mt-4 grid grid-cols-4 gap-1">
                         {steps.map((s, i) => {
@@ -4513,7 +4513,7 @@ function DashboardPageContent() {
 
                     {/* Items */}
                     <div className={card}>
-                      <h3 className="flex items-center gap-2 text-sm font-semibold"><SectionIcon section="themes" icon={IProducts} size="sm" />Items ({itemCount(o)})</h3>
+                      <h3 className="flex items-center gap-2.5 text-[15px] font-semibold"><SectionIcon section="themes" icon={IProducts} size="sm" />Items ({itemCount(o)})</h3>
                       <ul className="mt-2 divide-y divide-neutral-100">
                         {o.items.map((item, idx) => (
                           <li key={idx} className="flex items-center gap-3 py-3">
@@ -4553,7 +4553,7 @@ function DashboardPageContent() {
                     {/* Shipping: courier, Shiprocket, WhatsApp updates and invoice sit in the wide column */}
                     {/* Tracking */}
                     <div className={card}>
-                      <h3 className="flex items-center gap-2 text-sm font-semibold"><SectionIcon section="products" icon={ITruck} size="sm" />Courier & tracking</h3>
+                      <h3 className="flex items-center gap-2.5 text-[15px] font-semibold"><SectionIcon section="products" icon={ITruck} size="sm" />Courier & tracking</h3>
                       <div className="mt-3 space-y-2">
                         <Input
                           placeholder="Courier (e.g. Delhivery)"
@@ -4600,21 +4600,21 @@ function DashboardPageContent() {
                     <OrderActions store={store} order={o} onChange={(next) => (setSelectedOrder(next), refreshStore())} />
                     {/* Customer */}
                     <div className={card}>
-                      <h3 className="flex items-center gap-2 text-sm font-semibold"><SectionIcon section="customers" icon={ICustomers} size="sm" />Customer</h3>
+                      <h3 className="flex items-center gap-2.5 text-[15px] font-semibold"><SectionIcon section="customers" icon={ICustomers} size="sm" />Customer</h3>
                       <div className="mt-3 flex items-center gap-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-sm font-semibold uppercase text-neutral-700">
-                          {o.customer.name.charAt(0) || "?"}
-                        </span>
+                        <Avatar name={o.customer.name} />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">{o.customer.name}</p>
                           <p className="truncate text-xs text-neutral-500">{o.customer.phone}</p>
+                          {o.customer.altPhone && <p className="truncate text-xs text-neutral-500">Also: {o.customer.altPhone}</p>}
                           {o.customer.email && <p className="truncate text-xs text-neutral-500">{o.customer.email}</p>}
+                          {o.marketingOptIn && <span className="mt-1 inline-block"><StatusChip label="Agreed to offers" tint="green" /></span>}
                         </div>
                       </div>
                       <div className="mt-3 flex gap-2 rounded-xl bg-neutral-50 p-3 text-xs text-neutral-700">
                         <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" />
                         <span className="min-w-0 break-words">
-                          {[o.address.street, o.address.city, o.address.state, o.address.pincode].filter(Boolean).join(", ")}
+                          {[o.address.street, o.address.landmark ? `near ${o.address.landmark}` : "", o.address.city, o.address.state, o.address.pincode].filter(Boolean).join(", ")}
                         </span>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -4638,7 +4638,7 @@ function DashboardPageContent() {
                     {/* Payment */}
                     <div className={card}>
                       <div className="flex items-center justify-between gap-2">
-                        <h3 className="flex items-center gap-2 text-sm font-semibold"><SectionIcon section="reviews" icon={ICard} size="sm" />Payment</h3>
+                        <h3 className="flex items-center gap-2.5 text-[15px] font-semibold"><SectionIcon section="reviews" icon={ICard} size="sm" />Payment</h3>
                         {pill(PAYMENT[o.paymentStatus])}
                       </div>
                       <dl className="mt-3 space-y-1.5 text-sm">
@@ -4697,7 +4697,6 @@ function DashboardPageContent() {
                 const online = os.filter((x) => x.paymentMethod === "razorpay" || x.paymentMethod === "cashfree").length;
                 return (
                   <StatStrip
-                    phone={0}
                     stats={[
                       { label: "Sales", value: `₹${Math.round(sales / 100).toLocaleString("en-IN")}`, icon: IRupee, section: "orders", spark: dailyCounts(os, (x) => x.createdAt, 14, (x) => x.total), hint: "last 14 days in the chart" },
                       { label: "To ship", value: filters[1].count ?? 0, icon: ITruck, section: "reviews", hint: (filters[1].count ?? 0) ? "Pack these next" : "All caught up" },
@@ -4708,48 +4707,16 @@ function DashboardPageContent() {
                 );
               })()}
 
-              {/* phones: four tabs on one line (label and count side by side); abandoned checkouts sit in the page header */}
-              <div className="grid grid-cols-4 gap-1 rounded-xl bg-neutral-100 p-1 md:hidden">
-                {filters.slice(0, 4).map((f) => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setOrderFilter(f.id)}
-                    aria-pressed={orderFilter === f.id}
-                    className={`flex h-9 min-w-0 items-center justify-center gap-1 rounded-lg px-1 text-[12.5px] font-medium transition-all !min-h-0 ${
-                      orderFilter === f.id ? "bg-white text-neutral-950 shadow-sm" : "text-neutral-500"
-                    }`}
-                  >
-                    <span className="truncate">{f.label}</span>
-                    <span className={`shrink-0 tabular-nums ${orderFilter === f.id ? "text-neutral-400" : "text-neutral-400"}`}>{f.count ?? ""}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Filter: equal segments, always fits the screen */}
-              <div className="hidden grid-cols-5 gap-1 rounded-2xl bg-neutral-100 p-1 md:grid">
-                {filters.map((f) => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setOrderFilter(f.id)}
-                    aria-pressed={orderFilter === f.id}
-                    className={`flex min-w-0 flex-col items-center rounded-xl px-1 py-2 transition-all !min-h-0 ${
-                      orderFilter === f.id ? "bg-white text-neutral-950 shadow-sm" : "text-neutral-500 hover:text-neutral-800"
-                    }`}
-                  >
-                    <span className="text-base font-semibold tabular-nums leading-tight">{f.count ?? "–"}</span>
-                    <span className="w-full truncate text-center text-[11px]">{f.label}</span>
-                  </button>
-                ))}
-              </div>
+              {/* filters: four on phones (abandoned checkouts sit in the page header), all five on computers */}
+              <Segmented items={filters.slice(0, 4)} value={orderFilter} onChange={setOrderFilter} className="md:hidden" />
+              <Segmented items={filters} value={orderFilter} onChange={setOrderFilter} className="hidden md:flex" />
 
               {orderFilter === "abandoned" ? (
                 <div key="abandoned" className="swap-enter">
                   {planHas(store.planId, "abandonedCart") ? (
                     <AbandonedCheckouts store={store} onCount={setAbandonedCount} />
                   ) : (
-                    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+                    <div className={`flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6 ${CARD}`}>
                       <div className="min-w-0">
                         <p className="text-base font-semibold">Win back unfinished checkouts</p>
                         <p className="mt-0.5 text-sm text-neutral-500">See who left before paying and remind them on WhatsApp. Part of Growth.</p>
@@ -4761,8 +4728,8 @@ function DashboardPageContent() {
                   )}
                 </div>
               ) : store.orders.length === 0 ? (
-                <div className="rounded-2xl border border-neutral-200 bg-white px-5 py-12 text-center">
-                  <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-700">
+                <div className={`px-5 py-12 text-center ${CARD}`}>
+                  <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
                     <ShoppingBag className="h-6 w-6" />
                   </span>
                   <p className="mt-4 text-base font-semibold">No orders yet</p>
@@ -4789,11 +4756,11 @@ function DashboardPageContent() {
                   </div>
                 </div>
               ) : list.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-neutral-300 bg-white px-5 py-12 text-center text-sm text-neutral-500">
+                <div className={`px-5 py-12 text-center text-sm text-neutral-500 ${CARD}`}>
                   No orders in this view.
                 </div>
               ) : (
-                <ul className="overflow-hidden rounded-2xl border border-neutral-200 bg-white divide-y divide-neutral-100">
+                <ul className="grid gap-2.5 xl:grid-cols-2">
                   {list.map((order) => (
                     <li key={order.id}>
                       <button
@@ -4803,25 +4770,28 @@ function DashboardPageContent() {
                           setTrackingNumberInput(order.trackingNumber || "");
                           setSelectedOrder(order);
                         }}
-                        className="flex w-full min-w-0 items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-neutral-50 active:bg-neutral-100 !min-h-0"
+                        className={`w-full min-w-0 p-4 text-left transition-shadow hover:shadow-[0_12px_30px_-22px_rgba(0,0,0,0.35)] active:scale-[0.995] !min-h-0 ${CARD}`}
                       >
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-sm font-semibold uppercase text-neutral-700">
-                          {order.customer.name.charAt(0) || "?"}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex min-w-0 items-center gap-2">
-                            <span className="truncate text-sm font-semibold">{order.customer.name}</span>
-                            {pill(STATUS[order.fulfilmentStatus])}
+                        <span className="flex min-w-0 items-center gap-3">
+                          <Avatar name={order.customer.name} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[15px] font-semibold">{order.customer.name}</span>
+                            <span className="block truncate text-xs text-neutral-500">
+                              {order.number} · {itemCount(order)} item{itemCount(order) === 1 ? "" : "s"}
+                            </span>
                           </span>
-                          <span className="block truncate text-xs text-neutral-500">
-                            {order.number} · {new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · {itemCount(order)} item{itemCount(order) === 1 ? "" : "s"}
+                          {pill(STATUS[order.fulfilmentStatus])}
+                        </span>
+                        <span className="mt-3 flex items-center justify-between gap-3 border-t border-neutral-100 pt-3 text-xs text-neutral-500">
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">
+                              {new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} ·{" "}
+                              {order.paymentMethod === "cashfree" || order.paymentMethod === "razorpay" ? "Paid online" : order.paymentMethod === "cod" ? "Cash on delivery" : order.paymentMethod.toUpperCase()}
+                            </span>
                           </span>
+                          <span className="shrink-0 text-[15px] font-semibold tabular-nums text-neutral-950">{rupees(order.total)}</span>
                         </span>
-                        <span className="flex shrink-0 flex-col items-end">
-                          <span className="text-sm font-semibold tabular-nums">{rupees(order.total)}</span>
-                          <span className="text-[10px] font-semibold uppercase text-neutral-400">{order.paymentMethod === "cashfree" || order.paymentMethod === "razorpay" ? "online" : order.paymentMethod}</span>
-                        </span>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-neutral-300" />
                       </button>
                     </li>
                   ))}
@@ -4865,12 +4835,12 @@ function DashboardPageContent() {
           isDiscountModalOpen ? (
             <div className="mt-6 space-y-6 animate-enter-scale">
               {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl bg-white border border-neutral-200 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-[24px] bg-white ring-1 ring-black/[0.04]">
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
                     onClick={() => setIsDiscountModalOpen(false)}
-                    className="-ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900 transition-colors cursor-pointer"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700 hover:bg-neutral-200 hover:text-neutral-950 transition-colors cursor-pointer !min-h-0"
                     title="Back to Discounts"
                   >
                     <ChevronLeft className="w-4 h-4" />
@@ -4908,7 +4878,7 @@ function DashboardPageContent() {
               {/* Form Grid */}
               <form onSubmit={handleCreateDiscount} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <div className="lg:col-span-7 space-y-6">
-                  <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-4 text-xs">
+                  <div className="p-6 rounded-[24px] bg-white ring-1 ring-black/[0.04] space-y-4 text-xs">
                     <h3 className="flex items-center gap-2 border-b border-neutral-100 pb-3 text-sm font-semibold text-neutral-900"><SectionIcon section="discounts" icon={IDiscounts} size="sm" /> Coupon details</h3>
 
                     <div>
@@ -4997,7 +4967,7 @@ function DashboardPageContent() {
 
                 <div className="lg:col-span-5 space-y-6">
                   {/* Live Coupon Badge Preview */}
-                  <div className="p-6 rounded-xl bg-white border border-neutral-200 shadow-xs space-y-4 text-xs">
+                  <div className="p-6 rounded-[24px] bg-white ring-1 ring-black/[0.04] space-y-4 text-xs">
                     <h3 className="flex items-center gap-2 border-b border-neutral-100 pb-3 text-sm font-semibold text-neutral-900"><SectionIcon section="customers" icon={IEye} size="sm" /> What buyers will see</h3>
                     <p className="text-neutral-500 text-[11px]">How buyers will see this discount tag at checkout:</p>
 
@@ -5091,22 +5061,20 @@ function DashboardPageContent() {
                       </div>
                     ) : (
                       <>
-                        <div className="flex justify-end">
-                          <button
-                            type="button"
-                            data-tour="add-coupon"
-                            onClick={() => openNew()}
-                            className="h-11 px-5 rounded-xl bg-neutral-950 text-white text-sm font-semibold inline-flex items-center gap-2 hover:bg-black"
-                          >
-                            <Plus className="w-4 h-4" />
-                            New coupon
-                          </button>
+                        <div data-tour="add-coupon">
+                          <ActionTiles
+                            items={[
+                              { label: "New coupon", icon: Plus, tint: "rose", onClick: () => openNew() },
+                              { label: "10% welcome code", icon: Percent, tint: "violet", onClick: () => openNew({ code: "WELCOME10", type: "percentage", value: "10", min: "500" }) },
+                              { label: "₹100 off code", icon: Tag, tint: "green", onClick: () => openNew({ code: "FLAT100", type: "flat", value: "100", min: "999" }) },
+                            ]}
+                          />
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                           {all.map((discount) => (
                             <div
                               key={discount.id}
-                              className={`relative flex overflow-hidden rounded-2xl border bg-white transition-opacity ${discount.isActive ? "border-neutral-200" : "border-neutral-200 opacity-70"}`}
+                              className={`relative flex overflow-hidden transition-opacity ${CARD} ${discount.isActive ? "" : "opacity-70"}`}
                             >
                               {/* value stub */}
                               <div className={`w-28 shrink-0 flex flex-col items-center justify-center text-center px-2 py-4 ${discount.isActive ? "bg-neutral-950 text-white" : "bg-neutral-200 text-neutral-600"}`}>
@@ -5206,29 +5174,16 @@ function DashboardPageContent() {
                 );
               return (
                 <>
-                  {/* phones: a slim row of chips; tablets and computers: three numbers in one card */}
-                  <StatChips
-                    items={[
-                      { label: "Customers", value: all.length },
-                      { label: "Came back", value: repeatCount, tone: "text-violet-700" },
-                      { label: "This month", value: recentCount, tone: "text-emerald-700" },
+                  <StatStrip
+                    stats={[
+                      { label: "Customers", value: all.length, icon: ICustomers, section: "customers", hint: `${all.reduce((n, c) => n + c.totalOrders, 0)} orders between them` },
+                      { label: "Came back", value: repeatCount, icon: IRepeat, section: "customers", progress: all.length ? repeatCount / all.length : 0 },
+                      { label: "This month", value: recentCount, icon: ITrend, section: "customers", hint: "ordered in the last 30 days" },
                     ]}
                   />
-                  <div className="hidden grid-cols-3 divide-x divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200 bg-white md:grid">
-                    {[
-                      { label: "Customers", value: all.length, tone: "text-neutral-950" },
-                      { label: "Came back", value: repeatCount, tone: "text-violet-700" },
-                      { label: "This month", value: recentCount, tone: "text-emerald-700" },
-                    ].map((s) => (
-                      <div key={s.label} className="min-w-0 px-3 py-3 sm:px-5 sm:py-4">
-                        <p className="truncate text-[11px] font-medium text-neutral-500 sm:text-xs">{s.label}</p>
-                        <p className={`mt-0.5 text-lg font-semibold tabular-nums sm:text-xl ${s.tone}`}>{s.value}</p>
-                      </div>
-                    ))}
-                  </div>
 
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <label className="flex h-11 flex-1 items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3.5 transition-colors focus-within:border-neutral-900">
+                    <label className="flex h-11 flex-1 items-center gap-2 rounded-full bg-white px-4 ring-1 ring-black/[0.05] transition-shadow focus-within:ring-neutral-900">
                       <Search className="h-4 w-4 shrink-0 text-neutral-400" />
                       <input value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} placeholder="Search name, phone or email" className="w-full bg-transparent text-sm outline-none" />
                       {customerSearch && (
@@ -5238,30 +5193,21 @@ function DashboardPageContent() {
                       )}
                     </label>
                     <div className="flex items-center gap-2">
-                      <div className="grid flex-1 grid-cols-3 rounded-xl bg-neutral-100 p-1 text-sm sm:inline-flex sm:flex-none">
-                        {(
-                          [
-                            ["all", "All"],
-                            ["repeat", "Repeat"],
-                            ["new", "New"],
-                          ] as const
-                        ).map(([id, label]) => (
-                          <button
-                            key={id}
-                            type="button"
-                            onClick={() => setCustomerFilter(id)}
-                            style={{ minHeight: 0 }}
-                            className={`h-9 rounded-lg px-3 font-medium transition-colors ${customerFilter === id ? "bg-white text-neutral-950 shadow-sm" : "text-neutral-500 hover:text-neutral-900"}`}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
+                      <Segmented
+                        className="flex-1 sm:w-64 sm:flex-none"
+                        items={[
+                          { id: "all" as const, label: "All", count: all.length },
+                          { id: "repeat" as const, label: "Repeat", count: repeatCount },
+                          { id: "new" as const, label: "New", count: all.length - repeatCount },
+                        ]}
+                        value={customerFilter}
+                        onChange={setCustomerFilter}
+                      />
                       <select
                         value={customerSort}
                         onChange={(e) => setCustomerSort(e.target.value as "recent" | "orders" | "spent")}
                         aria-label="Sort customers"
-                        className="h-11 w-36 shrink-0 rounded-xl border border-neutral-200 bg-white px-3 text-sm font-medium outline-none focus:border-neutral-900"
+                        className="h-11 w-36 shrink-0 rounded-full bg-white px-4 text-sm font-medium outline-none ring-1 ring-black/[0.05] focus:ring-neutral-900"
                       >
                         <option value="recent">Latest first</option>
                         <option value="orders">Most orders</option>
@@ -5271,9 +5217,9 @@ function DashboardPageContent() {
                   </div>
 
                   {list.length === 0 ? (
-                    <p className="rounded-2xl border border-dashed border-neutral-200 bg-white px-6 py-12 text-center text-sm text-neutral-500">No customers here{customerSearch ? ` for “${customerSearch}”` : ""}.</p>
+                    <p className={`px-6 py-12 text-center text-sm text-neutral-500 ${CARD}`}>No customers here{customerSearch ? ` for “${customerSearch}”` : ""}.</p>
                   ) : (
-                    <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+                    <div className={`overflow-hidden ${CARD}`}>
                       {/* column titles (computers) */}
                       <div className="hidden grid-cols-[minmax(0,2fr)_minmax(0,1.6fr)_90px_110px_110px_76px] items-center gap-4 border-b border-neutral-100 bg-neutral-50/70 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 md:grid">
                         <span>Customer</span>
@@ -5293,11 +5239,12 @@ function DashboardPageContent() {
                               className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 px-4 py-3 transition-colors hover:bg-neutral-50/70 md:grid-cols-[minmax(0,2fr)_minmax(0,1.6fr)_90px_110px_110px_76px] md:gap-4 md:px-5"
                             >
                               <div className="flex min-w-0 items-center gap-3">
-                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-950 text-[12px] font-semibold text-white">{initials(cust.name)}</span>
+                                <Avatar name={cust.name} />
                                 <span className="min-w-0">
                                   <span className="flex items-center gap-1.5">
                                     <span className="truncate text-sm font-semibold">{cust.name}</span>
-                                    {!isNew(cust) && <span className="shrink-0 rounded-full bg-violet-50 px-1.5 py-px text-[10px] font-semibold text-violet-700">Repeat</span>}
+                                    {!isNew(cust) && <StatusChip label="Repeat" tint="violet" />}
+                                    {cust.marketingOptIn && <StatusChip label="Offers OK" tint="green" />}
                                   </span>
                                   {/* phones: one quiet line under the name */}
                                   <span className="mt-0.5 block truncate text-xs text-neutral-500 md:hidden">
@@ -5451,7 +5398,7 @@ function DashboardPageContent() {
 
 
               {/* live theme */}
-              <section className="overflow-hidden rounded-3xl border border-neutral-200 bg-white">
+              <section className="overflow-hidden rounded-[28px] bg-white ring-1 ring-black/[0.04]">
                 <div className="grid md:grid-cols-[1.35fr_1fr]">
                   <a href={liveStoreUrl} target="_blank" rel="noreferrer" className="group relative block aspect-[16/10] overflow-hidden bg-neutral-100 md:aspect-auto md:min-h-[300px]" aria-label="Open your live shop">
                     {/* your real shop, as buyers see it right now */}
@@ -5500,7 +5447,7 @@ function DashboardPageContent() {
                 <section>
                   <h3 className="text-sm font-semibold text-neutral-950">Your other themes</h3>
                   <p className="mt-0.5 text-xs text-neutral-500">Themes you&apos;ve edited or used. Buyers only see your live theme.</p>
-                  <div className="mt-3 divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+                  <div className="mt-3 divide-y divide-neutral-100 overflow-hidden rounded-[24px] bg-white ring-1 ring-black/[0.04]">
                     {mine.map((t) => {
                       const usable = canUseTheme(store, t.slug);
                       const status = ownsTheme(store, t.slug) ? "Owned" : store.themeContent?.[t.slug] !== undefined ? "Edited" : "With your plan";
@@ -5557,7 +5504,7 @@ function DashboardPageContent() {
                 {/* one theme per row: a wide landscape preview, then name, description and actions */}
                 <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
                   {picks.map((t) => (
-                    <div key={t.slug} className="group flex flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+                    <div key={t.slug} className="group flex flex-col overflow-hidden rounded-[24px] bg-white ring-1 ring-black/[0.04]">
                       <a href={previewHref(t.slug)} className="relative block aspect-[16/9] overflow-hidden bg-neutral-100" aria-label={`Preview ${t.name}`}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={themeThumb(t)} alt="" className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.03]" />
@@ -5743,7 +5690,7 @@ function DashboardPageContent() {
               )}
 
               {/* your subscription */}
-              <div className="rounded-2xl border border-neutral-200 bg-white">
+              <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04]">
                 <div className="flex items-start justify-between gap-4 p-5 sm:p-6">
                   <div className="min-w-0">
                     <p className="text-xs text-neutral-500">Current plan</p>
@@ -5788,7 +5735,7 @@ function DashboardPageContent() {
                     <dd className="mt-0.5 font-medium tabular-nums">{unlimited ? `${used} · no limit` : `${used} of ${limit}`}</dd>
                     {!unlimited && (
                       <div className="mt-1.5 h-1 rounded-full bg-neutral-100 overflow-hidden">
-                        <div className={`h-full rounded-full ${pct >= 90 ? "bg-amber-500" : "bg-indigo-500"}`} style={{ width: `${Math.max(2, pct)}%` }} />
+                        <div className={`h-full rounded-full ${pct >= 90 ? "bg-amber-500" : "bg-neutral-950"}`} style={{ width: `${Math.max(2, pct)}%` }} />
                       </div>
                     )}
                   </div>
@@ -5858,7 +5805,7 @@ function DashboardPageContent() {
               />
 
               {/* payment history */}
-              <div className="rounded-2xl border border-neutral-200 bg-white">
+              <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04]">
                 <div className="px-5 pt-5 sm:px-6">
                   <h3 className="text-base font-semibold">Payment history</h3>
                 </div>
@@ -5949,7 +5896,7 @@ function DashboardPageContent() {
             </div>
 
             {/* Logo */}
-            <div className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+            <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 sm:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-base font-semibold">Store logo</h3>
@@ -5994,7 +5941,7 @@ function DashboardPageContent() {
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     e.target.value = "";
-                    if (file) uploadPhoto(file, undefined, setLogoUrlInput);
+                    if (file) uploadPhoto(file, CROP.logo, setLogoUrlInput);
                   }}
                 />
                 <span className="w-10 h-10 rounded-xl bg-neutral-100 flex items-center justify-center shrink-0">
@@ -6011,7 +5958,7 @@ function DashboardPageContent() {
                 or use an image link
                 <span className="h-px flex-1 bg-neutral-200" />
               </div>
-              <label className="mt-3 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors">
+              <label className="mt-3 flex items-center gap-2 h-11 px-4 rounded-full bg-white ring-1 ring-black/[0.05] focus-within:ring-neutral-900 transition-shadow">
                 <Globe className="w-4 h-4 text-neutral-400 shrink-0" />
                 <input
                   value={logoUrlInput.startsWith("data:") ? "" : logoUrlInput}
@@ -6045,10 +5992,10 @@ function DashboardPageContent() {
             </div>
 
             {/* Announcement bar */}
-            <form onSubmit={handleSaveSettings} className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+            <form onSubmit={handleSaveSettings} className="rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 sm:p-6">
               <h3 className="text-base font-semibold">Top bar message</h3>
               <p className="mt-0.5 text-sm text-neutral-500">One short line shown above your store, like an offer. Leave empty to hide it.</p>
-              <label className="mt-4 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors">
+              <label className="mt-4 flex items-center gap-2 h-11 px-4 rounded-full bg-white ring-1 ring-black/[0.05] focus-within:ring-neutral-900 transition-shadow">
                 <Bell className="w-4 h-4 text-neutral-400 shrink-0" />
                 <input
                   value={announcementInput}
@@ -6094,7 +6041,7 @@ function DashboardPageContent() {
             )}
 
             {/* Cash on delivery */}
-            <form onSubmit={handleSaveSettings} className="rounded-2xl border border-neutral-200 bg-white">
+            <form onSubmit={handleSaveSettings} className="rounded-[24px] bg-white ring-1 ring-black/[0.04]">
               <div className="p-5 sm:p-6">
                 <h3 className="text-base font-semibold">Cash on delivery</h3>
 
@@ -6128,7 +6075,7 @@ function DashboardPageContent() {
                   <div className="mt-4 reveal-in">
                     <label htmlFor="settings-cod-fee" className="block text-sm font-medium">Extra charge for cash on delivery</label>
                     <span className="mt-0.5 block text-xs text-neutral-500">Optional. Leave 0 for no extra charge.</span>
-                    <label className="mt-1.5 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors sm:max-w-[200px]">
+                    <label className="mt-1.5 flex items-center gap-2 h-11 px-4 rounded-full bg-white ring-1 ring-black/[0.05] focus-within:ring-neutral-900 transition-shadow sm:max-w-[200px]">
                       <span className="text-sm text-neutral-400">₹</span>
                       <input
                         id="settings-cod-fee"
@@ -6152,7 +6099,7 @@ function DashboardPageContent() {
             )}
 
             {settingsSection === "delivery" && (
-            <form onSubmit={handleSaveSettings} className="rounded-2xl border border-neutral-200 bg-white">
+            <form onSubmit={handleSaveSettings} className="rounded-[24px] bg-white ring-1 ring-black/[0.04]">
               <div className="p-5 sm:p-6">
                 <h3 className="text-base font-semibold">Delivery charges</h3>
                 <p className="mt-0.5 text-sm text-neutral-500">How much buyers pay for delivery. It&apos;s added at checkout.</p>
@@ -6189,7 +6136,7 @@ function DashboardPageContent() {
                   <div className="mt-4 grid gap-4 sm:grid-cols-2 reveal-in">
                     <div>
                       <label htmlFor="settings-delivery-fee" className="block text-sm font-medium">Delivery charge</label>
-                      <label className="mt-1.5 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors">
+                      <label className="mt-1.5 flex items-center gap-2 h-11 px-4 rounded-full bg-white ring-1 ring-black/[0.05] focus-within:ring-neutral-900 transition-shadow">
                         <span className="text-sm text-neutral-400">₹</span>
                         <input
                           id="settings-delivery-fee"
@@ -6204,7 +6151,7 @@ function DashboardPageContent() {
                     {deliveryMode === "free_above" && (
                       <div className="reveal-in">
                         <label htmlFor="settings-free-above" className="block text-sm font-medium">Free when the order is</label>
-                        <label className="mt-1.5 flex items-center gap-2 h-11 px-3.5 rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-900 transition-colors">
+                        <label className="mt-1.5 flex items-center gap-2 h-11 px-4 rounded-full bg-white ring-1 ring-black/[0.05] focus-within:ring-neutral-900 transition-shadow">
                           <span className="text-sm text-neutral-400">₹</span>
                           <input
                             id="settings-free-above"

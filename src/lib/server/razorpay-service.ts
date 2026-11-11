@@ -6,7 +6,7 @@ import type { OrderData, StoreData } from "../store-service";
 import { ApiError } from "./api-error";
 import { isShopClosed } from "../policies";
 import { storeHas } from "./plan-access";
-import { buyerProblem } from "../checkout-rules";
+import { buyerProblem, detailsProblem } from "../checkout-rules";
 import { notifySellerOfOrder } from "./order-alerts";
 import { adminDb } from "./firebase-admin";
 import { readStore, readStoreTx, writeStoreTx } from "./store-data";
@@ -195,8 +195,9 @@ export interface CreateRazorpayPaymentInput {
   subdomain: string;
   items: BagItemInput[];
   couponCode?: string;
-  customer: { name: string; phone: string; email?: string };
-  address: { street: string; city: string; state: string; pincode: string };
+  customer: { name: string; phone: string; email?: string; altPhone?: string };
+  address: { street: string; landmark?: string; city: string; state: string; pincode: string };
+  marketingOptIn?: boolean;
   notes?: string;
   returnBase: string;
   /** the signed-in buyer's account id, when there is one (from a verified token) */
@@ -218,6 +219,8 @@ export async function createRazorpayPayment(
   if (account.mode === "test" && !(await isOwner(store))) throw new ApiError(409, "Online payment isn't available for this shop right now.");
   const buyerIssue = buyerProblem(store, { email: input.customer.email, signedIn: !!input.buyerUid });
   if (buyerIssue) throw new ApiError(400, buyerIssue);
+  const detailsIssue = detailsProblem(store, { landmark: input.address.landmark, altPhone: input.customer.altPhone, phone: input.customer.phone });
+  if (detailsIssue) throw new ApiError(400, detailsIssue);
 
   let quote;
   try {
@@ -253,9 +256,15 @@ export async function createRazorpayPayment(
     id: orderId,
     storeId: store.id,
     token,
-    customer: { name: input.customer.name, phone, ...(input.customer.email ? { email: input.customer.email } : {}) },
+    customer: {
+      name: input.customer.name,
+      phone,
+      ...(input.customer.email ? { email: input.customer.email } : {}),
+      ...(input.customer.altPhone ? { altPhone: input.customer.altPhone } : {}),
+    },
     ...(input.buyerUid ? { customerUid: input.buyerUid } : {}),
-    address: input.address,
+    address: { street: input.address.street, ...(input.address.landmark ? { landmark: input.address.landmark } : {}), city: input.address.city, state: input.address.state, pincode: input.address.pincode },
+    ...(input.marketingOptIn ? { marketingOptIn: true } : {}),
     items: quote.items,
     subtotal: quote.subtotal,
     discount: quote.discount,

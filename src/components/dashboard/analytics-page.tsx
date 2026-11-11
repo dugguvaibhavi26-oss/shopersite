@@ -26,9 +26,9 @@ const STATUS: { id: OrderData["fulfilmentStatus"]; label: string; color: string 
   { id: "delivered", label: "Delivered", color: "#10b981" },
   { id: "cancelled", label: "Cancelled", color: "#f43f5e" },
 ];
-/** one accent family (indigo), darkest first, so colour adds meaning without taking over */
-const ACCENT = "#4f46e5";
-const PALETTE = ["#4f46e5", "#6366f1", "#818cf8", "#a5b4fc", "#c7d2fe", "#e0e7ff"];
+/** black and greys first, with two soft colours last, so colour adds meaning without taking over */
+const ACCENT = "#171717";
+const PALETTE = ["#171717", "#525252", "#a3a3a3", "#d4d4d4", "#a7f3d0", "#fde68a"];
 
 type Range = 7 | 30 | 90 | 365 | 0;
 const RANGES: { id: Range; label: string }[] = [
@@ -180,7 +180,7 @@ function Columns({ cols, highlight }: { cols: { label: string; value: number }[]
 
 /* ------------------------------ page ------------------------------ */
 
-const card = "rounded-[22px] border border-black/[0.05] bg-white p-5 sm:p-6";
+const card = "rounded-[24px] bg-white p-5 ring-1 ring-black/[0.04] sm:p-6";
 const title = "text-sm font-semibold";
 
 export function AnalyticsPage({ store }: { store: StoreData }) {
@@ -358,14 +358,14 @@ export function AnalyticsPage({ store }: { store: StoreData }) {
     <div className="space-y-4">
       {/* period */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-full bg-white p-1 text-sm shadow-[0_0_0_1px_rgba(0,0,0,0.06)]">
+        <div className="inline-flex rounded-full bg-white p-1 text-sm ring-1 ring-black/[0.05]">
           {RANGES.map((r) => (
-            <button key={r.id} type="button" onClick={() => setRange(r.id)} style={{ minHeight: 0 }} className={`h-8 rounded-full px-3.5 font-medium transition-colors ${range === r.id ? "bg-indigo-600 text-white" : "text-neutral-500 hover:text-neutral-900"}`}>
+            <button key={r.id} type="button" onClick={() => setRange(r.id)} style={{ minHeight: 0 }} className={`h-8 rounded-full px-3.5 font-medium transition-colors ${range === r.id ? "bg-neutral-950 text-white" : "text-neutral-500 hover:text-neutral-900"}`}>
               {r.label}
             </button>
           ))}
         </div>
-        <button type="button" onClick={downloadCsv} disabled={!a.cur.length} style={{ minHeight: 0 }} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3.5 text-sm font-medium hover:border-neutral-900 disabled:opacity-40">
+        <button type="button" onClick={downloadCsv} disabled={!a.cur.length} style={{ minHeight: 0 }} className="inline-flex h-10 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-medium ring-1 ring-black/[0.05] hover:ring-neutral-900 disabled:opacity-40">
           <Download className="h-4 w-4" /> Download orders (CSV)
         </button>
       </div>
@@ -373,14 +373,14 @@ export function AnalyticsPage({ store }: { store: StoreData }) {
       {/* KPIs */}
       <div className="m-stagger grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {a.kpis.map((k, i) => (
-          <div key={k.label} className={`rounded-[20px] border p-4 ${i === 0 ? "border-indigo-100 bg-gradient-to-br from-indigo-50 to-white" : "border-black/[0.05] bg-white"}`}>
-            <p className={`flex items-center gap-1.5 text-xs ${i === 0 ? "font-medium text-indigo-700" : "text-neutral-500"}`}>
+          <div key={k.label} className={`rounded-[24px] p-4 ${i === 0 ? "col-span-2 bg-neutral-950 text-white md:col-span-1" : "bg-white ring-1 ring-black/[0.04]"}`}>
+            <p className={`flex items-center gap-1.5 text-xs ${i === 0 ? "font-medium text-white/60" : "text-neutral-500"}`}>
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: PALETTE[Math.min(i, 3)] }} />
               {k.label}
             </p>
             <p className="mt-1 text-[22px] font-semibold tracking-tight tabular-nums">{k.value}</p>
             {k.change !== null && (
-              <p className={`mt-0.5 text-xs font-medium ${k.change >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+              <p className={`mt-0.5 text-xs font-medium ${k.change >= 0 ? (i === 0 ? "text-lime-200" : "text-emerald-600") : i === 0 ? "text-rose-300" : "text-rose-500"}`}>
                 {k.change >= 0 ? "▲" : "▼"} {Math.abs(Math.round(k.change * 100))}% <span className="font-normal text-neutral-400">vs before</span>
               </p>
             )}

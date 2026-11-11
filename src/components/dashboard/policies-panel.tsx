@@ -58,7 +58,7 @@ export function PoliciesPanel({ store, onSaved }: { store: StoreData; onSaved: (
       </div>
 
       {/* what buyers can do themselves */}
-      <section className="rounded-2xl border border-neutral-200 bg-white p-5">
+      <section className="rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5">
         <h3 className="text-sm font-semibold text-neutral-900">Cancellations &amp; returns</h3>
         <p className="mt-1 text-xs text-neutral-500">Let buyers send requests from their order page.</p>
         <div className="mt-4 space-y-3">
@@ -100,7 +100,7 @@ export function PoliciesPanel({ store, onSaved }: { store: StoreData; onSaved: (
           const isOpen = open === id;
           const changed = plain(drafts[id]).trim() !== (saved?.body || "").trim();
           return (
-            <section key={id} className="rounded-2xl border border-neutral-200 bg-white">
+            <section key={id} className="rounded-[24px] bg-white ring-1 ring-black/[0.04]">
               <button type="button" onClick={() => setOpen(isOpen ? null : id)} className="flex w-full items-center gap-3 p-4 text-left sm:p-5">
                 <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${ok ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
                   {ok ? <CheckCircle2 className="h-4 w-4" /> : <FileText className="h-4 w-4" />}

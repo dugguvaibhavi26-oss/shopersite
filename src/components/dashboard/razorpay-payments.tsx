@@ -209,7 +209,7 @@ export function RazorpayPaymentsCard({ store, onOpenPlugin }: { store: StoreData
   const connected = !!status?.connected;
 
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white">
+    <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04]">
       <div className="p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

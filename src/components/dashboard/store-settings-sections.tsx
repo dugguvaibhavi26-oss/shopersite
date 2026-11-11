@@ -4,9 +4,11 @@ import * as React from "react";
 import { brief } from "@/lib/brief";
 import { Check, ChevronRight } from "lucide-react";
 import { storeService, type CheckoutRules, type StoreData } from "@/lib/store-service";
-import { checkoutRulesOf } from "@/lib/checkout-rules";
+import { checkoutRulesOf, cleanPincodes, type FieldRule } from "@/lib/checkout-rules";
 import { GST_RATES } from "@/lib/invoice";
 import { INDIA_STATES } from "@/lib/india-states";
+import { effectivePlan } from "@/lib/subscription";
+import { ownerHeaders } from "./staff-accounts";
 
 /**
  * The smaller Settings pages: Checkout, Customer accounts, Taxes, Notifications, Tracking & ads and
@@ -24,7 +26,7 @@ function Panel({ title, text, children, onSave, saved, error }: { title?: string
         e.preventDefault();
         onSave();
       }}
-      className="rounded-2xl border border-neutral-200 bg-white"
+      className="rounded-[24px] bg-white ring-1 ring-black/[0.04]"
     >
       <div className="space-y-5 p-4 sm:p-6">
         {title && (
@@ -150,38 +152,141 @@ const saveRules = (store: StoreData, changes: CheckoutRules) =>
 
 export function CheckoutSettings({ store, onChanged }: Props) {
   const r = checkoutRulesOf(store);
+  // order rules
   const [minOrder, setMinOrder] = React.useState(toRupeeText(r.minOrder));
   const [codMax, setCodMax] = React.useState(toRupeeText(r.codMax));
-  const [notes, setNotes] = React.useState(r.orderNotes);
+  const [rulesSaved, flashRules] = useSaved();
+  // customer information
   const [email, setEmail] = React.useState(r.email);
-  const [saved, flash] = useSaved();
+  const [landmark, setLandmark] = React.useState(r.landmark);
+  const [altPhone, setAltPhone] = React.useState(r.altPhone);
+  const [infoSaved, flashInfo] = useSaved();
+  // at checkout
+  const [notes, setNotes] = React.useState(r.orderNotes);
+  const [offers, setOffers] = React.useState(r.marketingOptIn);
+  const [extrasSaved, flashExtras] = useSaved();
+  // cash on delivery
+  const [pins, setPins] = React.useState(r.codPincodes.join(", "));
+  const [codSaved, flashCod] = useSaved();
+  // thank-you page
+  const [thanks, setThanks] = React.useState(r.thankYou);
+  const [thanksSaved, flashThanks] = useSaved();
+
+  const onlineOnly = store.products.filter((p) => p.codBlocked).length;
+  const save = (changes: CheckoutRules, flash: () => void) => {
+    saveRules(store, changes);
+    onChanged();
+    flash();
+  };
+
   return (
-    <Panel
-      saved={saved}
-      onSave={() => {
-        saveRules(store, { minOrder: toPaise(minOrder), codMax: toPaise(codMax), orderNotes: notes, email });
-        onChanged();
-        flash();
-      }}
-    >
-      <Money id="co-min" label="Minimum order amount" hint="Buyers can't check out below this (the item total, before delivery). Leave empty for no minimum." value={minOrder} onChange={setMinOrder} />
-      {store.codEnabled ? (
-        <Money id="co-codmax" label="Highest order allowed with cash on delivery" hint="Bigger orders must be paid online or by UPI. Leave empty for no limit." value={codMax} onChange={setCodMax} />
-      ) : (
-        <p className="rounded-xl bg-neutral-50 px-4 py-3 text-sm text-neutral-500">Cash on delivery is off. Turn it on in Payments to set a limit for it.</p>
-      )}
-      <Choice
-        label="Buyer's email at checkout"
-        value={email}
-        onChange={setEmail}
-        options={[
-          { id: "optional", title: "Optional", text: "Buyers can skip it" },
-          { id: "required", title: "Required", text: "Needed to place an order" },
-          { id: "hidden", title: "Don't ask", text: "Name and phone only" },
-        ]}
-      />
-      <Toggle label="Note for the shop" text="Let buyers add a note, like a landmark or gift message." checked={notes} onChange={setNotes} />
-    </Panel>
+    <div className="space-y-4">
+      <Panel title="Order rules" text="Limits that apply to every order." saved={rulesSaved} onSave={() => save({ minOrder: toPaise(minOrder), codMax: toPaise(codMax) }, flashRules)}>
+        <Money id="co-min" label="Minimum order amount" hint="Buyers can't check out below this (the item total, before delivery). Leave empty for no minimum." value={minOrder} onChange={setMinOrder} />
+        {store.codEnabled ? (
+          <Money id="co-codmax" label="Highest order allowed with cash on delivery" hint="Bigger orders must be paid online. Leave empty for no limit." value={codMax} onChange={setCodMax} />
+        ) : (
+          <p className="rounded-xl bg-neutral-50 px-4 py-3 text-sm text-neutral-500">Cash on delivery is off. Turn it on in Payments to set a limit for it.</p>
+        )}
+        <p className="rounded-xl bg-neutral-50 px-4 py-3 text-[13px] text-neutral-600">
+          To cap how many of one product a buyer can order, open the product and set <b className="font-semibold text-neutral-900">Most per order</b>.
+        </p>
+      </Panel>
+
+      <Panel
+        title="Customer information"
+        text="What buyers fill in at checkout. Name, mobile number and address are always asked."
+        saved={infoSaved}
+        onSave={() => save({ email, landmark, altPhone }, flashInfo)}
+      >
+        <div className="divide-y divide-neutral-100 rounded-2xl ring-1 ring-black/[0.05]">
+          <FieldRow label="Email" hint="For order updates" value={email} onChange={setEmail} />
+          <FieldRow label="Landmark" hint="Near a school, temple, shop… helps couriers find the address" value={landmark} onChange={setLandmark} />
+          <FieldRow label="Another phone number" hint="Used when the courier can't reach the first number" value={altPhone} onChange={setAltPhone} />
+        </div>
+      </Panel>
+
+      <Panel title="At checkout" text="Extra boxes buyers see before they pay." saved={extrasSaved} onSave={() => save({ orderNotes: notes, marketingOptIn: offers }, flashExtras)}>
+        <Toggle label="Note for the shop" text="Let buyers add a note, like a gift message." checked={notes} onChange={setNotes} />
+        <Toggle
+          label="Ask to send offers"
+          text="Shows an unticked box: “Send me offers and new arrivals on WhatsApp or email”. Buyers who tick it are marked in Customers."
+          checked={offers}
+          onChange={setOffers}
+        />
+      </Panel>
+
+      <Panel
+        title="Cash on delivery rules"
+        text="Where cash on delivery isn't offered. These only apply when you also take online payment, so buyers can always pay somehow."
+        saved={codSaved}
+        onSave={() => {
+          const clean = cleanPincodes(pins);
+          setPins(clean.join(", "));
+          save({ codPincodes: clean }, flashCod);
+        }}
+      >
+        <div>
+          <label htmlFor="co-pins" className="block text-sm font-medium">
+            PIN codes without cash on delivery
+          </label>
+          <span className="mt-0.5 block text-xs text-neutral-500">6-digit PIN codes, separated by commas or spaces. Buyers there pay online.</span>
+          <textarea
+            id="co-pins"
+            value={pins}
+            onChange={(e) => setPins(e.target.value.replace(/[^\d,\s]/g, ""))}
+            rows={3}
+            placeholder="110001, 400001"
+            className="mt-1.5 w-full resize-y rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 font-mono text-sm outline-none focus:border-neutral-900"
+          />
+          <span className="mt-1 block text-xs text-neutral-500">
+            {cleanPincodes(pins).length} PIN code{cleanPincodes(pins).length === 1 ? "" : "s"}
+          </span>
+        </div>
+        <p className="rounded-xl bg-neutral-50 px-4 py-3 text-[13px] text-neutral-600">
+          {onlineOnly
+            ? `${onlineOnly} product${onlineOnly === 1 ? " is" : "s are"} set to online payment only.`
+            : "No products are online-only."}{" "}
+          Change this in each product under <b className="font-semibold text-neutral-900">Online payment only</b>.
+        </p>
+      </Panel>
+
+      <Panel title="Thank-you message" text="Your own words on the page buyers see right after ordering." saved={thanksSaved} onSave={() => save({ thankYou: thanks.trim() }, flashThanks)}>
+        <div>
+          <textarea
+            value={thanks}
+            onChange={(e) => setThanks(e.target.value.slice(0, 300))}
+            rows={3}
+            placeholder="Thanks for shopping with us! We pack every order by hand and ship within 2 days."
+            aria-label="Thank-you message"
+            className="w-full resize-y rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-neutral-900"
+          />
+          <span className="mt-1 block text-right text-xs tabular-nums text-neutral-400">{thanks.length}/300</span>
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+/** One checkout field with its setting on the right: Optional, Required or Don't ask. */
+function FieldRow({ label, hint, value, onChange }: { label: string; hint: string; value: FieldRule; onChange: (v: FieldRule) => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <span className="min-w-0">
+        <span className="block text-sm font-medium">{label}</span>
+        <span className="block text-xs text-neutral-500">{hint}</span>
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as FieldRule)}
+        aria-label={`${label} at checkout`}
+        className="h-9 shrink-0 rounded-full border border-neutral-200 bg-white px-3 text-[13px] font-medium outline-none focus:border-neutral-900"
+      >
+        <option value="optional">Optional</option>
+        <option value="required">Required</option>
+        <option value="hidden">Don&apos;t ask</option>
+      </select>
+    </div>
   );
 }
 
@@ -292,29 +397,102 @@ export function TaxSettings({ store, onChanged }: Props) {
 
 export function NotificationSettings({ store, onChanged, onOpenEmails }: Props & { onOpenEmails: () => void }) {
   const [newOrders, setNewOrders] = React.useState(store.notifyNewOrders !== false);
+  const [lowStock, setLowStock] = React.useState(store.notifyLowStock !== false);
+  const [reviews, setReviews] = React.useState(store.notifyReviews !== false);
   const [saved, flash] = useSaved();
   const to = store.contactEmail || store.ownerEmail || "your account email";
+  const pro = effectivePlan(store).planId === "pro";
+
+  // Pro: staff who also get new-order emails
+  const [staff, setStaff] = React.useState<{ id: string; name: string; email: string; active: boolean }[] | null>(null);
+  const [picked, setPicked] = React.useState<string[]>(store.notifyStaff || []);
+  const [staffSaved, flashStaff] = useSaved();
+  const [staffError, setStaffError] = React.useState("");
+  React.useEffect(() => {
+    if (!pro) return;
+    let live = true;
+    (async () => {
+      try {
+        const r = await fetch(`/api/staff/accounts?store=${encodeURIComponent(store.subdomain)}`, { headers: await ownerHeaders(), cache: "no-store" });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || "Couldn't load your staff.");
+        if (live) setStaff(d.staff || []);
+      } catch (e) {
+        if (live) {
+          setStaff([]);
+          setStaffError(e instanceof Error ? e.message : "Couldn't load your staff.");
+        }
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [pro, store.subdomain]);
+
   return (
     <div className="space-y-4">
       <Panel
+        title="Emails to you"
+        text="Choose what Shopersite emails you about."
         saved={saved}
         onSave={() => {
-          storeService.updateStore(store.subdomain, { notifyNewOrders: newOrders });
+          storeService.updateStore(store.subdomain, { notifyNewOrders: newOrders, notifyLowStock: lowStock, notifyReviews: reviews });
           onChanged();
           flash();
         }}
       >
-        <Toggle label="New order emails" text="The moment an order is placed or paid." checked={newOrders} onChange={setNewOrders} />
-        <p className="-mt-1 flex min-w-0 items-center gap-2 rounded-xl bg-neutral-50 px-3 py-2.5 text-[13px] text-neutral-600">
+        <p className="flex min-w-0 items-center gap-2 rounded-xl bg-neutral-50 px-3 py-2.5 text-[13px] text-neutral-600">
           <span className="shrink-0 text-neutral-400">Sent to</span>
           <span className="truncate font-medium text-neutral-900">{to}</span>
         </p>
+        <Toggle label="New orders" text="The moment an order is placed or paid, with the items and address." checked={newOrders} onChange={setNewOrders} />
+        <Toggle label="Running low" text="When an order leaves a product with 5 or fewer in stock, or sells it out." checked={lowStock} onChange={setLowStock} />
+        <Toggle label="New reviews" text="When a buyer rates one of your products." checked={reviews} onChange={setReviews} />
       </Panel>
+
+      <Panel
+        title="Staff notifications"
+        text="Send new-order emails to your team as well."
+        saved={staffSaved}
+        error={staffError}
+        onSave={() => {
+          if (!pro) return;
+          storeService.updateStore(store.subdomain, { notifyStaff: picked });
+          onChanged();
+          flashStaff();
+        }}
+      >
+        {!pro ? (
+          <p className="rounded-xl bg-neutral-50 px-4 py-3 text-sm text-neutral-600">Staff accounts are part of the Pro plan. With Pro, pick who on your team gets new-order emails.</p>
+        ) : staff === null ? (
+          <p className="text-sm text-neutral-500">Loading your staff…</p>
+        ) : staff.length === 0 ? (
+          <p className="rounded-xl bg-neutral-50 px-4 py-3 text-sm text-neutral-600">No staff yet. Add them under Staff, then choose who gets emails here.</p>
+        ) : (
+          <div className="divide-y divide-neutral-100 rounded-2xl ring-1 ring-black/[0.05]">
+            {staff.map((m) => (
+              <label key={m.id} className={`flex cursor-pointer items-center gap-3 px-4 py-3 ${m.active ? "" : "opacity-60"}`}>
+                <input
+                  type="checkbox"
+                  checked={picked.includes(m.id)}
+                  onChange={(e) => setPicked((p) => (e.target.checked ? [...p, m.id] : p.filter((x) => x !== m.id)))}
+                  className="h-4 w-4 shrink-0 accent-neutral-950"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{m.name}</span>
+                  <span className="block truncate text-xs text-neutral-500">{m.email}{m.active ? "" : " · switched off, gets nothing"}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+      </Panel>
+
       <button
         type="button"
         onClick={onOpenEmails}
         style={{ minHeight: 0 }}
-        className="flex w-full items-center gap-3 rounded-2xl border border-neutral-200 bg-white p-4 text-left hover:bg-neutral-50 sm:p-5"
+        className="flex w-full items-center gap-3 rounded-[24px] bg-white ring-1 ring-black/[0.04] p-4 text-left hover:bg-neutral-50 sm:p-5"
       >
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold">Emails to your buyers</span>
@@ -400,7 +578,7 @@ export function PrivacySettings({ store, onChanged, onOpenPolicies }: Props & { 
           onChange={setBanner}
         />
       </Panel>
-      <div className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+      <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 sm:p-6">
         <h3 className="text-base font-semibold">Buyers&apos; data requests</h3>
         <p className="mt-1 text-sm text-neutral-500">
           Under India&apos;s DPDP Act, buyers can ask you to show, correct or delete their details. Your store&apos;s contact page shows a &ldquo;Request my data&rdquo; email link to{" "}

@@ -21,7 +21,7 @@ async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
-const card = "rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5";
+const card = "rounded-[24px] bg-white ring-1 ring-black/[0.04] p-4 sm:p-5";
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
 /* ------------------------------ Shiprocket ------------------------------ */

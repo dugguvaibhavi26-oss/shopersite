@@ -134,7 +134,7 @@ export function EmailPanel({ store, storeWebDomain, onRemoveSubscriber }: { stor
   return (
     <div className="space-y-4">
       {/* status + usage */}
-      <div className="rounded-2xl border border-neutral-200 bg-white">
+      <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04]">
         <div className="flex items-start justify-between gap-3 p-5 sm:p-6">
           <div className="min-w-0">
             <h3 className="text-base font-semibold">Email to subscribers</h3>
@@ -172,7 +172,7 @@ export function EmailPanel({ store, storeWebDomain, onRemoveSubscriber }: { stor
       </div>
 
       {status && !status.connected && (
-        <form onSubmit={connect} className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+        <form onSubmit={connect} className="rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 sm:p-6">
           <h3 className="text-base font-semibold">Connect your Gmail</h3>
           <p className="mt-0.5 text-sm text-neutral-500">Gmail needs an App Password (not your normal password). It takes about 2 minutes.</p>
 
@@ -230,7 +230,7 @@ export function EmailPanel({ store, storeWebDomain, onRemoveSubscriber }: { stor
       {status?.connected && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {/* sender */}
-          <div className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+          <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 sm:p-6">
             <h3 className="text-base font-semibold">Sending from</h3>
             <p className="mt-2 flex items-center gap-2 text-sm font-medium">
               <Mail className="h-4 w-4 text-neutral-400" /> {status.email}
@@ -264,7 +264,7 @@ export function EmailPanel({ store, storeWebDomain, onRemoveSubscriber }: { stor
           </div>
 
           {/* compose */}
-          <form onSubmit={send} className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+          <form onSubmit={send} className="rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 sm:p-6">
             <h3 className="text-base font-semibold">New email</h3>
             <p className="mt-0.5 text-sm text-neutral-500">Goes to all {fmt(subs.length)} subscriber{subs.length === 1 ? "" : "s"}.</p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -321,7 +321,7 @@ export function EmailPanel({ store, storeWebDomain, onRemoveSubscriber }: { stor
       )}
 
       {status?.campaigns && status.campaigns.length > 0 && (
-        <div className="rounded-2xl border border-neutral-200 bg-white">
+        <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04]">
           <h3 className="px-5 pt-5 text-base font-semibold sm:px-6">Sent emails</h3>
           <ul className="mt-3 divide-y divide-neutral-100 border-t border-neutral-100">
             {status.campaigns.map((c, i) => (
@@ -342,7 +342,7 @@ export function EmailPanel({ store, storeWebDomain, onRemoveSubscriber }: { stor
       )}
 
       {/* subscribers */}
-      <div className="rounded-2xl border border-neutral-200 bg-white">
+      <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04]">
         <div className="flex items-center justify-between gap-3 p-5 sm:px-6">
           <div>
             <h3 className="text-base font-semibold">Subscribers</h3>

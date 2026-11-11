@@ -16,6 +16,8 @@ export interface SavedDetails {
   phone: string;
   email: string;
   street: string;
+  landmark?: string;
+  altPhone?: string;
   city: string;
   state: string;
   pincode: string;
@@ -165,7 +167,7 @@ export function SiteProvider({
       const key = `${product.id}::${variantName || ""}`;
       setBag((prev) => {
         const found = prev.find((l) => l.key === key);
-        const max = product.stock > 0 ? product.stock : 99;
+        const max = Math.min(product.stock > 0 ? product.stock : 99, product.maxPerOrder && product.maxPerOrder > 0 ? product.maxPerOrder : 99);
         if (found) return prev.map((l) => (l.key === key ? { ...l, quantity: Math.min(max, l.quantity + quantity) } : l));
         return [
           ...prev,
@@ -200,7 +202,14 @@ export function SiteProvider({
     bagCount: bag.reduce((n, l) => n + l.quantity, 0),
     addToBag,
     setQuantity: (key, quantity) =>
-      setBag((prev) => (quantity <= 0 ? prev.filter((l) => l.key !== key) : prev.map((l) => (l.key === key ? { ...l, quantity } : l)))),
+      setBag((prev) => {
+        if (quantity <= 0) return prev.filter((l) => l.key !== key);
+        return prev.map((l) => {
+          if (l.key !== key) return l;
+          const most = store.products.find((p) => p.id === l.productId)?.maxPerOrder;
+          return { ...l, quantity: most && most > 0 ? Math.min(most, quantity) : quantity };
+        });
+      }),
     removeLine: (key) => setBag((prev) => prev.filter((l) => l.key !== key)),
     clearBag: () => {
       setBag([]);

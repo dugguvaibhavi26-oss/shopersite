@@ -95,7 +95,7 @@ export function DomainSettings({ store, onUpgrade }: { store: StoreData; onUpgra
   };
 
   const current = (
-    <div className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5">
+    <div className="flex items-center gap-3 rounded-[24px] bg-white ring-1 ring-black/[0.04] p-4 sm:p-5">
       <Globe className="h-5 w-5 shrink-0 text-neutral-900" />
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold">{getStoreDomain(store.subdomain)}</span>
@@ -135,7 +135,7 @@ export function DomainSettings({ store, onUpgrade }: { store: StoreData; onUpgra
           <Loader2 className="h-4 w-4 animate-spin" /> Checking…
         </p>
       ) : !status.domain ? (
-        <form onSubmit={connect} className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+        <form onSubmit={connect} className="rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 sm:p-6">
           <h3 className="text-base font-semibold">Connect a domain you own</h3>
           <p className="mt-0.5 text-sm text-neutral-500">
             Bought one from GoDaddy, Hostinger, Namecheap or similar?
@@ -156,7 +156,7 @@ export function DomainSettings({ store, onUpgrade }: { store: StoreData; onUpgra
           {!status.available && <p className="mt-3 text-xs text-amber-700">Custom domains are being switched on.</p>}
         </form>
       ) : (
-        <div className="rounded-2xl border border-neutral-200 bg-white">
+        <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04]">
           <div className="flex flex-wrap items-center gap-3 p-5 sm:p-6">
             {status.live ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <Clock className="h-5 w-5 text-amber-600" />}
             <div className="min-w-0 flex-1">

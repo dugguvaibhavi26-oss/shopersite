@@ -1,13 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { BadgeCheck, Copy, Eye, EyeOff, Search, Star, Trash2, X } from "lucide-react";
+import { BadgeCheck, Clock, Copy, Eye, EyeOff, Search, Star, Trash2, X } from "lucide-react";
 import { IQuote } from "@/components/icons";
 import { storeService, type StoreData } from "@/lib/store-service";
 import { appConfirm } from "@/components/ui/app-dialog";
-import { EmptyState } from "./ui-kit";
+import { CARD, EmptyState, Segmented, StatStrip } from "./ui-kit";
 
-/** Reviews: a one-line summary, filters, and every review as a row with approve / hide / delete. */
+/** Reviews: the rating on a dark summary card, filters, and every review as a card with approve / hide / delete. */
 export function ReviewsPanel({ store, onChanged, onShare, shareLabel }: { store: StoreData; onChanged: () => void; onShare: () => void; shareLabel: string }) {
   const [status, setStatus] = React.useState<"all" | "pending" | "approved">("all");
   const [stars, setStars] = React.useState(0);
@@ -60,31 +60,31 @@ export function ReviewsPanel({ store, onChanged, onShare, shareLabel }: { store:
     storeService.deleteReview(store.subdomain, id);
     onChanged();
   };
-  const select = "h-10 min-w-0 rounded-xl border border-neutral-200 bg-white px-3 text-sm font-medium outline-none focus:border-neutral-900";
+  const select = "h-10 min-w-0 rounded-full bg-white px-4 text-sm font-medium outline-none ring-1 ring-black/[0.05] focus:ring-neutral-900";
 
   return (
     <div className="space-y-4">
       {/* summary */}
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-500">
-        <span className="inline-flex items-center gap-1 font-semibold text-neutral-900">
-          <Star className="h-4 w-4 fill-amber-400 text-amber-400" /> {avg.toFixed(1)}
-        </span>
-        average
-        <span className="text-neutral-300">·</span>
-        <span className="font-semibold text-neutral-900">{reviews.length}</span> review{reviews.length === 1 ? "" : "s"}
-        <span className="text-neutral-300">·</span>
-        <span className="font-semibold text-neutral-900">{Math.round((verified / reviews.length) * 100)}%</span> verified buyers
-        {pending > 0 && (
-          <>
-            <span className="text-neutral-300">·</span>
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[12px] font-semibold text-amber-800">{pending} waiting for you</span>
-          </>
-        )}
-      </p>
+      <StatStrip
+        stats={[
+          {
+            label: "Average rating",
+            value: (
+              <span className="inline-flex items-center gap-2">
+                {avg.toFixed(1)} <Star className="h-6 w-6 fill-amber-300 text-amber-300" />
+              </span>
+            ),
+            icon: Star,
+            section: "reviews",
+            hint: `from ${reviews.length} review${reviews.length === 1 ? "" : "s"}`,
+          },
+          { label: "Verified buyers", value: `${Math.round((verified / reviews.length) * 100)}%`, icon: BadgeCheck, section: "reviews", progress: verified / reviews.length },
+          { label: "Waiting for you", value: pending, icon: Clock, section: "reviews", hint: pending ? "Approve to show them" : "All checked" },
+        ]}
+      />
 
-      {/* filters */}
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-        <label className="flex h-10 flex-1 items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3.5 focus-within:border-neutral-900">
+        <label className="flex h-10 flex-1 items-center gap-2 rounded-full bg-white px-4 ring-1 ring-black/[0.05] focus-within:ring-neutral-900">
           <Search className="h-4 w-4 shrink-0 text-neutral-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search words, buyer or product" className="w-full bg-transparent text-sm outline-none" />
           {search && (
@@ -94,25 +94,15 @@ export function ReviewsPanel({ store, onChanged, onShare, shareLabel }: { store:
           )}
         </label>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-xl bg-neutral-100 p-1 text-sm">
-            {(
-              [
-                ["all", "All"],
-                ["pending", `Waiting${pending ? ` ${pending}` : ""}`],
-                ["approved", "Live"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setStatus(id)}
-                style={{ minHeight: 0 }}
-                className={`h-8 rounded-lg px-3 font-medium transition-colors ${status === id ? "bg-white text-neutral-950 shadow-sm" : "text-neutral-500 hover:text-neutral-900"}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            items={[
+              { id: "all" as const, label: "All", count: reviews.length },
+              { id: "pending" as const, label: "Waiting", count: pending },
+              { id: "approved" as const, label: "Live", count: reviews.length - pending },
+            ]}
+            value={status}
+            onChange={setStatus}
+          />
           <select value={stars} onChange={(e) => setStars(Number(e.target.value))} aria-label="Filter by stars" className={select}>
             <option value={0}>All stars</option>
             {[5, 4, 3, 2, 1].map((n) => (
@@ -160,9 +150,9 @@ export function ReviewsPanel({ store, onChanged, onShare, shareLabel }: { store:
 
       {/* list */}
       {shown.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-neutral-200 bg-white p-8 text-center text-sm text-neutral-500">No reviews match.</p>
+        <p className={`p-8 text-center text-sm text-neutral-500 ${CARD}`}>No reviews match.</p>
       ) : (
-        <ul className="divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+        <ul className={`divide-y divide-neutral-100 overflow-hidden ${CARD}`}>
           {shown.map((r) => {
             const p = product(r.productId);
             const live = r.status === "approved";

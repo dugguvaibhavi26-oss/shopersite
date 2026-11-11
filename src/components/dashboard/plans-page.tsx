@@ -17,8 +17,8 @@ const COL: Record<(typeof ORDER)[number], "free" | "growth" | "pro"> = { free: "
 /** a quiet accent per plan: Growth indigo, Pro violet; Free stays neutral */
 const TONE: Record<string, { bar: string; check: string; badge: string; btn: string; head: string }> = {
   free: { bar: "bg-neutral-200", check: "text-neutral-900", badge: "", btn: "", head: "text-neutral-800" },
-  starter: { bar: "bg-indigo-500", check: "text-indigo-600", badge: "bg-indigo-600 text-white", btn: "bg-indigo-600 text-white hover:bg-indigo-700", head: "text-indigo-700" },
-  pro: { bar: "bg-violet-500", check: "text-violet-600", badge: "border border-violet-200 bg-violet-50 text-violet-700", btn: "bg-violet-600 text-white hover:bg-violet-700", head: "text-violet-700" },
+  starter: { bar: "bg-sky-400", check: "text-neutral-900", badge: "bg-neutral-950 text-white", btn: "bg-neutral-950 text-white hover:bg-black", head: "text-neutral-950" },
+  pro: { bar: "bg-violet-400", check: "text-neutral-900", badge: "bg-violet-50 text-violet-700", btn: "bg-neutral-950 text-white hover:bg-black", head: "text-neutral-950" },
 };
 
 function PriceBlock({ plan, muted }: { plan: PlanFeature; muted: boolean }) {
@@ -130,9 +130,9 @@ export function PlansSection({
             <div
               key={plan.id}
               aria-disabled={lower}
-              className={`relative flex flex-col overflow-hidden rounded-2xl border p-5 sm:p-6 ${
+              className={`relative flex flex-col overflow-hidden rounded-[24px] border p-5 sm:p-6 ${
                 dark
-                  ? "border-indigo-500 bg-gradient-to-b from-indigo-50/60 to-white shadow-[0_0_0_1px_#6366f1,0_20px_40px_-24px_rgba(79,70,229,0.45)]"
+                  ? "border-neutral-950 bg-white shadow-[0_0_0_1px_#0a0a0a]"
                   : isCurrent
                     ? "border-neutral-900 bg-white shadow-[0_0_0_1px_#171717]"
                     : "border-neutral-200 bg-white"
@@ -203,7 +203,7 @@ export function PlansSection({
       {lowerNote && <p className="px-1 text-xs text-neutral-500">{lowerNote}</p>}
 
       {/* full comparison */}
-      <div className="rounded-2xl border border-neutral-200 bg-white">
+      <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04]">
         <button
           type="button"
           onClick={() => setCompareOpen((o) => !o)}
@@ -265,7 +265,7 @@ export function PlansSection({
       </div>
 
       {/* third-party apps */}
-      <div className="flex gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5">
+      <div className="flex gap-3 rounded-[24px] bg-white ring-1 ring-black/[0.04] p-4 sm:p-5">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-50">
           <Plug className="h-4 w-4 text-sky-600" />
         </span>

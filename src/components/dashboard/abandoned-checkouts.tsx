@@ -85,7 +85,7 @@ export function AbandonedCheckouts({ store, onCount }: { store: StoreData; onCou
           const text = `Hi ${first}! You were almost done ordering from ${store.name}:\n${c.items.map((i) => `• ${i.quantity} × ${i.title}`).join("\n")}\n\nYour bag is waiting here: ${cart}\nNeed any help with the order?`;
           const wa = buyerWhatsAppLink(c.phone, text);
           return (
-            <li key={c.id} className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5">
+            <li key={c.id} className="rounded-[24px] bg-white ring-1 ring-black/[0.04] p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="flex flex-wrap items-center gap-2 font-semibold">

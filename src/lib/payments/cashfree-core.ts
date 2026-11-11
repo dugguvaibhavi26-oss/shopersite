@@ -127,6 +127,8 @@ export function quoteOrder(
   for (const [id, qty] of wanted) {
     const p = store.products.find((x) => x.id === id)!;
     if ((p.stock ?? 0) < qty) throw new QuoteError("Some items in your bag are no longer available. Go back to your bag to update it.");
+    // the seller's limit per order (Products → edit → Most per order)
+    if (p.maxPerOrder && p.maxPerOrder > 0 && qty > p.maxPerOrder) throw new QuoteError(`You can order up to ${p.maxPerOrder} of "${p.title}" at a time. Update your bag to continue.`);
   }
 
   const subtotal = items.reduce((n, l) => n + l.price * l.quantity, 0);
@@ -225,6 +227,7 @@ export function applyNewOrder(
       ...customers[ci],
       totalOrders: (customers[ci].totalOrders || 0) + 1,
       totalSpent: (customers[ci].totalSpent || 0) + order.total,
+      ...(order.marketingOptIn ? { marketingOptIn: true } : {}),
       lastOrderAt: paid.paidAt,
     };
   } else {
@@ -234,6 +237,7 @@ export function applyNewOrder(
       name: order.customer.name,
       phone: order.customer.phone,
       ...(order.customer.email ? { email: order.customer.email } : {}),
+      ...(order.marketingOptIn ? { marketingOptIn: true } : {}),
       totalOrders: 1,
       totalSpent: order.total,
       lastOrderAt: paid.paidAt,

@@ -131,7 +131,7 @@ export function HelpAndMore({ storeName }: { storeName: string }) {
         ].map((group) => (
           <div key={group.title}>
             <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400">{group.title}</h2>
-            <div className="rounded-2xl border border-neutral-200 bg-white divide-y divide-neutral-100 overflow-hidden">
+            <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04] divide-y divide-neutral-100 overflow-hidden">
               {group.rows.map((row) => (
                 <LinkRow key={row.label} row={row} />
               ))}
@@ -140,7 +140,7 @@ export function HelpAndMore({ storeName }: { storeName: string }) {
         ))}
       </div>
 
-      <div className="rounded-2xl border border-neutral-200 bg-white px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04] px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <span className="block text-sm font-medium text-neutral-900">Follow {siteConfig.name}</span>
           <span className="block text-xs text-neutral-500">Tips, seller stories and new features</span>

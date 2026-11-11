@@ -100,7 +100,7 @@ export function Card({ title, hint, children }: { title: string; hint?: string; 
     <section>
       <h3 className="px-1 text-[15px] font-semibold">{title}</h3>
       {hint && <p className="mt-0.5 px-1 text-sm text-neutral-500">{brief(hint)}</p>}
-      <div className="mt-3 divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200 bg-white">{children}</div>
+      <div className="mt-3 divide-y divide-neutral-100 overflow-hidden rounded-[24px] bg-white ring-1 ring-black/[0.04]">{children}</div>
     </section>
   );
 }

@@ -5,7 +5,7 @@ import { ArrowLeft, Check, ImageIcon, PartyPopper, UploadCloud, X } from "lucide
 import { storeService, type StoreData } from "@/lib/store-service";
 import { missingPolicies } from "@/lib/policies";
 import { checkPrices } from "@/lib/validation";
-import { cropImage } from "@/components/ui/image-cropper";
+import { CROP, cropImage, type CropSpec } from "@/components/ui/image-cropper";
 
 type StepId = "logo" | "products" | "policies" | "discount" | "instagram";
 
@@ -33,9 +33,9 @@ export function isSetupStepDone(store: StoreData, id: StepId): boolean {
 }
 
 /** Crop, then upload to storage (photos are never kept inside the store record). */
-const uploadImage = async (sub: string, file: File, aspect: number | undefined, done: (url: string) => void, fail: (msg: string) => void) => {
+const uploadImage = async (sub: string, file: File, spec: CropSpec, done: (url: string) => void, fail: (msg: string) => void) => {
   if (file.size > 12 * 1024 * 1024) return fail("Choose a photo under 12 MB.");
-  const cropped = await cropImage(file, { aspect });
+  const cropped = await cropImage(file, spec);
   if (!cropped) return;
   try {
     done(await storeService.uploadStoreImage(sub, cropped));
@@ -119,10 +119,10 @@ export function SetupWizard({
   const [pPrice, setPPrice] = useState("");
   const [pCat, setPCat] = useState("");
   const [uploading, setUploading] = useState(false);
-  const pick = (aspect: number | undefined, set: (v: string) => void) => (f: File) => {
+  const pick = (spec: CropSpec, set: (v: string) => void) => (f: File) => {
     setUploading(true);
     setError("");
-    uploadImage(store.subdomain, f, aspect, set, setError).finally(() => setUploading(false));
+    uploadImage(store.subdomain, f, spec, set, setError).finally(() => setUploading(false));
   };
   const firstCategory = store.categories.find((c) => !c.isParent)?.name || "";
   const [dCode, setDCode] = useState("WELCOME10");
@@ -281,7 +281,7 @@ export function SetupWizard({
                   Already done. You can change it in Settings.
                 </div>
               ) : step.id === "logo" ? (
-                <ImagePicker value={logo} onPick={pick(undefined, setLogo)} label={uploading ? "Uploading…" : "Upload logo"} />
+                <ImagePicker value={logo} onPick={pick(CROP.logo, setLogo)} label={uploading ? "Uploading…" : "Upload logo"} />
               ) : step.id === "instagram" ? (
                 <Field label="Instagram username" prefix="@" value={insta} onChange={(e) => (setInsta(e.target.value), setError(""))} placeholder="roxtenn.store" autoFocus />
               ) : step.id === "products" ? (
@@ -299,7 +299,7 @@ export function SetupWizard({
                         onChange={(e) => {
                           const f = e.target.files?.[0];
                           e.target.value = "";
-                          if (f) pick(4 / 5, setPImage)(f);
+                          if (f) pick(CROP.product, setPImage)(f);
                         }}
                       />
                       <span className="relative flex h-[96px] items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-neutral-300 bg-neutral-50 hover:border-neutral-900 transition-colors">

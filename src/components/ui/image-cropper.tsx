@@ -5,30 +5,49 @@ import { createPortal } from "react-dom";
 import { Crop, Minus, Plus, RotateCw } from "lucide-react";
 
 /**
- * Crop a photo before it is uploaded: drag to position it, zoom, pick a shape.
- *   const file = await cropImage(picked, { aspect: 16 / 9 })   // null when cancelled
+ * Crop a photo before it is uploaded: drag to position it and zoom. Each kind of photo has one
+ * locked shape and size (CROP below), so every logo, product photo and banner comes out the same.
+ *   const file = await cropImage(picked, CROP.logo)   // null when cancelled
  */
 
-export const CROP_SHAPES = [
-  { id: "original", label: "Original", ratio: 0 },
-  { id: "square", label: "Square", ratio: 1 },
-  { id: "portrait", label: "4:5", ratio: 4 / 5 },
-  { id: "landscape", label: "3:2", ratio: 3 / 2 },
-  { id: "wide", label: "16:9", ratio: 16 / 9 },
-  { id: "banner", label: "Banner 3:1", ratio: 3 },
-] as const;
+export interface CropSpec {
+  /** width ÷ height, locked */
+  aspect: number;
+  /** the size the photo is saved at (never enlarged past the original) */
+  size: { w: number; h: number };
+  /** what the photo is for, shown in the cropper's title */
+  label: string;
+}
 
-type Req = { id: number; file: File; aspect?: number; resolve: (f: File | null) => void };
+/** The shape and size for every kind of photo the dashboard takes. */
+export const CROP = {
+  logo: { aspect: 1, size: { w: 512, h: 512 }, label: "Logo" },
+  product: { aspect: 4 / 5, size: { w: 1200, h: 1500 }, label: "Product photo" },
+  category: { aspect: 4 / 5, size: { w: 1200, h: 1500 }, label: "Category photo" },
+  banner: { aspect: 3, size: { w: 2400, h: 800 }, label: "Banner" },
+  wide: { aspect: 16 / 9, size: { w: 1920, h: 1080 }, label: "Wide photo" },
+  square: { aspect: 1, size: { w: 1200, h: 1200 }, label: "Square photo" },
+  portrait: { aspect: 4 / 5, size: { w: 1200, h: 1500 }, label: "Photo" },
+} satisfies Record<string, CropSpec>;
+
+
+type Req = { id: number; file: File; spec: CropSpec; resolve: (f: File | null) => void };
 let push: ((r: Req) => void) | null = null;
 let n = 1;
 
-export function cropImage(file: File, opts: { aspect?: number } = {}): Promise<File | null> {
+export function cropImage(file: File, spec: CropSpec): Promise<File | null> {
   // GIFs and SVGs aren't cropped (it would flatten them)
   if (!/^image\/(jpeg|png|webp|heic|heif|avif)$/i.test(file.type)) return Promise.resolve(file);
   return new Promise((resolve) => {
     if (!push) return resolve(file);
-    push({ id: n++, file, aspect: opts.aspect, resolve });
+    push({ id: n++, file, spec, resolve });
   });
+}
+
+/** "1:1", "4:5", "3:1"… for the cropper's title */
+function ratioName(aspect: number): string {
+  for (const [w, h] of [[1, 1], [4, 5], [3, 1], [16, 9], [3, 2], [2, 1], [3, 4], [9, 16]]) if (Math.abs(aspect - w / h) < 0.005) return `${w}:${h}`;
+  return aspect.toFixed(2);
 }
 
 export function ImageCropperHost() {
@@ -44,7 +63,7 @@ export function ImageCropperHost() {
     <Cropper
       key={req.id}
       file={req.file}
-      aspect={req.aspect}
+      spec={req.spec}
       onDone={(f) => {
         req.resolve(f);
         setReq(null);
@@ -54,10 +73,10 @@ export function ImageCropperHost() {
   );
 }
 
-function Cropper({ file, aspect, onDone }: { file: File; aspect?: number; onDone: (f: File | null) => void }) {
+function Cropper({ file, spec, onDone }: { file: File; spec: CropSpec; onDone: (f: File | null) => void }) {
   const [img, setImg] = React.useState<HTMLImageElement | null>(null);
   const [url, setUrl] = React.useState("");
-  const [ratio, setRatio] = React.useState<number>(aspect || 0);
+  const ratio = spec.aspect;
   const [zoom, setZoom] = React.useState(1);
   const [rotate, setRotate] = React.useState(0);
   const [pos, setPos] = React.useState({ x: 0, y: 0 }); // offset of the photo's centre from the frame's centre, in frame px
@@ -98,7 +117,7 @@ function Cropper({ file, aspect, onDone }: { file: File; aspect?: number; onDone
   const turned = rotate % 180 !== 0;
   const natW = img ? (turned ? img.naturalHeight : img.naturalWidth) : 1;
   const natH = img ? (turned ? img.naturalWidth : img.naturalHeight) : 1;
-  const r = ratio || natW / natH;
+  const r = ratio;
   const maxH = 380;
   let frameW = stageW;
   let frameH = frameW / r;
@@ -135,8 +154,8 @@ function Cropper({ file, aspect, onDone }: { file: File; aspect?: number; onDone
       const sy = (shownH / 2 - frameH / 2 - at.y) / scale;
       const sw = frameW / scale;
       const sh = frameH / scale;
-      const max = 2400;
-      const k = Math.min(1, max / Math.max(sw, sh));
+      // saved at the locked size, or smaller when the photo itself is smaller (never blown up)
+      const k = Math.min(1, spec.size.w / sw);
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(sw * k);
       canvas.height = Math.round(sh * k);
@@ -164,8 +183,11 @@ function Cropper({ file, aspect, onDone }: { file: File; aspect?: number; onDone
       <div className="w-full max-w-[560px] rounded-t-2xl bg-white p-4 shadow-2xl sm:rounded-2xl sm:p-5 font-[Inter,sans-serif] text-neutral-900">
         <div className="flex items-center gap-2">
           <Crop className="h-4 w-4" />
-          <p className="text-[15px] font-semibold">Crop photo</p>
-          <span className="ml-auto text-xs text-neutral-500">Drag to move · zoom to fit</span>
+          <p className="text-[15px] font-semibold">{spec.label}</p>
+          <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-neutral-600">
+            {ratioName(spec.aspect)} · {spec.size.w} × {spec.size.h}
+          </span>
+          <span className="ml-auto hidden text-xs text-neutral-500 sm:inline">Drag to move · zoom to fit</span>
         </div>
 
         <div ref={stageRef} className="mt-4 flex h-[380px] w-full items-center justify-center overflow-hidden rounded-xl bg-neutral-900">
@@ -213,28 +235,13 @@ function Cropper({ file, aspect, onDone }: { file: File; aspect?: number; onDone
           </button>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {CROP_SHAPES.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => (setRatio(s.ratio), setPos({ x: 0, y: 0 }))}
-              className={`h-8 rounded-full border px-3 text-xs font-semibold ${Math.abs(ratio - s.ratio) < 0.001 ? "border-black bg-black text-white" : "border-neutral-200 hover:border-black"}`}
-            >
-              {s.label}
-              {aspect && Math.abs(aspect - s.ratio) < 0.001 ? " · best fit" : ""}
-            </button>
-          ))}
-        </div>
+        <p className="mt-3 text-xs text-neutral-500">The frame is locked to this shape so every {spec.label.toLowerCase()} on your store matches.</p>
 
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" onClick={() => onDone(null)} className="h-10 rounded-xl px-4 text-sm font-semibold text-neutral-600 hover:text-black">
             Cancel
-          </button>
-          <button type="button" onClick={() => onDone(file)} className="h-10 rounded-xl border border-neutral-300 px-4 text-sm font-semibold hover:border-black">
-            Use as it is
           </button>
           <button type="button" disabled={!img || busy} onClick={save} className="h-10 rounded-xl bg-black px-5 text-sm font-semibold text-white disabled:opacity-40">
             {busy ? "Cropping…" : "Crop & use"}

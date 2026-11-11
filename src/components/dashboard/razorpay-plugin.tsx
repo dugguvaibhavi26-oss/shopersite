@@ -155,7 +155,7 @@ export function RazorpayPlugin({ store, onOpenPayments }: { store: StoreData; on
               </div>
             </div>
           )}
-          <div className="rounded-2xl border border-neutral-200 bg-white p-5">
+          <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5">
             <p className="text-sm font-semibold">Manage it in Payments</p>
             <p className="mt-0.5 text-sm text-neutral-500">Test payments, switching to live and disconnecting all live in Settings → Payments.</p>
             <button type="button" onClick={onOpenPayments} style={{ minHeight: 0 }} className="mt-3 inline-flex h-10 items-center gap-1.5 rounded-xl border border-neutral-200 px-4 text-sm font-semibold hover:border-neutral-900">
@@ -164,7 +164,7 @@ export function RazorpayPlugin({ store, onOpenPayments }: { store: StoreData; on
           </div>
         </>
       ) : available ? (
-        <div className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+        <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 sm:p-6">
           <h3 className="text-base font-semibold">Connect in one click</h3>
           <p className="mt-0.5 max-w-xl text-sm text-neutral-500">
             Sign in to Razorpay and approve Shopersite. You&apos;ll come straight back here. No keys to copy, and the money always goes to your own bank.
@@ -180,7 +180,7 @@ export function RazorpayPlugin({ store, onOpenPayments }: { store: StoreData; on
           </p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+        <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 sm:p-6">
           <h3 className="text-base font-semibold">One-click connect is not available right now</h3>
           <p className="mt-0.5 text-sm text-neutral-500">You can still connect Razorpay with your API keys in Payments.</p>
           <button type="button" onClick={onOpenPayments} style={{ minHeight: 0 }} className="mt-4 inline-flex h-10 items-center gap-1.5 rounded-xl bg-neutral-950 px-4 text-sm font-semibold text-white hover:bg-black">

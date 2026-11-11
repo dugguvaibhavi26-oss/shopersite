@@ -36,7 +36,7 @@ describe("ReviewsPanel", () => {
 
   it("shows only waiting reviews on the Waiting tab", () => {
     render(<ReviewsPanel store={store} onChanged={() => {}} onShare={() => {}} shareLabel="Copy" />);
-    fireEvent.click(screen.getByRole("button", { name: /Waiting/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /Waiting/ }));
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
     expect(screen.getByText("Ravi")).toBeTruthy();
   });

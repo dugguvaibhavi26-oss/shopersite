@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { checkoutRulesOf } from "@/lib/checkout-rules";
 import { planHas } from "@/lib/plans";
 import { Check, Loader2, Mail, MapPin, MessageCircle, Package, Truck, X, ExternalLink, FileText } from "lucide-react";
 import { effectivePlan } from "@/lib/subscription";
@@ -214,6 +215,10 @@ export function SiteOrder({ token }: { token: string }) {
           <p className="m-muted mx-auto mt-3 max-w-md text-[length:calc(15px*var(--m-scale))]">
             Your order {order.number} is placed. {order.paymentMethod === "cashfree" || order.paymentMethod === "razorpay" ? "Your payment was received." : order.paymentMethod === "upi" ? "We've sent your UPI reference to the shop. They'll confirm your payment shortly." : "The shop will confirm it shortly."}
           </p>
+          {/* the shop's own words (Settings → Checkout → Thank-you message) */}
+          {checkoutRulesOf(store).thankYou && (
+            <p className="m-soft mx-auto mt-5 max-w-md whitespace-pre-line rounded-2xl px-5 py-4 text-[length:calc(14px*var(--m-scale))]">{checkoutRulesOf(store).thankYou}</p>
+          )}
         </div>
       )}
 
@@ -332,6 +337,7 @@ export function SiteOrder({ token }: { token: string }) {
             <p className="mt-2 font-medium">{order.customer.name}</p>
             <p className="m-muted mt-1 leading-relaxed">
               {order.address.street}
+              {order.address.landmark ? ` (near ${order.address.landmark})` : ""}
               <br />
               {order.address.city}, {order.address.state} {order.address.pincode}
             </p>

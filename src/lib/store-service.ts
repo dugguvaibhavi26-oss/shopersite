@@ -48,6 +48,10 @@ export interface ProductData {
   reviewCount?: number;
   colorSwatches?: string[]; // e.g. ["#111111", "#EDE6DC", "#545C4B"]
   options?: ProductVariant[];
+  /** most a buyer can order of this product in one order; missing = no limit (only stock) */
+  maxPerOrder?: number;
+  /** cash on delivery isn't offered when this product is in the bag (online payment only) */
+  codBlocked?: boolean;
   details?: {
     fabric?: string;
     fit?: string;
@@ -102,15 +106,21 @@ export interface OrderData {
     name: string;
     phone: string;
     email?: string;
+    /** a second number to reach the buyer (Settings → Checkout) */
+    altPhone?: string;
   };
   /** the buyer's account, when they were signed in to the shop while ordering */
   customerUid?: string;
   address: {
     street: string;
+    /** a landmark near the address (Settings → Checkout) */
+    landmark?: string;
     city: string;
     state: string;
     pincode: string;
   };
+  /** the buyer ticked "send me offers" at checkout */
+  marketingOptIn?: boolean;
   items: OrderItemData[];
   subtotal: number; // paise
   discount: number; // paise
@@ -177,6 +187,8 @@ export interface CustomerData {
   totalOrders: number;
   totalSpent: number; // paise
   lastOrderAt: string;
+  /** agreed at checkout to get offers and new arrivals from the shop */
+  marketingOptIn?: boolean;
 }
 
 export interface CustomBrandTheme {
@@ -230,6 +242,16 @@ export interface CheckoutRules {
   email?: "optional" | "required" | "hidden";
   /** buyers must sign in before ordering */
   requireLogin?: boolean;
+  /** ask for a landmark near the address */
+  landmark?: "optional" | "required" | "hidden";
+  /** ask for a second phone number */
+  altPhone?: "optional" | "required" | "hidden";
+  /** show an unticked "send me offers" box at checkout */
+  marketingOptIn?: boolean;
+  /** PIN codes where cash on delivery isn't offered (when online payment is set up) */
+  codPincodes?: string[];
+  /** the shop's own words on the order confirmation page */
+  thankYou?: string;
 }
 
 export interface StoreData {
@@ -259,6 +281,12 @@ export interface StoreData {
   gstState?: string;
   /** Settings → Notifications: email the seller when an order comes in (on unless switched off) */
   notifyNewOrders?: boolean;
+  /** email the owner when an order leaves a product with 5 or fewer in stock (on unless switched off) */
+  notifyLowStock?: boolean;
+  /** email the owner when a buyer leaves a review (on unless switched off) */
+  notifyReviews?: boolean;
+  /** Pro: staff members (by id) who also get new-order emails */
+  notifyStaff?: string[];
   /** Settings → Tracking & ads */
   tracking?: { metaPixelId?: string; gaId?: string };
   /** Settings → Customer privacy: show a cookie notice before tracking runs */
@@ -1350,8 +1378,9 @@ class StoreService {
     input: {
       method: "upi" | "cod";
       items: { productId: string; quantity: number; variantName?: string }[];
-      customer: { name: string; phone: string; email?: string };
-      address: { street: string; city: string; state: string; pincode: string };
+      customer: { name: string; phone: string; email?: string; altPhone?: string };
+      address: { street: string; landmark?: string; city: string; state: string; pincode: string };
+      marketingOptIn?: boolean;
       utr?: string;
       couponCode?: string;
       notes?: string;

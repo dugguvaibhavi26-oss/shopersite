@@ -5803,3 +5803,14 @@ html.cap-ios body {
 @media (prefers-reduced-motion: reduce) {
   .roxy-border, .roxy-border-glow { animation: none; }
 }
+
+/* Dashboard pages: form fields read as soft grey app fields, not bordered boxes on paper.
+   Fields on a transparent background (inside search pills and grouped boxes) keep their look. */
+[data-dash-forms] input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=color]):not(.bg-transparent), [data-dash-forms] select:not(.bg-transparent), [data-dash-forms] textarea:not(.bg-transparent) {
+  background-color: #f3f3f1;
+  border-color: transparent;
+}
+[data-dash-forms] input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=color]):not(.bg-transparent):focus, [data-dash-forms] select:not(.bg-transparent):focus, [data-dash-forms] textarea:not(.bg-transparent):focus {
+  background-color: #ffffff;
+  border-color: #171717;
+}

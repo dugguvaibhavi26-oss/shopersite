@@ -15,7 +15,7 @@ import {
   type OnlineAvailability,
 } from "@/lib/payments/client";
 import { cn } from "@/lib/utils";
-import { checkoutRulesOf, codAllowedFor, codLimitText, minOrderProblem } from "@/lib/checkout-rules";
+import { checkoutRulesOf, codAllowedFor, codBlockedReason, codLimitText, detailsProblem, minOrderProblem } from "@/lib/checkout-rules";
 import { BuyerAuth } from "./buyer-auth";
 import { amountToFreeDelivery, deliveryFee } from "@/lib/delivery";
 import { INDIA_STATES } from "@/lib/india-states";
@@ -258,13 +258,17 @@ export function SiteCheckout() {
   const [agreed, setAgreed] = React.useState(false);
   // opt-in (unticked) to one reminder email if the checkout isn't finished
   const [remindOk, setRemindOk] = React.useState(false);
+  // the seller's "send me offers" box (Settings → Checkout); always starts unticked
+  const [offersOk, setOffersOk] = React.useState(false);
   const [agreeError, setAgreeError] = React.useState("");
   const t = useTotals(method);
   // the seller's checkout rules (Settings → Checkout); the server checks the same ones
   const rules = checkoutRulesOf(store);
   const minIssue = minOrderProblem(store, Math.max(0, t.subtotal - t.discount));
   const codTotal = t.total - t.codFee + (store.codFee || 0);
-  const codUsable = codOn && codAllowedFor(store, codTotal, onlineOn);
+  // online-only products and PIN codes the seller doesn't take cash on delivery for
+  const codBlocked = codBlockedReason(store, { productIds: t.lines.map((l) => l.productId), pincode: form.pincode }, onlineOn);
+  const codUsable = codOn && codAllowedFor(store, codTotal, onlineOn) && !codBlocked;
   const loginNeeded = rules.requireLogin && !user && !demo && !editing;
   React.useEffect(() => {
     if (method === "cod" && !codUsable && onlineOn) setMethod("online");
@@ -295,7 +299,7 @@ export function SiteCheckout() {
 
   const set = (k: keyof SavedDetails) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     let v = e.target.value;
-    if (k === "phone") v = phoneInput(v);
+    if (k === "phone" || k === "altPhone") v = phoneInput(v);
     if (k === "pincode") v = onlyDigits(v, 6);
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((er) => ({ ...er, [k]: undefined }));
@@ -330,6 +334,12 @@ export function SiteCheckout() {
     pick("phone", checkPhone(form.phone));
     if (rules.email !== "hidden") pick("email", checkEmail(form.email, { required: rules.email === "required" }));
     pick("street", checkStreet(form.street));
+    const extra = detailsProblem(store, {
+      landmark: rules.landmark === "hidden" ? "" : form.landmark,
+      altPhone: rules.altPhone === "hidden" ? "" : form.altPhone,
+      phone: form.phone,
+    });
+    if (extra) er[/landmark/i.test(extra) ? "landmark" : "altPhone"] = extra;
     pick("city", checkPlace(form.city, "city"));
     if (!form.state) er.state = "Choose your state";
     pick("pincode", checkPincode(form.pincode));
@@ -357,14 +367,18 @@ export function SiteCheckout() {
     }).catch(() => {});
   };
 
+  const extraAddress = () => (rules.landmark !== "hidden" && form.landmark?.trim() ? { landmark: form.landmark.trim() } : {});
+  const extraCustomer = () => (rules.altPhone !== "hidden" && form.altPhone?.trim() ? { altPhone: cleanPhone(form.altPhone) } : {});
+
   const orderInput = () => {
     const phone = cleanPhone(form.phone);
     return {
       phone,
       body: {
         items: t.lines.map((l) => ({ productId: l.productId, quantity: l.quantity, ...(l.variantName ? { variantName: l.variantName } : {}) })),
-        customer: { name: form.name.trim(), phone, ...(form.email.trim() ? { email: form.email.trim() } : {}) },
-        address: { street: form.street.trim(), city: form.city.trim(), state: form.state, pincode: form.pincode.trim() },
+        customer: { name: form.name.trim(), phone, ...(form.email.trim() ? { email: form.email.trim() } : {}), ...extraCustomer() },
+        address: { street: form.street.trim(), ...extraAddress(), city: form.city.trim(), state: form.state, pincode: form.pincode.trim() },
+        ...(rules.marketingOptIn && offersOk ? { marketingOptIn: true } : {}),
         ...(coupon ? { couponCode: coupon } : {}),
         ...(note.trim() ? { notes: note.trim() } : {}),
       },
@@ -418,8 +432,9 @@ export function SiteCheckout() {
         store: store.subdomain,
         items: t.lines.map((l) => ({ productId: l.productId, quantity: l.quantity, ...(l.variantName ? { variantName: l.variantName } : {}) })),
         ...(coupon ? { couponCode: coupon } : {}),
-        customer: { name: form.name.trim(), phone, ...(form.email.trim() ? { email: form.email.trim() } : {}) },
-        address: { street: form.street.trim(), city: form.city.trim(), state: form.state, pincode: form.pincode.trim() },
+        customer: { name: form.name.trim(), phone, ...(form.email.trim() ? { email: form.email.trim() } : {}), ...extraCustomer() },
+        address: { street: form.street.trim(), ...extraAddress(), city: form.city.trim(), state: form.state, pincode: form.pincode.trim() },
+        ...(rules.marketingOptIn && offersOk ? { marketingOptIn: true } : {}),
         ...(note.trim() ? { notes: note.trim() } : {}),
         returnBase: `${back.origin}${back.pathname}`,
       };
@@ -465,7 +480,7 @@ export function SiteCheckout() {
   const field = (k: keyof SavedDetails, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
     <label className="block">
       <span className="mb-1.5 block text-[length:calc(13px*var(--m-scale))] font-medium">{label}</span>
-      <input value={form[k]} onChange={set(k)} className={cn("m-field", errors[k] && "!border-red-500")} aria-invalid={!!errors[k]} {...props} />
+      <input value={form[k] || ""} onChange={set(k)} className={cn("m-field", errors[k] && "!border-red-500")} aria-invalid={!!errors[k]} {...props} />
       {errors[k] && <span className="mt-1 block text-[length:calc(12px*var(--m-scale))] text-red-600">{errors[k]}</span>}
     </label>
   );
@@ -527,6 +542,8 @@ export function SiteCheckout() {
                 {field("name", "Full name", { autoComplete: "name", maxLength: 80 })}
                 {field("phone", "Mobile number", { autoComplete: "tel-national", inputMode: "tel", placeholder: "10-digit number" })}
               </div>
+              {rules.altPhone !== "hidden" &&
+                field("altPhone", rules.altPhone === "required" ? "Another phone number" : "Another phone number (optional)", { inputMode: "tel", placeholder: "In case we can't reach you" })}
               {rules.email !== "hidden" &&
                 field("email", rules.email === "required" ? "Email (for order updates)" : "Email (optional, for order updates)", { type: "email", autoComplete: "email", maxLength: 200 })}
               {rules.email !== "hidden" && form.email.trim() && (
@@ -551,6 +568,8 @@ export function SiteCheckout() {
                 )}
               </div>
               {field("street", "House no., street, area", { autoComplete: "street-address", maxLength: 200 })}
+              {rules.landmark !== "hidden" &&
+                field("landmark", rules.landmark === "required" ? "Landmark" : "Landmark (optional)", { maxLength: 120, placeholder: "Near a school, temple, shop…" })}
               <div className="grid gap-4 sm:grid-cols-2">
                 {field("city", "City", { autoComplete: "address-level2", maxLength: 60 })}
                 <label className="block">
@@ -568,6 +587,18 @@ export function SiteCheckout() {
                 <label className="block">
                   <span className="mb-1.5 block text-[length:calc(13px*var(--m-scale))] font-medium">Note for the shop (optional)</span>
                   <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} className="m-field" placeholder="Landmark, gift message…" />
+                </label>
+              )}
+              {rules.marketingOptIn && (
+                <label className="flex items-start gap-3 text-[length:calc(13px*var(--m-scale))]">
+                  <input
+                    type="checkbox"
+                    checked={offersOk}
+                    onChange={(e) => setOffersOk(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--m-text)]"
+                    style={{ minHeight: 0, minWidth: 0 }}
+                  />
+                  <span>Send me offers and new arrivals from {store.name} on WhatsApp or email</span>
                 </label>
               )}
               <label className="flex items-start gap-3 text-[length:calc(13px*var(--m-scale))]">
@@ -599,7 +630,8 @@ export function SiteCheckout() {
                     {form.name} · {form.phone}
                   </p>
                   <p className="m-muted mt-1">
-                    {form.street}, {form.city}, {form.state} {form.pincode}
+                    {form.street}
+                    {rules.landmark !== "hidden" && form.landmark?.trim() ? ` (near ${form.landmark.trim()})` : ""}, {form.city}, {form.state} {form.pincode}
                   </p>
                 </div>
                 <button type="button" onClick={() => setStep("details")} className="shrink-0 text-[length:calc(13px*var(--m-scale))] font-medium underline underline-offset-4">
@@ -660,7 +692,7 @@ export function SiteCheckout() {
                 )}
               </div>
 
-              {codOn && !codUsable && <p className="m-muted text-[length:calc(13px*var(--m-scale))]">{codLimitText(store)}</p>}
+              {codOn && !codUsable && <p className="m-muted text-[length:calc(13px*var(--m-scale))]">{codBlocked || codLimitText(store)}</p>}
               {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-[length:calc(13px*var(--m-scale))] text-red-700">{error}</p>}
               {(onlineOn || codUsable) && (
                 <button type="button" disabled={placing} onClick={place} className="m-btn mt-2 h-12 w-full">

@@ -30,10 +30,10 @@ async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
 }
 
 const PLUGINS: { id: PluginId; name: string; text: string; icon: React.ElementType; tone: string; plan: "free" | "starter" | "pro" }[] = [
-  { id: "razorpay", name: "Razorpay", text: "Take UPI, card and net banking payments. Connect your Razorpay account in one click.", icon: IRupee, tone: "bg-neutral-100 text-neutral-900", plan: "free" },
-  { id: "shiprocket", name: "Shiprocket", text: "Ship orders with 25+ couriers. Labels, pickup and live tracking.", icon: ITruck, tone: "bg-neutral-100 text-neutral-900", plan: "starter" },
-  { id: "whatsapp", name: "WhatsApp", text: "One-tap order updates to buyers: confirmed, shipped with tracking, delivered.", icon: IChat, tone: "bg-neutral-100 text-neutral-900", plan: "free" },
-  { id: "gmail", name: "Gmail", text: "Email buyers about their orders and new products, from your Gmail.", icon: IMail, tone: "bg-neutral-100 text-neutral-900", plan: "pro" },
+  { id: "razorpay", name: "Razorpay", text: "Take UPI, card and net banking payments. Connect your Razorpay account in one click.", icon: IRupee, tone: "bg-sky-50 text-sky-700", plan: "free" },
+  { id: "shiprocket", name: "Shiprocket", text: "Ship orders with 25+ couriers. Labels, pickup and live tracking.", icon: ITruck, tone: "bg-amber-50 text-amber-800", plan: "starter" },
+  { id: "whatsapp", name: "WhatsApp", text: "One-tap order updates to buyers: confirmed, shipped with tracking, delivered.", icon: IChat, tone: "bg-emerald-50 text-emerald-700", plan: "free" },
+  { id: "gmail", name: "Gmail", text: "Email buyers about their orders and new products, from your Gmail.", icon: IMail, tone: "bg-rose-50 text-rose-700", plan: "pro" },
 ];
 
 const PLAN_NAME = { free: "Free", starter: "Growth", pro: "Pro" } as const;
@@ -67,7 +67,9 @@ export function PluginsHub({
     return (
       <div key={view} className="swap-enter space-y-5">
         <div className="flex items-center gap-3">
-          <p.icon className="h-6 w-6 text-neutral-900" />
+          <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${p.tone}`}>
+            <p.icon className="h-5 w-5" />
+          </span>
           <div>
             <h2 className="text-base font-semibold tracking-tight">{p.name}</h2>
             <p className="text-sm text-neutral-500">{p.text}</p>
@@ -100,10 +102,12 @@ export function PluginsHub({
               type="button"
               onClick={() => onOpen(p.id)}
               style={{ minHeight: 0 }}
-              className="group flex flex-col rounded-2xl border border-neutral-200 bg-white p-5 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-neutral-950 hover:shadow-[0_20px_44px_-24px_rgba(0,0,0,0.3)]"
+              className="group flex flex-col rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 text-left transition-all duration-300 hover:-translate-y-0.5 hover:ring-neutral-950 hover:shadow-[0_20px_44px_-24px_rgba(0,0,0,0.3)]"
             >
               <span className="flex items-start justify-between gap-3">
-                <p.icon className="h-6 w-6 text-neutral-900" />
+                <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${p.tone}`}>
+                  <p.icon className="h-5 w-5" />
+                </span>
                 {isOn(p.id) ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
                     <Check className="h-3 w-3" /> On
@@ -192,7 +196,7 @@ function WhatsAppPlugin({ store, onChanged }: { store: StoreData; onChanged: () 
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 sm:p-5">
         <b>Free on every plan.</b> Open any order and tap <b>WhatsApp the buyer</b>. WhatsApp opens with the message written for you, from your own number. Nothing is sent until you press send.
       </div>
-      <div className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+      <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 sm:p-6">
         <h3 className="text-base font-semibold">Your messages</h3>
         <p className="mt-0.5 text-sm text-neutral-500">Edit the wording. Words in {"{brackets}"} fill in from each order.</p>
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -405,7 +409,7 @@ function ShiprocketPlugin({ store }: { store: StoreData }) {
 
   if (!status.connected)
     return (
-      <form onSubmit={connect} className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+      <form onSubmit={connect} className="space-y-4 rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 sm:p-6">
         <div>
           <h3 className="text-base font-semibold">Connect your Shiprocket account</h3>
           <p className="mt-0.5 text-sm text-neutral-500">Three quick steps. You only do this once.</p>
@@ -474,7 +478,7 @@ function ShiprocketPlugin({ store }: { store: StoreData }) {
         </button>
       </div>
 
-      <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+      <div className="space-y-4 rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 sm:p-6">
         <h3 className="text-base font-semibold">Shipping defaults</h3>
         <label className="block text-sm">
           <span className="mb-1.5 block font-medium">Pickup address</span>
@@ -518,7 +522,7 @@ function ShiprocketPlugin({ store }: { store: StoreData }) {
       </div>
 
       {status.webhook && (
-        <div className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+        <div className="rounded-[24px] bg-white ring-1 ring-black/[0.04] p-5 sm:p-6">
           <h3 className="text-base font-semibold">Automatic tracking updates</h3>
           <p className="mt-0.5 text-sm text-neutral-500">
          In Shiprocket open Settings → API → Webhooks, paste these two values and switch it on.</p>

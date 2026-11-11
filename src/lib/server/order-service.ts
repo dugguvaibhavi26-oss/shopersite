@@ -4,8 +4,8 @@ import { randomBytes } from "node:crypto";
 import { applyNewOrder, quoteOrder, QuoteError, type BagItemInput } from "../payments/cashfree-core";
 import { canUseReviews } from "../plans";
 import { isShopClosed, orderPolicyOf } from "../policies";
-import { buyerProblem, codAllowedFor, codLimitText } from "../checkout-rules";
-import { notifySellerOfOrder } from "./order-alerts";
+import { buyerProblem, codAllowedFor, codBlockedReason, codLimitText, detailsProblem } from "../checkout-rules";
+import { notifySellerOfOrder, notifySellerOfReview } from "./order-alerts";
 import { isValidUpiId, type OrderData, type ReviewData, type StoreData } from "../store-service";
 import { ApiError } from "./api-error";
 import { adminDb } from "./firebase-admin";
@@ -34,8 +34,9 @@ export interface PlaceOrderInput {
   method: "upi" | "cod";
   items: BagItemInput[];
   couponCode?: string;
-  customer: { name: string; phone: string; email?: string };
-  address: { street: string; city: string; state: string; pincode: string };
+  customer: { name: string; phone: string; email?: string; altPhone?: string };
+  address: { street: string; landmark?: string; city: string; state: string; pincode: string };
+  marketingOptIn?: boolean;
   notes?: string;
   utr?: string;
   /** the signed-in buyer's account id (from a verified token) */
@@ -56,6 +57,12 @@ export async function placeOrder(input: PlaceOrderInput): Promise<OrderData> {
     if (input.method === "cod" && !store.codEnabled && onlineAvailable) throw new ApiError(409, "Cash on delivery isn't available at this shop. Please pay online.");
     const buyerIssue = buyerProblem(store, { email: input.customer.email, signedIn: !!input.customerUid });
     if (buyerIssue) throw new ApiError(400, buyerIssue);
+    const detailsIssue = detailsProblem(store, { landmark: input.address.landmark, altPhone: input.customer.altPhone, phone: input.customer.phone });
+    if (detailsIssue) throw new ApiError(400, detailsIssue);
+    if (input.method === "cod") {
+      const codIssue = codBlockedReason(store, { productIds: input.items.map((i) => i.productId), pincode: input.address.pincode }, onlineAvailable);
+      if (codIssue) throw new ApiError(409, codIssue);
+    }
     if (input.method === "upi" && !isValidUpiId(store.upiId || "")) throw new ApiError(409, "UPI payment isn't set up at this shop.");
 
     // a UPI reference can pay for one order only
@@ -85,9 +92,15 @@ export async function placeOrder(input: PlaceOrderInput): Promise<OrderData> {
       id,
       storeId: store.id,
       token: `tok_sh_${randomBytes(12).toString("hex")}`,
-      customer: { name: input.customer.name, phone: input.customer.phone, ...(input.customer.email ? { email: input.customer.email } : {}) },
+      customer: {
+        name: input.customer.name,
+        phone: input.customer.phone,
+        ...(input.customer.email ? { email: input.customer.email } : {}),
+        ...(input.customer.altPhone ? { altPhone: input.customer.altPhone } : {}),
+      },
       ...(input.customerUid ? { customerUid: input.customerUid } : {}),
-      address: input.address,
+      address: { street: input.address.street, ...(input.address.landmark ? { landmark: input.address.landmark } : {}), city: input.address.city, state: input.address.state, pincode: input.address.pincode },
+      ...(input.marketingOptIn ? { marketingOptIn: true } : {}),
       items: quote.items,
       subtotal: quote.subtotal,
       discount: quote.discount,
@@ -214,7 +227,7 @@ export async function addReview(input: {
   tokens: string[];
 }): Promise<ReviewData> {
   const db = adminDb();
-  return db.runTransaction(async (tx) => {
+  const saved = await db.runTransaction(async (tx) => {
     const store = await readStoreTx(tx, input.subdomain);
     shopIsOpen(store);
     if (!canUseReviews(store.planId)) throw new ApiError(409, "Reviews aren't open at this shop.");
@@ -236,8 +249,10 @@ export async function addReview(input: {
       createdAt: new Date().toISOString(),
     };
     writeStoreTx(tx, store.subdomain, { reviews: [review, ...reviews] });
-    return review;
+    return { review, store };
   });
+  await notifySellerOfReview(saved.store, saved.review);
+  return saved.review;
 }
 
 /** Adds an email to the shop's drop-alert list. */
