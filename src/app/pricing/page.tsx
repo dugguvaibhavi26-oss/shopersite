@@ -22,7 +22,6 @@ import {
   PLATFORM_PLANS,
   calculatePlanPrice,
   planDiscountPercent,
-  BILLING_CYCLES,
   type BillingCycle,
   type PlanId,
   priceAfterTrial,
@@ -40,171 +39,176 @@ interface ComparisonFeature {
 }
 
 const COMPARISON_FEATURES: ComparisonFeature[] = [
-  // Core Store & Products
   {
-    category: "Store & Inventory",
+    category: "Store & products",
     name: "Platform commission",
-    tooltip: "Shopersite takes zero percentage from your revenue.",
-    free: "0% forever",
-    starter: "0% forever",
-    pro: "0% forever",
+    tooltip: "Shopersite takes no percentage of your sales.",
+    free: "0%",
+    starter: "0%",
+    pro: "0%",
   },
   {
-    category: "Store & Inventory",
-    name: "Product listing limit",
-    tooltip: "Maximum number of active products in your catalog.",
-    free: "5 products",
-    starter: "100 products",
+    category: "Store & products",
+    name: "Products",
+    free: "Up to 75",
+    starter: "Up to 200",
     pro: "Unlimited",
   },
   {
-    category: "Store & Inventory",
-    name: "Categories & Collections",
-    free: "Up to 3",
-    starter: "Unlimited",
-    pro: "Unlimited",
-  },
-  {
-    category: "Store & Inventory",
-    name: "Product variants (Sizes, Colors)",
+    category: "Store & products",
+    name: "Your shop address (yourbrand.shopersite.in)",
     free: true,
     starter: true,
     pro: true,
   },
   {
-    category: "Store & Inventory",
-    name: "Inventory tracking & stock alerts",
-    free: true,
-    starter: true,
-    pro: true,
-  },
-
-  // Payments & Checkout
-  {
-    category: "Payments & Settlements",
-    name: "Direct UPI payments (GPay, PhonePe, Paytm)",
-    tooltip: "Payments settle instantly into your own UPI ID.",
+    category: "Store & products",
+    name: "Order management and tracking",
     free: true,
     starter: true,
     pro: true,
   },
   {
-    category: "Payments & Settlements",
-    name: "Payment gateway processing fee",
-    tooltip: "Zero platform fee; standard payment gateway fees only if enabled.",
-    free: "₹0 fee",
-    starter: "₹0 fee",
-    pro: "₹0 fee",
-  },
-  {
-    category: "Payments & Settlements",
-    name: "Cash on Delivery (COD) support",
+    category: "Store & products",
+    name: "Sales analytics and low-stock alerts",
     free: true,
     starter: true,
     pro: true,
   },
   {
-    category: "Payments & Settlements",
-    name: "Automated WhatsApp payment verification",
+    category: "Store & products",
+    name: "Bulk upload (CSV / Excel)",
     free: false,
     starter: true,
     pro: true,
   },
-
-  // Design & Branding
   {
-    category: "Design & Storefront",
-    name: "Designer Themes Access",
-    tooltip: "Pick from 37 curated, high-converting storefront aesthetics.",
-    free: "Free starter themes",
-    starter: "All 37 themes",
-    pro: "All 37 themes + Custom",
+    category: "Payments & delivery",
+    name: "Cash on Delivery",
+    free: true,
+    starter: true,
+    pro: true,
   },
   {
-    category: "Design & Storefront",
-    name: "Custom domain connection",
-    tooltip: "Connect your own www.yourbrand.com domain.",
-    free: "storename.shopersite.in",
-    starter: "storename.shopersite.in",
-    pro: "Custom domain included",
+    category: "Payments & delivery",
+    name: "Online payments (your own Razorpay account)",
+    tooltip: "Cards, UPI and net banking. Razorpay charges its own fee; Shopersite adds nothing.",
+    free: false,
+    starter: true,
+    pro: true,
   },
   {
-    category: "Design & Storefront",
+    category: "Payments & delivery",
+    name: "Shipping integration (Shiprocket)",
+    free: false,
+    starter: true,
+    pro: true,
+  },
+  {
+    category: "Payments & delivery",
+    name: "Automatic invoices",
+    free: false,
+    starter: false,
+    pro: true,
+  },
+  {
+    category: "Design",
+    name: "Themes",
+    free: "1 theme",
+    starter: "7 themes",
+    pro: "All 30 themes",
+  },
+  {
+    category: "Design",
+    name: "Website editor",
+    free: "Photos only",
+    starter: "Full editor",
+    pro: "Full editor",
+  },
+  {
+    category: "Design",
+    name: "Your own domain",
+    tooltip: "Connect your own www.yourbrand.com address.",
+    free: false,
+    starter: false,
+    pro: true,
+  },
+  {
+    category: "Design",
     name: "Remove Shopersite branding",
     free: false,
     starter: false,
     pro: true,
   },
-
-  // Marketing & Growth
   {
-    category: "Marketing & Operations",
-    name: "Discount coupons & promo codes",
-    free: false,
-    starter: true,
-    pro: true,
-  },
-  {
-    category: "Marketing & Operations",
-    name: "WhatsApp 1-click customer checkout",
+    category: "Marketing",
+    name: "AI product descriptions",
     free: true,
     starter: true,
     pro: true,
   },
   {
-    category: "Marketing & Operations",
-    name: "Customer CRM & Order history",
-    free: "Basic",
-    starter: "Full CRM",
-    pro: "Full CRM + Export",
+    category: "Marketing",
+    name: "Coupons and promo codes",
+    free: false,
+    starter: true,
+    pro: true,
   },
   {
-    category: "Marketing & Operations",
-    name: "Sales reports & analytics",
-    free: "7-day view",
-    starter: "All-time + Trends",
-    pro: "Advanced + CSV export",
+    category: "Marketing",
+    name: "Customer reviews",
+    free: false,
+    starter: true,
+    pro: true,
   },
   {
-    category: "Marketing & Operations",
-    name: "Support priority",
-    free: "Standard email",
-    starter: "Priority WhatsApp",
-    pro: "Dedicated 1-on-1 manager",
+    category: "Marketing",
+    name: "Abandoned cart recovery",
+    free: false,
+    starter: true,
+    pro: true,
+  },
+  {
+    category: "Marketing",
+    name: "Email integration and automatic emails",
+    free: false,
+    starter: false,
+    pro: true,
   },
 ];
 
 const PRICING_FAQS = [
   {
     q: "Are there really no transaction fees or commissions on sales?",
-    a: "Yes, exactly 0%. Whether you sell ₹1,000 or ₹10,00,000, Shopersite never takes a percentage cut from your hard-earned revenue. When customers pay via direct UPI, 100% of the money goes directly into your bank account.",
+    a: "Yes, exactly 0%. Whether you sell ₹1,000 or ₹10,00,000, Shopersite never takes a percentage of your sales. If you take online payments, Razorpay charges its own fee on your Razorpay account; Shopersite adds nothing to it.",
   },
   {
     q: "How do customer payments reach my bank account?",
-    a: "During checkout, customers can pay instantly via UPI (Google Pay, PhonePe, Paytm, BHIM) straight to your UPI ID, or choose Cash on Delivery. Settlements are instant with zero holding period because payments go directly to you.",
+    a: "On every plan, buyers can choose Cash on Delivery and you collect the money yourself. On Growth and Pro you can connect your own Razorpay account, so buyers pay by card, UPI or net banking and Razorpay settles the money to your bank account. Shopersite never holds your money.",
   },
   {
     q: "Can I start on the Free plan and upgrade later?",
-    a: "Yes! You can start on the ₹0 Free plan with no credit card required. As your order volume increases, you can upgrade to Starter or Pro at any time with a single click. Any unused time on your current billing period is credited automatically.",
+    a: "Yes! You can start on the ₹0 Free plan with no credit card required. As your order volume increases, you can upgrade to Growth or Pro at any time from Settings → Plan & billing.",
   },
   {
     q: "Can I connect my own custom domain (e.g., www.mybrand.com)?",
-    a: "Yes! The Pro plan includes full custom domain support with automated SSL certificate provisioning. On Free and Starter plans, your shop lives on a clean branded subdomain like storename.shopersite.in.",
+    a: "Yes. The Pro plan lets you connect your own domain. On Free and Growth plans, your shop lives on a clean branded subdomain like storename.shopersite.in.",
   },
   {
     q: "What payment methods are supported for subscription billing?",
-    a: "You can pay for your Starter or Pro plan using any Indian UPI app, Debit Cards, Credit Cards, or Net Banking. We support Monthly, Quarterly (save 5%), and Yearly (save 10%) billing.",
+    a: "Growth and Pro are paid automatically each month through Razorpay, by card or UPI AutoPay. You approve it once, and you can cancel any time.",
   },
   {
     q: "Can I cancel my subscription anytime?",
-    a: "Yes, absolutely. There are no lock-in contracts. You can cancel or pause your subscription from your dashboard at any time, and you'll retain full access until the end of your prepaid period.",
+    a: "Yes, absolutely. There are no lock-in contracts. You can cancel from your dashboard at any time. No more payments are taken, and you keep your plan until the end of the period you paid for (or the free trial).",
   },
 ];
 
 export default function PricingPage() {
   usePlatformSettings();
   const { user, signOut } = useAuth();
-  const [billingCycle, setBillingCycle] = React.useState<BillingCycle>("monthly");
+  // plans are billed monthly only (Razorpay Subscriptions)
+  const billingCycle = "monthly" as BillingCycle;
   const [openFaqIndex, setOpenFaqIndex] = React.useState<number | null>(null);
 
   // Group comparison features by category
@@ -226,51 +230,10 @@ export default function PricingPage() {
               Run your entire store with one transparent plan.
             </h1>
             <p className="text-base sm:text-lg text-neutral-600 max-w-2xl mx-auto leading-relaxed">
-              No hidden fees, no percentage cuts, no surprise charges. Keep 100% of your sales with direct UPI settlements.
+              No hidden fees, no percentage cuts, no surprise charges. Keep 100% of your sales.
             </p>
 
-            {/* 3-WAY BILLING CYCLE TOGGLE */}
-            <div className="pt-6 flex flex-col items-center justify-center gap-2">
-              <div className="inline-flex flex-wrap items-center justify-center rounded-2xl bg-neutral-100 p-1.5 text-xs font-semibold gap-1 border border-neutral-200 shadow-2xs">
-                {BILLING_CYCLES.map((cycle) => {
-                  const isSelected = billingCycle === cycle.id;
-                  return (
-                    <button
-                      key={cycle.id}
-                      type="button"
-                      onClick={() => setBillingCycle(cycle.id)}
-                      className={cn(
-                        "flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer",
-                        isSelected
-                          ? "bg-black text-white shadow-xs"
-                          : "text-neutral-600 hover:text-black hover:bg-neutral-200/50"
-                      )}
-                    >
-                      <span>{cycle.label}</span>
-                      {cycle.tag && (
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider",
-                            isSelected
-                              ? "bg-amber-400 text-black"
-                              : cycle.id === "yearly"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-blue-100 text-blue-800"
-                          )}
-                        >
-                          {cycle.tag}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="text-xs text-neutral-500 font-medium">
-                {billingCycle === "quarterly" && "Save 5% on 3-month commitments. Billed quarterly."}
-                {billingCycle === "yearly" && "Save 10% on annual commitments. Billed annually."}
-                {billingCycle === "monthly" && "Standard month-to-month billing. Cancel anytime."}
-              </p>
-            </div>
+            <p className="pt-6 text-center text-xs text-neutral-500 font-medium">Billed monthly. Cancel anytime.</p>
           </div>
         </div>
 
@@ -396,10 +359,10 @@ export default function PricingPage() {
                       Free (₹0)
                     </th>
                     <th className="py-4 px-6 text-xs font-black uppercase tracking-wider text-neutral-900 w-1/5">
-                      Starter (₹399/mo)
+                      {PLATFORM_PLANS.starter.name} ({PLATFORM_PLANS.starter.priceFormatted.split(" ")[0]}/mo)
                     </th>
                     <th className="py-4 px-6 text-xs font-black uppercase tracking-wider text-neutral-900 w-1/5">
-                      Pro (₹899/mo)
+                      {PLATFORM_PLANS.pro.name} ({PLATFORM_PLANS.pro.priceFormatted.split(" ")[0]}/mo)
                     </th>
                   </tr>
                 </thead>
@@ -471,7 +434,7 @@ export default function PricingPage() {
               Frequently Asked Questions
             </h2>
             <p className="text-xs sm:text-sm text-neutral-600 max-w-lg mx-auto">
-              Everything you need to know about billing, UPI settlements, and plan features.
+              Everything you need to know about billing, payments and plan features.
             </p>
           </div>
 
@@ -533,7 +496,7 @@ export default function PricingPage() {
                   href="/themes"
                   className="px-5 py-3.5 rounded-xl bg-white/10 text-white text-xs font-bold hover:bg-white/20 border border-white/15 transition-colors"
                 >
-                  Browse 37 Themes
+                  Browse All Themes
                 </Link>
               </div>
             </div>

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { siteConfig } from "@/lib/config/site";
 import { usePlatformSettings } from "@/lib/use-platform-settings";
-import { PLATFORM_PLANS, priceAfterTrial, trialLength, planDiscountPercent, calculatePlanPrice, BILLING_CYCLES, type BillingCycle } from "@/lib/plans";
+import { PLATFORM_PLANS, priceAfterTrial, trialLength, planDiscountPercent, calculatePlanPrice, type BillingCycle } from "@/lib/plans";
 import { PLATFORM_THEMES, getTheme, themeThumb, type ThemeDefinition } from "@/lib/themes";
 import { useLandingConfig } from "@/lib/landing-client";
 import { DEFAULT_FEATURED_THEME_SLUGS } from "@/lib/landing-config";
@@ -1005,7 +1005,8 @@ function Statement() {
 
 function Pricing() {
   usePlatformSettings();
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
+  // plans are billed monthly only (Razorpay Subscriptions)
+  const billingCycle = "monthly" as BillingCycle;
 
   return (
     <section id="pricing" className="border-t border-neutral-200">
@@ -1018,48 +1019,7 @@ function Pricing() {
           text="No commissions, no hidden fees. Start free and upgrade when you're ready."
         />
 
-        {/* 3-way Billing Cycle Toggle */}
-        <div className="mt-10 flex flex-col items-center justify-center gap-2">
-          <div className="inline-flex flex-wrap items-center justify-center rounded-2xl bg-neutral-100 p-1.5 text-xs font-semibold gap-1 border border-neutral-200/80 shadow-2xs">
-            {BILLING_CYCLES.map((cycle) => {
-              const isSelected = billingCycle === cycle.id;
-              return (
-                <button
-                  key={cycle.id}
-                  type="button"
-                  onClick={() => setBillingCycle(cycle.id)}
-                  className={cn(
-                    "flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all duration-200 cursor-pointer",
-                    isSelected
-                      ? "bg-black text-white shadow-sm"
-                      : "text-neutral-600 hover:text-black hover:bg-neutral-200/50"
-                  )}
-                >
-                  <span>{cycle.label}</span>
-                  {cycle.tag && (
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase",
-                        isSelected
-                          ? "bg-amber-400 text-black"
-                          : cycle.id === "yearly"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-blue-100 text-blue-800"
-                      )}
-                    >
-                      {cycle.tag}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-[11px] text-neutral-500 font-medium">
-            {billingCycle === "quarterly" && "Save 5% on 3-month commitments. Billed quarterly."}
-            {billingCycle === "yearly" && "Save 10% on annual commitments. Billed annually."}
-            {billingCycle === "monthly" && "Standard month-to-month billing. Cancel anytime."}
-          </p>
-        </div>
+        <p className="mt-10 text-center text-[11px] text-neutral-500 font-medium">Billed monthly. Cancel anytime.</p>
 
         <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
           {Object.values(PLATFORM_PLANS).map((plan, i) => {
