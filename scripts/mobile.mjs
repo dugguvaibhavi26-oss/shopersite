@@ -69,7 +69,7 @@ function capEnv() {
 function serverUrlFor(env) {
   return dev
     ? env.CAP_DEV_SERVER_URL || "http://10.0.2.2:3000"
-    : env.CAP_SERVER_URL || "https://shopersite-app.vercel.app";
+    : env.CAP_SERVER_URL || "https://shopersite.in";
 }
 
 function sync() {
@@ -120,7 +120,14 @@ switch (command) {
     // Full path: Windows may not look in the current folder for commands (NoDefaultCurrentDirectoryInExePath)
     const androidDir = path.join(root, "android");
     const gradlew = path.join(androidDir, isWindows ? "gradlew.bat" : "gradlew");
-    run(gradlew, [target], { cwd: androidDir });
+    // Ensure Java 21 is used (Android Studio bundled jbr) since Capacitor 8 requires Java 21
+    const jbrPath = "C:\\Program Files\\Android\\Android Studio\\jbr";
+    const env = { ...process.env };
+    if (existsSync(jbrPath)) {
+      env.JAVA_HOME = jbrPath;
+      env.Path = `${path.join(jbrPath, "bin")};${env.Path || env.PATH || ""}`;
+    }
+    run(gradlew, [target], { cwd: androidDir, env });
     const outputs = {
       assembleDebug: ["android/app/build/outputs/apk/debug/app-debug.apk"],
       assembleRelease: [

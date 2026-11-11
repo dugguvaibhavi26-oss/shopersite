@@ -17,7 +17,7 @@ import type { KeyboardResize } from "@capacitor/keyboard";
  * Run `npm run cap:sync` (or `npm run cap:sync:dev`) after changing anything here.
  */
 
-const PRODUCTION_URL_DEFAULT = "https://www.shopersite.in";
+const PRODUCTION_URL_DEFAULT = "https://shopersite.in";
 
 const isDev = process.env.CAP_ENV === "development";
 const serverUrl = isDev

@@ -298,7 +298,9 @@ export function TumbleDeckShowcase({
 
       e.preventDefault()
       const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? root.clientHeight : 1
-      const d = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * scale
+      const raw = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * scale
+      // Invert delta so scrolling down tumbles cards forward, scrolling up returns/lifts cards back
+      const d = -raw
       if (reduce) {
         // No scrubbing: whole cards only, one per `scrollPerCard` of travel.
         acc += d

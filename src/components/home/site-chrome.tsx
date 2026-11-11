@@ -130,26 +130,29 @@ export function SiteHeader({ user, onSignOut }: { user: boolean; onSignOut: () =
       {/* Mobile menu */}
       {mobileOpen && (
         <div className="animate-in slide-in-from-top-2 lg:hidden border-t border-neutral-200 max-h-[calc(100svh-6rem)] overflow-y-auto rounded-b-[17px]">
-          <div className="px-4 py-4 space-y-1">
-            {[...PRODUCT_MENU, ...RESOURCES_MENU].map(({ icon: Icon, title, href }, i) => (
-              <a
-                key={title}
-                href={href}
-                onClick={() => setMobileOpen(false)}
-                style={{ animationDelay: `${i * 45}ms` }}
-                className="hero-rise group/m flex items-center gap-3 px-3 py-3 rounded-[8px] hover:bg-neutral-100 active:bg-neutral-100 text-sm font-medium"
-              >
-                <span className="w-8 h-8 rounded-[6px] bg-neutral-100 flex items-center justify-center transition-colors group-active/m:bg-black group-active/m:text-white">
-                  <Icon className="w-4 h-4" />
-                </span>
-                {title}
-              </a>
+          <div className="px-5 pt-2 pb-4">
+            {[
+              { label: "Product", items: PRODUCT_MENU.map(({ title, href }) => ({ title, href })) },
+              { label: "Resources", items: [...RESOURCES_MENU.map(({ title, href }) => ({ title, href })), { title: "Pricing", href: "/pricing" }] },
+            ].map((group, g) => (
+              <div key={group.label} className="pt-4">
+                <div className="pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400">{group.label}</div>
+                {group.items.map(({ title, href }, i) => (
+                  <a
+                    key={title}
+                    href={href}
+                    onClick={() => setMobileOpen(false)}
+                    style={{ animationDelay: `${(g * 4 + i) * 35}ms` }}
+                    className="hero-rise group/m flex items-center justify-between border-b border-neutral-100 py-2.5 text-[17px] font-medium tracking-[-0.01em] text-neutral-900 last:border-b-0 active:text-neutral-500"
+                  >
+                    {title}
+                    <span aria-hidden className="text-neutral-300 transition-transform group-active/m:translate-x-1">→</span>
+                  </a>
+                ))}
+              </div>
             ))}
-            <Link href="/pricing" onClick={() => setMobileOpen(false)} className="block px-3 py-3 rounded-[8px] hover:bg-neutral-100 text-sm font-medium">
-              Pricing
-            </Link>
           </div>
-          <div className="px-4 pb-5 grid grid-cols-2 gap-2">
+          <div className="px-5 pb-5 grid grid-cols-2 gap-2">
             {user ? (
               <>
                 <button type="button" onClick={onSignOut} className="py-3 rounded-[14px] border border-neutral-300 text-sm font-semibold">
