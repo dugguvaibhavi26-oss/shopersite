@@ -56,8 +56,6 @@ const requestGuidance = (s: string) =>
   send("/api/support/guidance", { method: "POST", body: JSON.stringify({ store: s, topic: "razorpay_setup" }) }, "Couldn't send your request. Please try again.");
 const getTestPass = (s: string) =>
   send<{ pass: string }>("/api/razorpay/test-pass", { method: "POST", body: JSON.stringify({ store: s }) }, "Couldn't start a test payment.");
-const startOAuth = (s: string) =>
-  send<{ url: string }>("/api/razorpay/oauth/connect", { method: "POST", body: JSON.stringify({ store: s }) }, "Couldn't open Razorpay. Please try again.");
 
 async function fetchOAuthAvailable(): Promise<boolean> {
   try {
@@ -90,7 +88,7 @@ function useChecklist(subdomain: string) {
   return { done, toggle };
 }
 
-export function RazorpayPaymentsCard({ store }: { store: StoreData }) {
+export function RazorpayPaymentsCard({ store, onOpenPlugin }: { store: StoreData; onOpenPlugin?: () => void }) {
   const [status, setStatus] = React.useState<RazorpayStatus | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
@@ -108,13 +106,6 @@ export function RazorpayPaymentsCard({ store }: { store: StoreData }) {
 
   React.useEffect(() => {
     fetchOAuthAvailable().then(setOauthAvailable);
-    const p = new URLSearchParams(window.location.search);
-    if (p.get("razorpay") === "error") setError("Razorpay connection didn't finish. Please try again.");
-    if (p.has("razorpay")) {
-      p.delete("razorpay");
-      const q = p.toString();
-      window.history.replaceState(null, "", window.location.pathname + (q ? `?${q}` : "") + window.location.hash);
-    }
   }, []);
 
   const refresh = React.useCallback(async () => {
@@ -155,17 +146,6 @@ export function RazorpayPaymentsCard({ store }: { store: StoreData }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't connect Razorpay.");
     } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleOAuth = async () => {
-    setError("");
-    setBusy(true);
-    try {
-      window.location.href = (await startOAuth(store.subdomain)).url;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't open Razorpay.");
       setBusy(false);
     }
   };
@@ -412,15 +392,14 @@ export function RazorpayPaymentsCard({ store }: { store: StoreData }) {
           <div className="mt-5">
             {updating ? <BackLink onClick={() => { setUpdating(false); setForm({ keyId: "", keySecret: "" }); setError(""); }} label="Cancel" /> : <BackLink onClick={() => go("choose")} />}
 
-            {oauthAvailable && !updating && (
-              <div className="mt-3 rounded-xl border border-neutral-200 p-4">
-                <p className="text-sm font-semibold">Fastest: sign in to Razorpay</p>
-                <p className="mt-0.5 text-sm text-neutral-500">Approve Shopersite in your Razorpay account. No keys to copy.</p>
-                <button type="button" onClick={handleOAuth} disabled={busy} className="mt-3 inline-flex h-10 items-center gap-2 rounded-xl bg-neutral-950 px-4 text-sm font-semibold text-white hover:bg-black disabled:opacity-60">
-                  {busy && <Loader2 className="h-4 w-4 animate-spin" />} Connect with Razorpay
+            {oauthAvailable && !updating && onOpenPlugin && (
+              <p className="mt-3 rounded-xl bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+                Faster: connect in one click from{" "}
+                <button type="button" onClick={onOpenPlugin} style={{ minHeight: 0 }} className="font-semibold text-neutral-950 underline underline-offset-2">
+                  Plugins → Razorpay
                 </button>
-                <p className="mt-4 text-xs font-medium uppercase tracking-wide text-neutral-400">Or paste your API keys</p>
-              </div>
+                . Or paste your API keys below.
+              </p>
             )}
 
             <p className="mt-3 text-sm text-neutral-600">

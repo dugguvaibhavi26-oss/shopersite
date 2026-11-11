@@ -7,7 +7,7 @@
 export type FeatureTarget =
   | { kind: "tab"; tab: "analytics" | "products" | "categories" | "orders" | "discounts" | "customers" | "reviews" | "staff" | "workplace" | "themes" | "plugins" | "notifications" | "profile" }
   | { kind: "settings"; section: "general" | "billing" | "store" | "domain" | "payments" | "checkout" | "accounts" | "delivery" | "taxes" | "notifications" | "events" | "privacy" | "policies" }
-  | { kind: "plugin"; plugin: "shiprocket" | "whatsapp" | "gmail" }
+  | { kind: "plugin"; plugin: "razorpay" | "shiprocket" | "whatsapp" | "gmail" }
   | { kind: "add-product" }
   | { kind: "abandoned" }
   | { kind: "assistant" }
@@ -46,6 +46,7 @@ export const DASHBOARD_FEATURES: DashboardFeature[] = [
 
   // payments and delivery
   { id: "settings-payments", group: "Payments & delivery", label: "Payments", hint: "Razorpay and cash on delivery", button: "Set up payments", words: "payment gateway razorpay cod online card money", target: { kind: "settings", section: "payments" } },
+  { id: "plugin-razorpay", group: "Payments & delivery", label: "Razorpay one-click connect", hint: "Connect Razorpay by signing in, no keys to copy", button: "Connect Razorpay", words: "payment gateway razorpay online upi card plugin oauth", target: { kind: "plugin", plugin: "razorpay" } },
   { id: "settings-checkout", group: "Payments & delivery", label: "Checkout", hint: "Minimum order, COD limit, buyer fields", button: "Open checkout settings", words: "order rules minimum", target: { kind: "settings", section: "checkout" } },
   { id: "settings-delivery", group: "Payments & delivery", label: "Shipping & delivery", hint: "What buyers pay for delivery", button: "Set delivery charges", words: "shipping rates courier free delivery pincode", target: { kind: "settings", section: "delivery" } },
   { id: "settings-taxes", group: "Payments & delivery", label: "Taxes", hint: "GST number and how prices are shown", button: "Add GST details", words: "gst tax gstin", target: { kind: "settings", section: "taxes" } },

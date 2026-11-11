@@ -475,16 +475,21 @@ function DashboardPageContent() {
     const p = new URLSearchParams(window.location.search);
     const s = p.get("section") as SettingsSection | null;
     if (s && (SETTINGS_SECTIONS as readonly string[]).includes(s)) return s;
-    return p.has("razorpay") ? "payments" : "general";
+    return p.has("razorpay") && p.get("tab") !== "plugins" ? "payments" : "general";
   });
   // Phones show the settings list first; tapping a row opens that page (with a back arrow)
   const [settingsListOpen, setSettingsListOpen] = useState(() => {
     if (typeof window === "undefined") return true;
     const p = new URLSearchParams(window.location.search);
-    return !(p.has("section") || p.has("razorpay"));
+    return !(p.has("section") || (p.has("razorpay") && p.get("tab") !== "plugins"));
   });
   // Plugins opens on the list of plugins; leaving the tab goes back to it
-  const [pluginView, setPluginView] = useState<PluginId | null>(null);
+  const [pluginView, setPluginView] = useState<PluginId | null>(() => {
+    // coming back from Razorpay's sign-in opens Plugins → Razorpay
+    if (typeof window === "undefined") return null;
+    const p = new URLSearchParams(window.location.search);
+    return p.get("tab") === "plugins" && p.get("plugin") === "razorpay" ? "razorpay" : null;
+  });
   useEffect(() => {
     if (activeTab !== "plugins") setPluginView(null);
   }, [activeTab]);
@@ -529,6 +534,8 @@ function DashboardPageContent() {
       const home = new URL(window.location.href);
       home.searchParams.delete("tab");
       home.searchParams.delete("section");
+      home.searchParams.delete("plugin");
+      home.searchParams.delete("razorpay");
       const hereUrl = new URL(window.location.href);
       hereUrl.searchParams.set("tab", activeTab);
       const here = hereUrl.href;
@@ -6066,7 +6073,14 @@ function DashboardPageContent() {
             <>
             {/* Online payments: Growth and Pro connect their own payment gateway */}
             {planHas(store.planId, "paymentGateway") ? (
-              <RazorpayPaymentsCard store={store} />
+              <RazorpayPaymentsCard
+                store={store}
+                onOpenPlugin={() => {
+                  setActiveTab("plugins");
+                  setPluginView("razorpay");
+                  scrollDashTop({ top: 0 });
+                }}
+              />
             ) : (
               <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-neutral-950 p-5 text-white sm:p-6">
                 <div className="min-w-0">
@@ -6239,6 +6253,7 @@ function DashboardPageContent() {
             }}
             onUpgrade={() => openSettings("billing")}
             onChanged={refreshStore}
+            onOpenPayments={() => openSettings("payments")}
             gmail={
           <div className="space-y-6">
             {!canUseEmail(store.planId) ? (

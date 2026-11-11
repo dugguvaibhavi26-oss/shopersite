@@ -47,7 +47,12 @@ function HeroBanner({ slides }: { slides: HeroSlide[] }) {
   }, [i, paused, n]);
   const open = (s: HeroSlide) => {
     if (!s.link) return;
-    if (s.link.startsWith("/")) window.location.assign(s.link);
+    // our own pages (a /path, or a full link to this site) open here; other sites in a new tab
+    let own = s.link.startsWith("/");
+    try {
+      own ||= new URL(s.link).origin === window.location.origin;
+    } catch {}
+    if (own) window.location.assign(s.link);
     else window.open(s.link, "_blank", "noopener,noreferrer");
   };
 
@@ -69,13 +74,13 @@ function HeroBanner({ slides }: { slides: HeroSlide[] }) {
           type="button"
           tabIndex={k === i ? 0 : -1}
           aria-hidden={k !== i}
-          aria-label={s.title}
+          aria-label={s.title || `Banner ${k + 1}`}
           onClick={() => open(s)}
           className={`absolute inset-0 transition-opacity duration-700 ${k === i ? "opacity-100" : "pointer-events-none opacity-0"} ${s.link ? "cursor-pointer" : "cursor-default"}`}
         >
           {s.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={s.imageUrl} alt={s.title} className="h-full w-full object-cover" />
+            <img src={s.imageUrl} alt={s.title || ""} className="h-full w-full object-cover" />
           ) : (
             <span className="flex h-full w-full flex-col items-center justify-center gap-2 bg-neutral-100 text-neutral-400">
               <ImageIcon className="h-8 w-8" />

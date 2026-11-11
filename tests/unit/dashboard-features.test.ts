@@ -15,7 +15,7 @@ describe("dashboard features", () => {
     const sections = DASHBOARD_FEATURES.flatMap((f) => (f.target.kind === "settings" ? [f.target.section] : []));
     expect(sections.sort()).toEqual(["accounts", "billing", "checkout", "delivery", "domain", "events", "general", "notifications", "payments", "policies", "privacy", "store", "taxes"]);
     const plugins = DASHBOARD_FEATURES.flatMap((f) => (f.target.kind === "plugin" ? [f.target.plugin] : []));
-    expect(plugins.sort()).toEqual(["gmail", "shiprocket", "whatsapp"]);
+    expect(plugins.sort()).toEqual(["gmail", "razorpay", "shiprocket", "whatsapp"]);
   });
 
   it("finds features by what a person would type", () => {
@@ -61,5 +61,17 @@ describe("the admin's own Home cards", () => {
     expect(mergeDiscover({ cards: { design: { feature: "themes" } } }).design.feature).toBe("themes");
     expect(mergeDiscover({ cards: { design: { feature: "gone" } } }).design.feature).toBe("");
     expect(mergeDiscover(null).season.feature).toBe("");
+  });
+});
+
+describe("top banner slides", () => {
+  it("keeps a slide that is only an image, and drops one with nothing in it", async () => {
+    const { mergeSlides } = await import("@/lib/discover");
+    const img = { id: "s1", imageUrl: "https://img.example/b.png", link: "/dashboard?tab=billing" };
+    const [one] = mergeSlides({ slides: [img] });
+    expect(one.imageUrl).toBe(img.imageUrl);
+    expect(one.title).toBe("");
+    expect(one.link).toBe("/dashboard?tab=billing");
+    expect(mergeSlides({ slides: [{ id: "s2" }] })).toEqual([]);
   });
 });

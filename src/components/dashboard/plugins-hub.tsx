@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { Check, ChevronRight, Loader2, Lock, Package, RotateCcw, Send } from "lucide-react";
-import { IChat, IMail, ITruck } from "@/components/icons";
+import { IChat, IMail, IRupee, ITruck } from "@/components/icons";
+import { RazorpayPlugin, useRazorpayConnected } from "./razorpay-plugin";
 import { auth } from "@/lib/firebase";
 import type { StoreData } from "@/lib/store-service";
 import { effectivePlan } from "@/lib/subscription";
@@ -13,11 +14,11 @@ import { storeService } from "@/lib/store-service";
 import type { OrderData } from "@/lib/store-service";
 
 /**
- * Plugins: extra tools a store can switch on. Gmail (emails to buyers), WhatsApp (alerts and buyer
- * updates) and Shiprocket (shipping). More will be added here over time.
+ * Plugins: extra tools a store can switch on. Razorpay (online payments, one-click connect), Gmail
+ * (emails to buyers), WhatsApp (alerts and buyer updates) and Shiprocket (shipping).
  */
 
-export type PluginId = "gmail" | "whatsapp" | "shiprocket";
+export type PluginId = "razorpay" | "gmail" | "whatsapp" | "shiprocket";
 
 async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
   const user = auth.currentUser;
@@ -29,6 +30,7 @@ async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
 }
 
 const PLUGINS: { id: PluginId; name: string; text: string; icon: React.ElementType; tone: string; plan: "free" | "starter" | "pro" }[] = [
+  { id: "razorpay", name: "Razorpay", text: "Take UPI, card and net banking payments. Connect your Razorpay account in one click.", icon: IRupee, tone: "bg-neutral-100 text-neutral-900", plan: "free" },
   { id: "shiprocket", name: "Shiprocket", text: "Ship orders with 25+ couriers. Labels, pickup and live tracking.", icon: ITruck, tone: "bg-neutral-100 text-neutral-900", plan: "starter" },
   { id: "whatsapp", name: "WhatsApp", text: "One-tap order updates to buyers: confirmed, shipped with tracking, delivered.", icon: IChat, tone: "bg-neutral-100 text-neutral-900", plan: "free" },
   { id: "gmail", name: "Gmail", text: "Email buyers about their orders and new products, from your Gmail.", icon: IMail, tone: "bg-neutral-100 text-neutral-900", plan: "pro" },
@@ -42,6 +44,7 @@ export function PluginsHub({
   onOpen,
   onUpgrade,
   onChanged,
+  onOpenPayments,
   gmail,
 }: {
   store: StoreData;
@@ -49,12 +52,15 @@ export function PluginsHub({
   onOpen: (id: PluginId | null) => void;
   onUpgrade: () => void;
   onChanged: () => void;
+  /** Settings → Payments, where the Razorpay connection is managed */
+  onOpenPayments: () => void;
   gmail: React.ReactNode;
 }) {
   const plan = effectivePlan(store).planId;
   const allowed = (p: "free" | "starter" | "pro") => (p === "free" ? true : p === "pro" ? plan === "pro" : plan !== "free");
+  const razorpayOn = useRazorpayConnected(store.subdomain);
   const isOn = (id: PluginId) =>
-    id === "gmail" ? !!store.pluginsConfig?.gmailIntegration?.isConnected : id === "whatsapp" ? true : false;
+    id === "razorpay" ? razorpayOn : id === "gmail" ? !!store.pluginsConfig?.gmailIntegration?.isConnected : id === "whatsapp" ? true : false;
 
   if (view) {
     const p = PLUGINS.find((x) => x.id === view)!;
@@ -69,6 +75,8 @@ export function PluginsHub({
         </div>
         {!(p.id === "shiprocket" ? planHas(store.planId, "shipping") : allowed(p.plan)) && p.id !== "gmail" ? (
           <UpgradeCard plan={PLAN_NAME[p.plan]} onUpgrade={onUpgrade} />
+        ) : p.id === "razorpay" ? (
+          <RazorpayPlugin store={store} onOpenPayments={onOpenPayments} />
         ) : p.id === "gmail" ? (
           gmail
         ) : p.id === "whatsapp" ? (

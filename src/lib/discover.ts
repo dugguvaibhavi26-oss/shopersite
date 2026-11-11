@@ -169,5 +169,5 @@ export function mergeSlides(saved: unknown): HeroSlide[] {
       link: cleanLink(s.link),
       enabled: s.enabled !== false,
     }))
-    .filter((s) => s.title);
+    .filter((s) => s.imageUrl || s.title);
 }

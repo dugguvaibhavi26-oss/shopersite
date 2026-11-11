@@ -32,7 +32,7 @@ export function HeroSlidesSettings({ myEmail }: { myEmail: string }) {
     next.splice(i + d, 0, x);
     setForm(next);
   };
-  const add = () => setForm([...form, { id: `slide-${Date.now().toString(36)}`, title: "", text: "", imageUrl: "", tag: "", ctaLabel: "Learn more", link: "", enabled: true }]);
+  const add = () => setForm([...form, { id: `slide-${Date.now().toString(36)}`, title: "", text: "", imageUrl: "", tag: "", ctaLabel: "", link: "", enabled: true }]);
   const dirty = JSON.stringify(form) !== JSON.stringify(live);
 
   const upload = async (i: number, file?: File | null) => {
@@ -51,9 +51,9 @@ export function HeroSlidesSettings({ myEmail }: { myEmail: string }) {
   };
 
   const save = async () => {
-    for (const s of form) {
-      if (!s.title.trim()) return setError("Every slide needs a title (or delete the empty one).");
-      if (s.link && !cleanLink(s.link)) return setError(`The link on "${s.title}" must start with https:// or /`);
+    for (const [i, s] of form.entries()) {
+      if (!s.imageUrl) return setError(`Slide ${i + 1} has no image. Add one, or delete the slide.`);
+      if (s.link && !cleanLink(s.link)) return setError(`The link on slide ${i + 1} must start with https:// or /`);
     }
     setSaving(true);
     setError("");
@@ -73,7 +73,7 @@ export function HeroSlidesSettings({ myEmail }: { myEmail: string }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h3 className="text-xl font-black tracking-tight text-neutral-900 sm:text-2xl">Top banner</h3>
-          <p className="text-sm text-neutral-500">The big rotating banner at the top of every seller&apos;s Home on computers. Upload 1600 × 600 px, the same size as the dashboard banners below. With no slides, sellers see the built-in ones.</p>
+          <p className="text-sm text-neutral-500">The big rotating banner at the top of every seller&apos;s Home on computers. Images only: upload 1600 × 600 px with your words in the picture, the same size as the dashboard banners below. With no slides, sellers see the built-in ones.</p>
         </div>
         <div className="flex gap-2">
           {form.length < MAX_SLIDES && (
@@ -125,15 +125,12 @@ export function HeroSlidesSettings({ myEmail }: { myEmail: string }) {
                   </button>
                 </span>
               </div>
-              <div className="grid gap-2 sm:grid-cols-[1fr_140px]">
-                <input value={s.title} onChange={(e) => set(i, { title: e.target.value })} maxLength={80} placeholder="Title, e.g. Get ready for Diwali" className="h-9 rounded-lg border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-900" />
-                <input value={s.tag} onChange={(e) => set(i, { tag: e.target.value })} maxLength={24} placeholder="Tag, e.g. New" className="h-9 rounded-lg border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-900" />
-              </div>
-              <textarea value={s.text} onChange={(e) => set(i, { text: e.target.value })} maxLength={180} rows={2} placeholder="One or two lines of text" className="w-full resize-none rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-900" />
-              <div className="grid gap-2 sm:grid-cols-[1fr_160px]">
-                <input value={s.link} onChange={(e) => set(i, { link: e.target.value })} placeholder="Link: https://docs.shopersite.in/… or /dashboard?tab=plugins" className="h-9 rounded-lg border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-900" />
-                <input value={s.ctaLabel} onChange={(e) => set(i, { ctaLabel: e.target.value })} maxLength={30} placeholder="Button text" className="h-9 rounded-lg border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-900" />
-              </div>
+              {/* image only: the words belong in the picture itself */}
+              <label className="block">
+                <span className="text-xs text-neutral-500">Opens when tapped (optional)</span>
+                <input value={s.link} onChange={(e) => set(i, { link: e.target.value })} placeholder="/dashboard?tab=billing or https://docs.shopersite.in/…" className="mt-1 h-9 w-full rounded-lg border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-900" />
+              </label>
+              <p className="text-[11px] text-neutral-400">Leave it empty for a picture that doesn&apos;t open anything.</p>
             </div>
           </div>
         ))}

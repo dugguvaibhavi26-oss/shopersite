@@ -3,13 +3,23 @@ import { connectRazorpayOAuth } from "@/lib/server/razorpay-service";
 import { getStoreDoc } from "@/lib/server/firebase-admin";
 import { oauthRedirectUri, readOAuthState } from "@/lib/server/razorpay-oauth-state";
 
-/** Razorpay sends the seller back here (?code=&state=) after they approve or decline. */
+/**
+ * Razorpay sends the seller back here (?code=&state=) after they approve or decline. They land on
+ * Plugins → Razorpay (the page they started from), which shows whether it worked.
+ */
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const back = (result: "connected" | "error") => Response.redirect(new URL(`/dashboard?razorpay=${result}`, url.origin).toString(), 302);
+  const state = readOAuthState(url.searchParams.get("state") || "");
+  const back = (result: "connected" | "error") => {
+    const to = new URL("/dashboard", url.origin);
+    if (state) to.searchParams.set("store", state.subdomain);
+    to.searchParams.set("tab", "plugins");
+    to.searchParams.set("plugin", "razorpay");
+    to.searchParams.set("razorpay", result);
+    return Response.redirect(to.toString(), 302);
+  };
 
   const code = url.searchParams.get("code") || "";
-  const state = readOAuthState(url.searchParams.get("state") || "");
   if (url.searchParams.get("error") || !code || !state) return back("error");
 
   try {
