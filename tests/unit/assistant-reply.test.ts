@@ -42,6 +42,37 @@ describe("assistant reply cleanup", () => {
     expect(r.text).toBe("Summary\nSales are up.");
   });
 
+  it("never shows code: typed tool calls are handed back to be run", () => {
+    const a = cleanReply('```tool_code\nprint(default_api.find_orders(status="placed", days=7))\n```', store);
+    expect(a.text).toBe("");
+    expect(a.calls).toEqual([{ name: "find_orders", args: { status: "placed", days: 7 } }]);
+
+    const b = cleanReply('Let me check.\n{"name": "search_help", "arguments": {"query": "how to add shiprocket"}}', store);
+    expect(b.text).toBe("Let me check.");
+    expect(b.calls).toEqual([{ name: "search_help", args: { query: "how to add shiprocket" } }]);
+
+    const c = cleanReply("<function=store_overview>{}</function>", store);
+    expect(c.text).toBe("");
+    expect(c.calls).toEqual([{ name: "store_overview", args: {} }]);
+
+    const d = cleanReply('<|channel|>commentary to=functions.find_products <|constrain|>json<|message|>{"filter":"low_stock"}', store);
+    expect(d.text).toBe("");
+    expect(d.calls).toEqual([{ name: "find_products", args: { filter: "low_stock" } }]);
+
+    const e = cleanReply('<tool_call>{"name":"create_discount","arguments":"{\\"code\\":\\"DIWALI10\\",\\"type\\":\\"percentage\\",\\"value\\":10}"}</tool_call>', store);
+    expect(e.text).toBe("");
+    expect(e.calls).toEqual([{ name: "create_discount", args: { code: "DIWALI10", type: "percentage", value: 10 } }]);
+  });
+
+  it("strips stray JSON, code blocks, backticks and thinking, keeping the sentences", () => {
+    const r = cleanReply(
+      '<think>call the tool</think>You have **3 orders** to pack.\n```json\n{"orders": [1, 2, 3]}\n```\nOpen `Orders` to see them.\n{"status": "ok"}\n"total": 3,',
+      store
+    );
+    expect(r.text).toBe("You have **3 orders** to pack.\n\nOpen Orders to see them.");
+    expect(r.calls).toEqual([]);
+  });
+
   it("leaves normal text alone", () => {
     expect(cleanReply("- **2 orders** to ship\n- Add a policy page", store).text).toBe("- **2 orders** to ship\n- Add a policy page");
   });

@@ -490,11 +490,13 @@ function LiveFrame({ slug, device }: { slug: string; device: "desktop" | "phone"
   React.useEffect(() => setLoaded(false), [slug]);
 
   const desk = w / 1440;
-  const height = Math.round(900 * desk);
-  const phone = Math.max(0.2, (height - 28) / 844);
+  // the phone view gets a taller stage on narrow screens, so the phone is big enough to read
+  const tall = typeof window === "undefined" ? 0 : Math.round(Math.min(470, window.innerHeight * 0.56));
+  const height = device === "phone" ? Math.max(Math.round(900 * desk), tall) : Math.round(900 * desk);
+  const phone = Math.max(0.2, (height - 36) / 844);
 
   return (
-    <div ref={box} className="relative w-full overflow-hidden bg-neutral-100" style={{ height }}>
+    <div ref={box} className="relative w-full overflow-hidden bg-neutral-100 transition-[height] duration-300" style={{ height }}>
       {w > 0 &&
         (device === "desktop" ? (
           <iframe
@@ -507,7 +509,7 @@ function LiveFrame({ slug, device }: { slug: string; device: "desktop" | "phone"
           />
         ) : (
           <div
-            className="absolute left-1/2 top-[14px] -translate-x-1/2 overflow-hidden rounded-[26px] bg-white shadow-[0_20px_50px_-20px_rgba(0,0,0,0.45)] ring-[6px] ring-black"
+            className="absolute left-1/2 top-[18px] -translate-x-1/2 overflow-hidden rounded-[26px] bg-white shadow-[0_20px_50px_-20px_rgba(0,0,0,0.45)] ring-[5px] ring-black"
             style={{ width: 390 * phone, height: 844 * phone }}
           >
             <iframe
@@ -547,10 +549,10 @@ function ThemeDetails({ theme, offer, useHref, signedIn, onClose }: { theme: The
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={theme.name}>
       <div className="animate-backdrop-in absolute inset-0 bg-black/60 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="animate-sheet-up relative max-h-[94svh] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-t-[28px] bg-white sm:rounded-[24px]">
+      <div className="animate-sheet-up no-scrollbar relative max-h-[94svh] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-t-[24px] bg-white sm:rounded-[24px]">
         {/* the website, live, on top */}
         <div className="sticky top-0 z-10 bg-white">
-          <div className="flex items-center gap-3 border-b border-neutral-200 px-4 py-2.5">
+          <div className="flex items-center gap-2 border-b border-neutral-200 px-3 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
             <span className="hidden gap-1.5 sm:flex" aria-hidden>
               <span className="h-2.5 w-2.5 rounded-full bg-neutral-300" />
               <span className="h-2.5 w-2.5 rounded-full bg-neutral-300" />
@@ -559,7 +561,7 @@ function ThemeDetails({ theme, offer, useHref, signedIn, onClose }: { theme: The
             <span className="min-w-0 flex-1 truncate rounded-full bg-neutral-100 px-3 py-1 text-center text-xs text-neutral-500">
               {theme.slug}.shopersite.in
             </span>
-            <div className="flex rounded-full bg-neutral-100 p-0.5">
+            <div className="flex shrink-0 items-center rounded-full bg-neutral-100 p-0.5">
               {(["desktop", "phone"] as const).map((d) => (
                 <button
                   key={d}
@@ -567,13 +569,13 @@ function ThemeDetails({ theme, offer, useHref, signedIn, onClose }: { theme: The
                   onClick={() => setDevice(d)}
                   aria-pressed={device === d}
                   aria-label={d === "desktop" ? "Desktop view" : "Phone view"}
-                  className={`flex h-7 w-8 items-center justify-center rounded-full transition-colors ${device === d ? "bg-white text-black shadow-sm" : "text-neutral-500 hover:text-black"}`}
+                  className={`flex h-7 min-h-0 w-9 items-center justify-center rounded-full transition-colors ${device === d ? "bg-white text-black shadow-sm" : "text-neutral-500 hover:text-black"}`}
                 >
                   {d === "desktop" ? <Monitor className="h-3.5 w-3.5" /> : <Smartphone className="h-3.5 w-3.5" />}
                 </button>
               ))}
             </div>
-            <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-neutral-100">
+            <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 min-h-0 w-8 shrink-0 items-center justify-center rounded-full hover:bg-neutral-100">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -581,22 +583,24 @@ function ThemeDetails({ theme, offer, useHref, signedIn, onClose }: { theme: The
         <LiveFrame slug={theme.slug} device={device} />
 
         {/* about the theme, and what it costs */}
-        <div className="grid gap-8 p-6 sm:p-9 md:grid-cols-[1.25fr_1fr]">
+        <div className="grid gap-5 px-5 pb-6 pt-5 sm:gap-8 sm:p-9 md:grid-cols-[1.25fr_1fr]">
           <div>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">{theme.category}</span>
-            <h2 className="mt-2 text-3xl font-bold tracking-[-0.03em] sm:text-4xl">{theme.name}</h2>
-            <p className="mt-2 text-base text-neutral-500">{theme.tagline}</p>
-            <p className="mt-5 text-[15px] leading-relaxed text-neutral-700">{theme.description}</p>
-            <div className="mt-5 flex items-center gap-3">
-              <span className="text-sm text-neutral-500">Colours</span>
-              <Swatches colors={theme.previewColors} size="h-6 w-6" />
+            <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-neutral-500 sm:text-[11px]">{theme.category}</span>
+            <h2 className="mt-1 text-[1.6rem] font-bold leading-tight tracking-[-0.03em] sm:mt-2 sm:text-4xl">{theme.name}</h2>
+            <p className="mt-1 text-sm text-neutral-500 sm:mt-2 sm:text-base">{theme.tagline}</p>
+            <p className="mt-3 text-[13.5px] leading-relaxed text-neutral-700 sm:mt-5 sm:text-[15px]">{theme.description}</p>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-x-5 gap-y-3 sm:mt-5 sm:flex-col sm:items-start sm:justify-start sm:gap-y-6">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-neutral-500">Colours</span>
+                <Swatches colors={theme.previewColors} size="h-6 w-6" />
+              </div>
+              <a href={previewUrl(theme.slug)} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 text-sm font-semibold underline-offset-4 hover:underline">
+                Open the full preview <ExternalLink className="h-3.5 w-3.5" />
+              </a>
             </div>
-            <a href={previewUrl(theme.slug)} target="_blank" rel="noopener" className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold underline-offset-4 hover:underline">
-              Open the full preview <ExternalLink className="h-3.5 w-3.5" />
-            </a>
           </div>
 
-          <div className="rounded-[18px] border border-neutral-200 p-5">
+          <div className="rounded-[18px] border border-neutral-200 p-4 sm:p-5">
             <div className="flex items-baseline justify-between">
               <span className="text-sm font-semibold">Pricing</span>
               <Link href="/#pricing" className="text-xs text-neutral-500 underline-offset-4 hover:text-black hover:underline">

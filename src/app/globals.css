@@ -603,6 +603,16 @@
   display: none;
 }
 
+/* Phones and touch screens: no scrollbars anywhere (everything still scrolls by touch) */
+@media (max-width: 767px), (pointer: coarse) {
+  * {
+    scrollbar-width: none !important;
+  }
+  *::-webkit-scrollbar {
+    display: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee,
   .animate-float-gentle {
