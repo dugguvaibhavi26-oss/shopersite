@@ -21,6 +21,12 @@ import { cn } from "@/lib/utils";
 import { POLICY_IDS, POLICY_INFO, type PolicyId } from "@/lib/policies";
 import { EMPTY_DETAILS, rupees, useSite, visibleProducts, whatsappLink, type SavedDetails } from "./context";
 import { Container, InstagramIcon, EmptyState, MLink, ProductGrid } from "./ui";
+import { RichAbout, RichContact } from "./info-pages";
+import { StudioAbout } from "./studio-about";
+import { SneakerAbout, SneakerContact } from "./sneaker-pages";
+import { JewelAbout, JewelContact } from "./jewel-pages";
+import { WorkshopAbout } from "./workshop-about";
+import { MonoAbout } from "./mono-about";
 
 const STEPS: { id: OrderData["fulfilmentStatus"]; label: string }[] = [
   { id: "placed", label: "Placed" },
@@ -668,6 +674,16 @@ export function SiteInfoPage({ id }: { id: string }) {
   const page = own?.body?.trim()
     ? { ...content.pages[id as SitePageId], title: POLICY_INFO[id as PolicyId].title, body: own.body }
     : content.pages[id as SitePageId];
+  // themes with their own About and Contact designs
+  if (look.richPages === "studio" && !own && id === "about") return <StudioAbout page={page} />;
+  if (look.richPages === "sneaker" && !own && id === "about") return <SneakerAbout page={page} />;
+  if (look.richPages === "jewel" && !own && id === "about") return <JewelAbout page={page} />;
+  if (look.richPages === "jewel" && !own && id === "contact") return <JewelContact page={page} />;
+  if (look.richPages === "sneaker" && !own && id === "contact") return <SneakerContact page={page} />;
+  if (look.richPages === "workshop" && !own && id === "about") return <WorkshopAbout page={page} />;
+  if (look.richPages === "mono" && !own && id === "about") return <MonoAbout page={page} />;
+  if (look.richPages && !own && id === "about") return <RichAbout page={page} tone={look.richPages === "soft" || look.richPages === "editorial" ? look.richPages : "bold"} />;
+  if (look.richPages && !own && id === "contact") return <RichContact page={page} tone={look.richPages === "soft" || look.richPages === "editorial" ? look.richPages : "bold"} />;
   const paragraphs = page.body.split(/\n{2,}/).filter((p) => p.trim());
   const photo = id === "about" || id === "contact" ? page.image || "" : "";
   const style = photo ? look.pageStyle || "plain" : look.pageStyle === "card" ? "card" : "plain";

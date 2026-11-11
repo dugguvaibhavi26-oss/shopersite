@@ -45,7 +45,7 @@ function buildProbe(content: SiteContent): Probe {
     return { ...sec, settings };
   });
   const header = { ...content.header };
-  for (const k of ["catalogLabel", "aboutLabel", "contactLabel", "searchPlaceholder", "ctaLabel"] as const) header[k] = next("header", k);
+  for (const k of ["catalogLabel", "aboutLabel", "contactLabel", "homeLabel", "saleLabel", "shopAllLabel", "searchLabel", "bagLabel", "accountLabel", "wishlistLabel", "ordersLabel", "searchPlaceholder", "ctaLabel"] as const) header[k] = next("header", k);
   header.ctaLink = `/${next("header", "ctaLink")}`;
   const footer = { ...content.footer };
   for (const k of ["about", "newsletterHeading", "copyright"] as const) footer[k] = next("footer", k);

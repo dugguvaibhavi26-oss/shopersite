@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal, X } from "lucide-react";
 import type { CategoryData, ProductData } from "@/lib/store-service";
 import { cn } from "@/lib/utils";
-import { activeCategories, discountPercent, productsInCategory, unitsSold, useSite, visibleProducts } from "./context";
+import { activeCategories, discountPercent, productsInCategory, rupees, unitsSold, useSite, visibleProducts } from "./context";
 import { Container, Crumbs, EmptyState, MLink, ProductGrid } from "./ui";
 
 type Sort = "featured" | "newest" | "price-asc" | "price-desc";
@@ -16,9 +16,30 @@ const SORTS: { id: Sort; label: string }[] = [
   { id: "price-desc", label: "Price: high to low" },
 ];
 
+/** A round, easy-to-read price (in paise) near `paise`: 1,000, 2,500, 5,000… */
+function nicePrice(paise: number): number {
+  const r = paise / 100;
+  const step = r >= 5000 ? 1000 : r >= 1000 ? 500 : r >= 200 ? 100 : 50;
+  return Math.max(step, Math.round(r / step) * step) * 100;
+}
+
+/** Three price ranges that split the shop's own prices into roughly even groups. */
+function priceRanges(products: ProductData[]): { id: string; label: string; min: number; max: number }[] {
+  const prices = products.map((p) => p.price).sort((a, b) => a - b);
+  if (prices.length < 3 || prices[0] === prices[prices.length - 1]) return [];
+  const low = nicePrice(prices[Math.floor(prices.length / 3)]);
+  const high = nicePrice(prices[Math.floor((prices.length * 2) / 3)]);
+  if (high <= low) return [];
+  return [
+    { id: "low", label: `Under ${rupees(low)}`, min: 0, max: low - 1 },
+    { id: "mid", label: `${rupees(low)} – ${rupees(high)}`, min: low, max: high },
+    { id: "high", label: `Over ${rupees(high)}`, min: high + 1, max: Infinity },
+  ];
+}
+
 /** The full catalogue, one category (`slug`) or search results (`query`). */
 export function SiteCatalog({ slug, query }: { slug?: string; query?: string }) {
-  const { store, look } = useSite();
+  const { store, look, content } = useSite();
   // "chips": pills above the grid; "sidebar": a category list on the left on wide screens; "banner": a coloured title
   // banner with round category tiles
   const layout = look.catalogLayout || "chips";
@@ -28,6 +49,8 @@ export function SiteCatalog({ slug, query }: { slug?: string; query?: string }) 
     if (new URLSearchParams(window.location.search).get("sale") === "1") setSaleOnly(true);
   }, []);
   const [inStock, setInStock] = React.useState(false);
+  const [price, setPrice] = React.useState("");
+  const [pick, setPick] = React.useState("");
   const [filtersOpen, setFiltersOpen] = React.useState(false);
 
   const all = activeCategories(store);
@@ -37,12 +60,24 @@ export function SiteCatalog({ slug, query }: { slug?: string; query?: string }) 
   // chips: the category's children, its siblings, or every top-level category
   const chips = children.length ? children : parent ? all.filter((c) => c.parentId === parent.id) : all.filter((c) => !c.parentId);
 
-  const products = React.useMemo(() => {
+  // everything this page could show, before the buyer's filters
+  const base = React.useMemo(() => {
     let list: ProductData[] = category ? productsInCategory(store, category) : visibleProducts(store);
     if (query) {
       const q = query.toLowerCase();
       list = list.filter((p) => `${p.title} ${p.category} ${p.description}`.toLowerCase().includes(q));
     }
+    return list;
+  }, [store, category, query]);
+  const ranges = React.useMemo(() => priceRanges(base), [base]);
+  // on the full catalogue (not a category page) the filter can narrow to one category
+  const pickable = category ? [] : all.filter((c) => !c.parentId && productsInCategory(store, c).length);
+  const picked = pickable.find((c) => c.slug === pick) || null;
+
+  const products = React.useMemo(() => {
+    let list = picked ? base.filter((p) => productsInCategory(store, picked).some((x) => x.id === p.id)) : base;
+    const range = ranges.find((r) => r.id === price);
+    if (range) list = list.filter((p) => p.price >= range.min && p.price <= range.max);
     if (saleOnly) list = list.filter((p) => discountPercent(p) > 0);
     if (inStock) list = list.filter((p) => p.stock > 0);
     const sold = unitsSold(store);
@@ -52,7 +87,7 @@ export function SiteCatalog({ slug, query }: { slug?: string; query?: string }) 
     else if (sort === "price-desc") sorted.sort((a, b) => b.price - a.price);
     else sorted.sort((a, b) => Number(b.stock > 0) - Number(a.stock > 0) || (sold[b.id] || 0) - (sold[a.id] || 0));
     return sorted;
-  }, [store, category, query, saleOnly, inStock, sort]);
+  }, [store, base, picked, ranges, price, saleOnly, inStock, sort]);
 
   if (slug && !category) {
     return (
@@ -62,8 +97,66 @@ export function SiteCatalog({ slug, query }: { slug?: string; query?: string }) 
     );
   }
 
-  const title = query !== undefined ? (query ? `“${query}”` : "Search") : category ? category.name : "Catalog";
-  const filterCount = Number(saleOnly) + Number(inStock);
+  const title = query !== undefined ? query || "Search" : category ? category.name : content.header.catalogLabel || "Catalog";
+  const filterCount = Number(saleOnly) + Number(inStock) + Number(!!price && ranges.some((r) => r.id === price)) + Number(!!picked);
+  const clearFilters = () => {
+    setSaleOnly(false);
+    setInStock(false);
+    setPrice("");
+    setPick("");
+  };
+  // what is switched on, as chips the buyer can remove one by one
+  const active = [
+    ...(picked ? [{ label: picked.name, off: () => setPick("") }] : []),
+    ...ranges.filter((r) => r.id === price).map((r) => ({ label: r.label, off: () => setPrice("") })),
+    ...(saleOnly ? [{ label: "On sale", off: () => setSaleOnly(false) }] : []),
+    ...(inStock ? [{ label: "In stock", off: () => setInStock(false) }] : []),
+  ];
+  const option = (on: boolean) =>
+    cn(
+      "m-line min-h-0 rounded-full border px-4 py-2 text-[length:calc(13px*var(--m-scale))] transition-colors",
+      on ? "border-[var(--m-text)] bg-[var(--m-text)] text-[var(--m-bg)]" : "hover:border-[var(--m-text)]"
+    );
+  const group = (title: string, children: React.ReactNode) => (
+    <div>
+      <p className="m-cap text-[length:calc(11px*var(--m-scale))] font-semibold tracking-[0.14em]">{title}</p>
+      <div className="mt-3 flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+  const panel = (
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      {pickable.length > 1 &&
+        group(
+          "Category",
+          pickable.map((c) => (
+            <button key={c.id} type="button" aria-pressed={pick === c.slug} onClick={() => setPick(pick === c.slug ? "" : c.slug)} className={option(pick === c.slug)}>
+              {c.name}
+            </button>
+          ))
+        )}
+      {ranges.length > 0 &&
+        group(
+          "Price",
+          ranges.map((r) => (
+            <button key={r.id} type="button" aria-pressed={price === r.id} onClick={() => setPrice(price === r.id ? "" : r.id)} className={option(price === r.id)}>
+              {r.label}
+            </button>
+          ))
+        )}
+      {group(
+        "Availability",
+        <button type="button" aria-pressed={inStock} onClick={() => setInStock(!inStock)} className={option(inStock)}>
+          In stock only
+        </button>
+      )}
+      {group(
+        "Offers",
+        <button type="button" aria-pressed={saleOnly} onClick={() => setSaleOnly(!saleOnly)} className={option(saleOnly)}>
+          On sale
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div className="pb-20">
@@ -80,11 +173,12 @@ export function SiteCatalog({ slug, query }: { slug?: string; query?: string }) 
             <Crumbs
               items={[
                 { label: "Home", to: "/" },
-                ...(category || query !== undefined ? [{ label: "Catalog", to: "/catalog" }] : []),
-                { label: query !== undefined ? "Search" : category ? category.name : "Catalog" },
+                ...(category || query !== undefined ? [{ label: content.header.catalogLabel || "Catalog", to: "/catalog" }] : []),
+                { label: query !== undefined ? "Search" : category ? category.name : content.header.catalogLabel || "Catalog" },
               ]}
             />
-            <h1 className="m-h m-display t-hero m-rise mt-[clamp(18px,3vw,40px)] [overflow-wrap:anywhere]">{title}</h1>
+            {query && <p className="m-cap m-muted mt-[clamp(18px,3vw,40px)] text-[length:calc(11.5px*var(--m-scale))] font-semibold tracking-[0.16em]">Search results for</p>}
+            <h1 className={cn("m-h m-display t-hero m-rise [overflow-wrap:anywhere]", query ? "mt-2" : "mt-[clamp(18px,3vw,40px)]")}>{title}</h1>
             <p className="m-muted mt-3 text-[length:calc(14px*var(--m-scale))]">
               {products.length} {products.length === 1 ? "product" : "products"}
               {category?.description && !query ? ` · ${category.description}` : ""}
@@ -123,13 +217,16 @@ export function SiteCatalog({ slug, query }: { slug?: string; query?: string }) 
         <Crumbs
           items={[
             { label: "Home", to: "/" },
-            ...(category || query !== undefined ? [{ label: "Catalog", to: "/catalog" }] : []),
+            ...(category || query !== undefined ? [{ label: content.header.catalogLabel || "Catalog", to: "/catalog" }] : []),
             ...(parent ? [{ label: parent.name, to: `/category/${parent.slug}` }] : []),
-            { label: query !== undefined ? "Search" : category ? category.name : "Catalog" },
+            { label: query !== undefined ? "Search" : category ? category.name : content.header.catalogLabel || "Catalog" },
           ]}
         />
         <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
-          <h1 className="m-h t-title [overflow-wrap:anywhere]">{title}</h1>
+          <div className="min-w-0">
+            {query && <p className="m-cap m-muted mb-1.5 text-[length:calc(11.5px*var(--m-scale))] font-semibold tracking-[0.16em]">Search results for</p>}
+            <h1 className="m-h t-title [overflow-wrap:anywhere]">{title}</h1>
+          </div>
           <p className="m-muted pb-2 text-[length:calc(14px*var(--m-scale))]">
             {products.length} {products.length === 1 ? "product" : "products"}
           </p>
@@ -199,11 +296,26 @@ export function SiteCatalog({ slug, query }: { slug?: string; query?: string }) 
         )}
         <div className="min-w-0">
         <div className={cn("m-line sticky top-16 z-20 -mx-4 mt-8 flex items-center justify-between gap-3 border-y bg-[var(--m-bg)] px-4 py-3 sm:mx-0 sm:px-0 lg:top-[76px]", layout === "sidebar" && "lg:mt-0")}>
-          <button type="button" onClick={() => setFiltersOpen((v) => !v)} aria-expanded={filtersOpen} className={cn("m-cap flex items-center gap-2 text-[length:calc(12px*var(--m-scale))] font-semibold tracking-wider", layout === "sidebar" && "lg:invisible")}>
-            <SlidersHorizontal className="h-4 w-4" />
-            Filter{filterCount ? ` (${filterCount})` : ""}
-          </button>
-          <label className="flex items-center gap-2 text-[length:calc(13px*var(--m-scale))]">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((v) => !v)}
+              aria-expanded={filtersOpen}
+              className={cn(
+                "m-cap flex h-10 min-h-0 shrink-0 items-center gap-2 rounded-full border px-4 text-[length:calc(12px*var(--m-scale))] font-semibold tracking-wider transition-colors",
+                filtersOpen || filterCount ? "border-[var(--m-text)] bg-[var(--m-text)] text-[var(--m-bg)]" : "m-line hover:border-[var(--m-text)]",
+                layout === "sidebar" && "lg:hidden"
+              )}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filter
+              {filterCount > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--m-bg)] px-1 text-[10px] text-[var(--m-text)]">{filterCount}</span>}
+            </button>
+            <span className="m-muted hidden whitespace-nowrap text-[length:calc(13px*var(--m-scale))] sm:inline">
+              {products.length} {products.length === 1 ? "product" : "products"}
+            </span>
+          </div>
+          <label className="m-line flex h-10 items-center gap-2 rounded-full border px-4 text-[length:calc(13px*var(--m-scale))]">
             <span className="m-muted hidden sm:inline">Sort by</span>
             <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="bg-transparent text-[length:calc(13px*var(--m-scale))] font-medium outline-none">
               {SORTS.map((s) => (
@@ -214,35 +326,54 @@ export function SiteCatalog({ slug, query }: { slug?: string; query?: string }) 
             </select>
           </label>
         </div>
-        {filtersOpen && (
-          <div className="flex flex-wrap gap-2 pt-4">
-            {[
-              { on: saleOnly, set: setSaleOnly, label: "On sale" },
-              { on: inStock, set: setInStock, label: "In stock" },
-            ].map((f) => (
-              <button
-                key={f.label}
-                type="button"
-                aria-pressed={f.on}
-                onClick={() => f.set(!f.on)}
-                className={cn("m-line rounded-full border px-4 py-2 text-[length:calc(13px*var(--m-scale))]", f.on && "border-[var(--m-text)] bg-[var(--m-text)] text-[var(--m-bg)]")}
-              >
-                {f.label}
+        {active.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pt-4">
+            {active.map((a) => (
+              <button key={a.label} type="button" onClick={a.off} className="m-soft flex min-h-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[length:calc(12.5px*var(--m-scale))] font-medium">
+                {a.label}
+                <X className="h-3.5 w-3.5" />
               </button>
             ))}
-            {filterCount > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSaleOnly(false);
-                  setInStock(false);
-                }}
-                className="m-muted px-2 text-[length:calc(13px*var(--m-scale))] underline underline-offset-4"
-              >
-                Clear
-              </button>
-            )}
+            <button type="button" onClick={clearFilters} className="m-muted min-h-0 px-2 text-[length:calc(12.5px*var(--m-scale))] underline underline-offset-4">
+              Clear all
+            </button>
           </div>
+        )}
+        {filtersOpen && (
+          <>
+            {/* wide screens: a panel under the bar */}
+            <div className="m-line mt-4 hidden rounded-[var(--m-card)] border p-6 sm:block">
+              {panel}
+              <div className="m-line mt-6 flex items-center justify-between border-t pt-4">
+                <button type="button" onClick={clearFilters} className="m-muted min-h-0 text-[length:calc(13px*var(--m-scale))] underline underline-offset-4">
+                  Clear all
+                </button>
+                <button type="button" onClick={() => setFiltersOpen(false)} className="m-btn min-h-10 px-6">
+                  Show {products.length} {products.length === 1 ? "product" : "products"}
+                </button>
+              </div>
+            </div>
+            {/* phones: a sheet from the bottom */}
+            <div className="fixed inset-0 z-[120] flex flex-col justify-end bg-black/40 sm:hidden" onClick={() => setFiltersOpen(false)}>
+              <div role="dialog" aria-modal="true" aria-label="Filter" className="animate-sheet-up max-h-[85svh] overflow-y-auto rounded-t-[22px] bg-[var(--m-bg)] p-5 pb-[calc(20px+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
+                <div className="mb-5 flex items-center justify-between">
+                  <p className="m-h text-[length:calc(18px*var(--m-scale))]">Filter</p>
+                  <button type="button" aria-label="Close" onClick={() => setFiltersOpen(false)} className="flex h-10 w-10 items-center justify-center">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                {panel}
+                <div className="m-line mt-6 flex items-center gap-3 border-t pt-4">
+                  <button type="button" onClick={clearFilters} className="m-btn-outline m-btn min-h-11 flex-1">
+                    Clear all
+                  </button>
+                  <button type="button" onClick={() => setFiltersOpen(false)} className="m-btn min-h-11 flex-[2]">
+                    Show {products.length}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
         )}
 
         <div className="pt-8">

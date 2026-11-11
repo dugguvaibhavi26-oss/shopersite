@@ -57,7 +57,10 @@ import {
   fontStack,
   getDefaultSiteContent,
   resolveSiteContent,
+  themeOptionFields,
+  themeOptionDefaults,
   type SiteContent,
+  type ThemeOptionField,
   type SectionField,
   type SitePageId,
   type SiteSection,
@@ -93,11 +96,13 @@ type Selection =
   | { kind: "footer" }
   | { kind: "page"; id: SitePageId }
   | { kind: "section"; id: string }
+  | { kind: "options"; group: string }
   | null;
 
 const PREVIEW_PAGES: { path: string; label: string }[] = [
   { path: "", label: "Home" },
   { path: "/catalog", label: "Catalog" },
+  { path: "/wishlist", label: "Wishlist" },
   { path: "/cart", label: "Bag" },
   { path: "/account", label: "Account" },
   { path: "/pages/about", label: "About page" },
@@ -299,6 +304,12 @@ function ThemeEditor() {
     });
   // only the theme's own sections that were removed can be added back
   const removed = removedThemeSections(content, themeSlug, store.name);
+  // settings only this theme has, one sidebar row per group
+  const optionGroups: { group: string; fields: ThemeOptionField[] }[] = [];
+  for (const f of themeOptionFields(themeSlug)) {
+    const g = optionGroups.find((x) => x.group === f.group) || (optionGroups.push({ group: f.group, fields: [] }), optionGroups[optionGroups.length - 1]);
+    g.fields.push(f);
+  }
   const addSection = (id: string) => {
     update((c) => restoreThemeSection(c, themeSlug, id, store.name));
     setSelection({ kind: "section", id });
@@ -523,6 +534,20 @@ function ThemeEditor() {
               <div className="p-3">
                 <SidebarRow icon={Type} title="Text, buttons & photos" subtitle={`Text size ${content.settings.textSize}% · ${content.settings.headingFont}`} onClick={() => setSelection({ kind: "style" })} />
                 <SidebarRow icon={PanelTop} title="Header" subtitle="Announcement and menu" onClick={() => setSelection({ kind: "header" })} />
+                {optionGroups.map((g) => (
+                  <SidebarRow
+                    key={g.group}
+                    icon={Paintbrush}
+                    title={g.group}
+                    subtitle={`Only in ${getTheme(themeSlug).name}`}
+                    onClick={() => {
+                      setSelection({ kind: "options", group: g.group });
+                      // settings for one page (About, Contact) show that page in the preview
+                      const page = g.fields.find((f) => f.page)?.page;
+                      if (page) setPreviewPath(page);
+                    }}
+                  />
+                ))}
                 <p className="px-2 pb-2 pt-5 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">Homepage</p>
                 <ul className="space-y-1">
                   {sections.map((s, i) => (
@@ -601,9 +626,17 @@ function ThemeEditor() {
                 )}
                 {(
                   [
+                    ["homeLabel", "Home menu name"],
                     ["catalogLabel", "Catalog menu name"],
+                    ["saleLabel", "Sale menu name"],
+                    ["shopAllLabel", "All products menu name"],
                     ["aboutLabel", "About menu name"],
                     ["contactLabel", "Contact menu name"],
+                    ["searchLabel", "Search button word"],
+                    ["bagLabel", "Bag button word"],
+                    ["accountLabel", "Account button word"],
+                    ["wishlistLabel", "Wishlist button and page name"],
+                    ["ordersLabel", "Orders menu name"],
                     ["searchPlaceholder", "Search box text"],
                     ["ctaLabel", "Highlighted menu link (optional)"],
                   ] as const
@@ -616,6 +649,29 @@ function ThemeEditor() {
                   <LinkField label="Highlighted link goes to" store={store} value={content.header.ctaLink} onChange={(v) => update((c) => ({ ...c, header: { ...c.header, ctaLink: v } }))} />
                 )}
                 <p className="text-[12px] text-neutral-400">Your shop name and logo come from Settings.</p>
+              </Pane>
+            )}
+
+            {panel === "sections" && selection?.kind === "options" && (
+              <Pane title={selection.group} onBack={() => setSelection(null)}>
+                <ThemeOptions
+                  fields={optionGroups.find((g) => g.group === selection.group)?.fields || []}
+                  values={content.options}
+                  onChange={(key, value) => update((c) => ({ ...c, options: { ...c.options, [key]: value } }))}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    update((c) => {
+                      const d = themeOptionDefaults(themeSlug);
+                      const keys = (optionGroups.find((g) => g.group === selection.group)?.fields || []).map((f) => f.key);
+                      return { ...c, options: { ...c.options, ...Object.fromEntries(keys.map((k) => [k, d[k]])) } };
+                    })
+                  }
+                  className="flex items-center gap-1.5 text-[13px] font-medium text-neutral-500 hover:text-black"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" /> Back to the theme&apos;s settings
+                </button>
               </Pane>
             )}
 
@@ -1298,6 +1354,77 @@ function ThemeColours({ settings, onChange, onReset }: { settings: SiteSettings;
         <RotateCcw className="h-3.5 w-3.5" /> Back to the theme&apos;s colours
       </button>
     </div>
+  );
+}
+
+/** Settings only this theme has: colours as a picker plus hex code, words as a text box. */
+function ThemeOptions({ fields, values, onChange }: { fields: ThemeOptionField[]; values: Record<string, string>; onChange: (key: string, value: string) => void }) {
+  return (
+    <div className="space-y-3">
+      {fields.map((f) =>
+        f.kind === "select" ? (
+          <div key={f.key}>
+            <p className={label}>{f.label}</p>
+            <div className="space-y-2">
+              {(f.options || []).map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  aria-pressed={(values[f.key] || f.default) === o.value}
+                  onClick={() => onChange(f.key, o.value)}
+                  className={cn("block w-full rounded-xl border p-3 text-left", (values[f.key] || f.default) === o.value ? "border-black ring-1 ring-black" : "border-neutral-200")}
+                >
+                  <span className="block text-[13px] font-semibold">{o.label}</span>
+                  {o.help && <span className="mt-0.5 block text-[12px] leading-snug text-neutral-500">{o.help}</span>}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[12px] text-neutral-400">The editor preview shows everything at once. Open View in a new tab to see the effects.</p>
+          </div>
+        ) : f.kind === "color" ? (
+          <div key={f.key}>
+            <div className="flex items-center gap-3 rounded-xl border border-neutral-200 p-2 pr-3">
+              <input
+                type="color"
+                value={values[f.key] || f.default}
+                onChange={(e) => onChange(f.key, e.target.value)}
+                aria-label={f.label}
+                className="h-9 w-9 shrink-0 cursor-pointer rounded-lg border border-neutral-200 bg-white p-0.5"
+              />
+              <span className="flex-1 text-[13px] font-medium">{f.label}</span>
+              <HexInput label={f.label} value={values[f.key] || f.default} onChange={(v) => onChange(f.key, v)} />
+            </div>
+            {f.help && <p className="mt-1 px-1 text-[12px] text-neutral-400">{f.help}</p>}
+          </div>
+        ) : (
+          <Field key={f.key} label={f.label} help={f.help}>
+            <input className={input} value={values[f.key] ?? ""} maxLength={f.max || 60} placeholder={f.default} onChange={(e) => onChange(f.key, e.target.value)} />
+          </Field>
+        )
+      )}
+    </div>
+  );
+}
+
+/** A hex box that lets the seller type freely and only passes on complete colours (#RRGGBB). */
+function HexInput({ label: name, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return (
+    <input
+      value={draft}
+      onChange={(e) => {
+        const v = e.target.value;
+        if (!/^#?[0-9a-fA-F]{0,6}$/.test(v)) return;
+        setDraft(v);
+        const full = v.startsWith("#") ? v : `#${v}`;
+        if (/^#[0-9a-fA-F]{6}$/.test(full)) onChange(full);
+      }}
+      onBlur={() => setDraft(value)}
+      aria-label={`${name} hex code`}
+      maxLength={7}
+      className="w-[5.5rem] rounded-lg border border-neutral-200 px-2 py-1.5 font-mono text-[12px] uppercase outline-none focus:border-black"
+    />
   );
 }
 

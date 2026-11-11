@@ -24,6 +24,8 @@ interface DemoCatalog {
   categories: { name: string; image: string; subtitle: string }[];
   products: DemoProduct[];
   banners: { title: string; image: string }[];
+  /** the sample reviews' names and words, when the shared ones don't suit what the shop sells */
+  reviews?: { name: string; text: string }[];
 }
 
 const CLOTHING_SIZES = ["S", "M", "L", "XL"];
@@ -132,11 +134,11 @@ const CATALOGS: Record<SiteThemeSlug, DemoCatalog> = {
     ],
     products: [
       { title: "Everyday Court Sneaker", category: "Sneakers", price: 3999, image: "photo-1608229751021-ed4bd8677753", description: "Clean white leather sneaker that goes with everything.", colours: ["#FFFFFF", "#111111", "#C9B8A3"], sizes: SHOE_SIZES },
-      { title: "Sprint Runner", category: "Running", price: 4499, was: 5999, image: "photo-1542291026-7eec264c27ff", description: "Light running shoe with a springy foam sole.", colours: ["#D7262E", "#111111"], sizes: SHOE_SIZES },
-      { title: "Classic High-Top", category: "Sneakers", price: 4299, image: "photo-1524532787116-e70228437bbe", description: "Retro high-top with a padded collar.", colours: ["#FFFFFF", "#2F6B3F"], sizes: SHOE_SIZES },
+      { title: "Sprint Runner", category: "Running", price: 4499, was: 5999, image: "photo-1542291026-7eec264c27ff", description: "Light running shoe in red and black, with a springy foam sole.", colours: ["#D7262E", "#111111"], sizes: SHOE_SIZES },
+      { title: "Classic High-Top", category: "Sneakers", price: 4299, image: "photo-1524532787116-e70228437bbe", description: "Retro high-top in white or green, with a padded collar.", colours: ["#FFFFFF", "#2F6B3F"], sizes: SHOE_SIZES },
       { title: "Night Trainer", category: "Running", price: 4799, image: "photo-1582898967731-b5834427fd66", description: "Cushioned black trainer for runs and gym days.", colours: ["#111111"], sizes: SHOE_SIZES },
-      { title: "Canvas Low", category: "Sneakers", price: 2299, was: 2799, image: "photo-1641997465126-c73cc4070337", description: "Lightweight canvas sneaker with a rubber sole.", colours: ["#111111", "#FFFFFF"], sizes: SHOE_SIZES },
-      { title: "Trail Grip", category: "Running", price: 5299, image: "photo-1581888748626-2a3f240a6f9f", description: "Grippy outsole and a supportive fit for off-road runs.", colours: ["#6B6F73", "#E3D23A"], sizes: SHOE_SIZES },
+      { title: "Canvas Low", category: "Sneakers", price: 2299, was: 2799, image: "photo-1641997465126-c73cc4070337", description: "Lightweight canvas sneaker in black or white, with a rubber sole.", colours: ["#111111", "#FFFFFF"], sizes: SHOE_SIZES },
+      { title: "Trail Grip", category: "Running", price: 5299, image: "photo-1581888748626-2a3f240a6f9f", description: "Grey trail shoe with yellow laces, a grippy outsole and a supportive fit.", colours: ["#6B6F73", "#E3D23A"], sizes: SHOE_SIZES },
       { title: "Retro Court Red", category: "Sneakers", price: 4999, image: "photo-1575537302964-96cd47c06b1b", description: "A bold red court shoe with a premium finish.", colours: ["#B3202A"], sizes: SHOE_SIZES },
       { title: "Everyday Socks, 3 pairs", category: "Socks", price: 499, image: "photo-1585499583264-491df5142e83", description: "Cushioned cotton socks in bright stripes.", colours: ["#E9897E", "#2B2B2B", "#F2C200"] },
     ],
@@ -148,25 +150,25 @@ const CATALOGS: Record<SiteThemeSlug, DemoCatalog> = {
   // E01 (theme06): tech and lifestyle
   theme06: {
     categories: [
-      { name: "Footwear", image: "photo-1600185365926-3a2ce3cdb9eb", subtitle: "Light sneakers for every day" },
-      { name: "Clothing", image: "photo-1620799140188-3b2a02fd9a77", subtitle: "Trendy outfits and daily wear" },
-      { name: "Audio", image: "photo-1577174881658-0f30ed549adc", subtitle: "Headphones, earbuds and speakers" },
+      { name: "Audio", image: "photo-1577174881658-0f30ed549adc", subtitle: "Headphones and earbuds" },
       { name: "Wearables", image: "photo-1642101373432-a9c683c34902", subtitle: "Smartwatches for every wrist" },
-      { name: "Home", image: "photo-1505843490538-5133c6c7d0e1", subtitle: "Lamps, chairs and decor" },
       { name: "Cameras", image: "photo-1613600143671-234a54c236eb", subtitle: "Instant and film cameras" },
+      { name: "Speakers", image: "photo-1608043152269-423dbba4e7e1", subtitle: "Sound for every room" },
+      { name: "Charging", image: "photo-1591290619618-904f6dd935e3", subtitle: "Pads, cables and power banks" },
+      { name: "Cases", image: "photo-1535157412991-2ef801c1748b", subtitle: "Soft-touch phone cases" },
     ],
     products: [
       { title: "Studio Wireless Headphones", category: "Audio", price: 6999, was: 8499, image: "photo-1577174881658-0f30ed549adc", description: "Soft cushioned headphones with 40-hour battery life.", colours: ["#F4F4F4", "#111111"] },
       { title: "Pro Wireless Earbuds", category: "Audio", price: 4999, image: "photo-1572569511254-d8f925fe2cbb", description: "Noise-cancelling earbuds with a pocket charging case." },
       { title: "Fit Smartwatch", category: "Wearables", price: 5499, image: "photo-1642101373432-a9c683c34902", description: "Heart rate, sleep and workouts on a bright AMOLED screen.", colours: ["#111111", "#C9B8A3"] },
-      { title: "Air Runner Sneaker", category: "Footwear", price: 4299, was: 5299, image: "photo-1600185365926-3a2ce3cdb9eb", description: "Featherlight runner with a cushioned sole.", sizes: SHOE_SIZES },
-      { title: "Minimal Desk Lamp", category: "Home", price: 2499, image: "photo-1542728928-1413d1894ed1", description: "A warm metal desk lamp with an adjustable head." },
-      { title: "Moulded Lounge Chair", category: "Home", price: 8999, image: "photo-1505843490538-5133c6c7d0e1", description: "Classic moulded seat on solid wooden legs." },
-      { title: "Everyday White Hoodie", category: "Clothing", price: 1999, image: "photo-1620799140188-3b2a02fd9a77", description: "Soft brushed cotton hoodie in clean white.", sizes: CLOTHING_SIZES },
+      { title: "Rugged Speaker", category: "Speakers", price: 4499, was: 5499, image: "photo-1608043152269-423dbba4e7e1", description: "A waterproof speaker with deep bass." },
+      { title: "Wireless Charging Pad", category: "Charging", price: 1999, image: "photo-1591290619618-904f6dd935e3", description: "Charge your phone and earbuds at 15 W." },
+      { title: "Pastel Case Set", category: "Cases", price: 1499, image: "photo-1535157412991-2ef801c1748b", description: "Four soft-touch cases in pastel colours.", colours: ["#E9DDFB", "#BDE4E6", "#F7C9D4", "#2F3542"] },
       { title: "Instant Camera", category: "Cameras", price: 6499, image: "photo-1613600143671-234a54c236eb", description: "Print photos in seconds, wherever you are." },
       { title: "Over-Ear Headphones", category: "Audio", price: 3499, image: "photo-1583394838336-acd977736f90", description: "Rich sound in a light, foldable frame." },
-      { title: "Mesh Strap Watch", category: "Wearables", price: 3999, image: "photo-1786103776067-2df6237af61d", description: "Rose gold smartwatch with a metal mesh strap." },
-      { title: "Ceramic Bud Vase", category: "Home", price: 899, image: "photo-1784901390605-b50174168c40", description: "A small ruffled vase in soft pink ceramic." },
+      { title: "Mesh Strap Watch", category: "Wearables", price: 3999, image: "photo-1786103776067-2df6237af61d", description: "Tracks workouts and sleep, with a rose gold mesh strap." },
+      { title: "Home Speaker", category: "Speakers", price: 8999, image: "photo-1529359744902-86b2ab9edaea", description: "Room-filling sound with a voice assistant." },
+      { title: "Power Bank 20000", category: "Charging", price: 2799, image: "photo-1760708825913-65a50b3dc39b", description: "Charges three devices at once." },
       { title: "Classic Film Camera", category: "Cameras", price: 5299, was: 5999, image: "photo-1563552744114-78ff178ac8de", description: "A 35mm film camera, tested and ready to shoot." },
     ],
     banners: [
@@ -225,6 +227,14 @@ const CATALOGS: Record<SiteThemeSlug, DemoCatalog> = {
       { title: "The Dusk collection", image: "photo-1547062200-f195b1c77e30" },
       { title: "Made to gather around", image: "photo-1604578762246-41134e37f9cc" },
     ],
+    reviews: [
+      { name: "Ananya S.", text: "The chairs are so comfortable we now sit at the table long after dinner is over." },
+      { name: "Rahul K.", text: "Two men carried the table up three floors, set it up and took every bit of packaging away." },
+      { name: "Meera P.", text: "Solid, heavy and not a single wobble. You can feel the oak under your hands." },
+      { name: "Arjun T.", text: "They helped us measure our dining room on WhatsApp. The six-seater fits perfectly." },
+      { name: "Sana M.", text: "The oil finish has already taken a few spills and wiped clean every time." },
+      { name: "Kabir D.", text: "Bought the bench for the kids' side of the table. It's become everyone's favourite seat." },
+    ],
   },
   // Theme 07: ceramics
   theme07: {
@@ -236,7 +246,7 @@ const CATALOGS: Record<SiteThemeSlug, DemoCatalog> = {
     products: [
       { title: "Cloud Bowl Set", category: "Tableware", price: 3790, image: "photo-1530006498959-b7884e829a04", description: "Two deep bowls in a soft white glaze. 15×10 cm." },
       { title: "Speckled Green Cup", category: "Cups & mugs", price: 1290, image: "photo-1782351076283-73aa35f76058", description: "A speckled cup that fits right in your hands. 300 ml." },
-      { title: "Sunny Ruffle Vase", category: "Vases", price: 2890, image: "photo-1784901390624-cdf457c30168", description: "A small yellow vase with a ruffled rim. 18 cm." },
+      { title: "Moon Jar", category: "Vases", price: 5290, image: "photo-1612196808214-b8e1d6145a8c", description: "A round white jar, thrown in two halves and joined by hand. 24 cm." },
       { title: "Blue Dot Jug", category: "Tableware", price: 2290, image: "photo-1674405053661-d98f7f52be28", description: "A cheerful jug for water, milk or flowers. 1 L." },
       { title: "Blush Vase Trio", category: "Vases", price: 4590, was: 5290, image: "photo-1633738542859-b70b0237b1be", description: "Three pink vases in different sizes." },
       { title: "Floral Bowl Set", category: "Tableware", price: 3450, image: "photo-1567763745030-bfe9c51bec27", description: "Three hand-painted bowls with floral rims." },
@@ -244,10 +254,22 @@ const CATALOGS: Record<SiteThemeSlug, DemoCatalog> = {
       { title: "Speckled Mug", category: "Cups & mugs", price: 1590, image: "photo-1520485521983-bfaa0bc6c80e", description: "A big everyday mug with a speckled glaze. 400 ml." },
       { title: "Sun Candle Holder", category: "Vases", price: 1890, image: "photo-1728551040634-db461e235b1f", description: "A yellow tea-light holder that glows warmly." },
       { title: "Stone Pitcher", category: "Tableware", price: 2690, image: "photo-1478234170285-53301bcf2461", description: "A tall white pitcher with a matte stone finish." },
+      { title: "Sea Blue Plate Set", category: "Tableware", price: 4290, was: 4890, image: "photo-1578749556568-bc2c40e68b61", description: "Four dinner plates in a pale sea-blue glaze with raw rims. 27 cm." },
+      { title: "Sunny Ruffle Vase", category: "Vases", price: 2890, image: "photo-1784901390624-cdf457c30168", description: "A small yellow vase with a ruffled rim. 18 cm." },
+      { title: "Single Bud Vase", category: "Vases", price: 990, image: "photo-1581783342308-f792dbdd27c5", description: "A small white vase for one stem. 11 cm." },
+      { title: "Porcelain Cup", category: "Cups & mugs", price: 1390, image: "photo-1514228742587-6b1558fcca3d", description: "A smooth white cup with a rounded handle. 280 ml." },
     ],
     banners: [
       { title: "Southern gardens", image: "photo-1656626277991-0fd06ae52d5c" },
       { title: "Made by hand", image: "photo-1508269151431-a34449ca161d" },
+    ],
+    reviews: [
+      { name: "Ananya S.", text: "My morning coffee tastes better in this mug. Heavy in the hand, and the speckles are lovely." },
+      { name: "Rahul K.", text: "Wrapped in so much paper it took ages to unpack. Not a single chip." },
+      { name: "Meera P.", text: "The vase is even prettier in person. Every friend who visits asks where it's from." },
+      { name: "Arjun T.", text: "Bought the plates for our new home. They go in the dishwasher every night and still look new." },
+      { name: "Sana M.", text: "You can tell each piece is made by hand. Mine has a tiny thumbprint near the base and I love it." },
+      { name: "Kabir D.", text: "Ordered a custom set of six bowls on WhatsApp. Fired in two weeks, exactly the blue I wanted." },
     ],
   },
   // Theme 08: bags
@@ -1075,13 +1097,14 @@ export function demoCatalogFor(theme: string, storeId = "demo") {
     position: i,
     isActive: true,
   }));
-  const reviews: ReviewData[] = products.slice(0, REVIEWERS.length).map((p, i) => ({
+  const people = c.reviews || REVIEWERS;
+  const reviews: ReviewData[] = products.slice(0, people.length).map((p, i) => ({
     id: `demo-review-${i + 1}`,
     storeId,
     productId: p.id,
-    customerName: REVIEWERS[i].name,
+    customerName: people[i].name,
     rating: i % 3 === 2 ? 4 : 5,
-    comment: REVIEWERS[i].text,
+    comment: people[i].text,
     verifiedPurchase: true,
     status: "approved",
     createdAt: new Date(now - (i + 2) * day).toISOString(),

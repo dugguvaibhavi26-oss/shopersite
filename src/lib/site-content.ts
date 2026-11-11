@@ -126,6 +126,11 @@ export interface SiteThemeLook {
   bandColor?: string;
   /** "split" header in the accent colour instead of the page colour */
   headerTone?: "page" | "accent";
+  /** the phone menu: the shared light list, the theme's own black panel (Theme 3), soft photo tiles (E01) or a
+   *  numbered studio list on the panel colour with round category photos (Theme 07) */
+  menu?: "light" | "dark" | "soft" | "studio" | "editorial" | "workshop" | "mono" | "jewel";
+  /** the announcement as a slim black strip with the words sliding past (Theme 21) */
+  announceReel?: boolean;
   /** About, Contact and policy pages: "plain" text column; "banner" photo banner with the title on it; "split" photo
    *  beside the text; "card" big centred title over a soft card */
   pageStyle?: "plain" | "banner" | "split" | "card";
@@ -135,15 +140,20 @@ export interface SiteThemeLook {
   /** catalog: "chips" category pills above the grid; "sidebar" category list on the left; "banner" coloured title
    *  banner with category tiles */
   catalogLayout?: "chips" | "sidebar" | "banner";
+  /** About and Contact get fuller designs (src/components/storefront/site/info-pages.tsx): true = bold black bands, "soft" = soft panels */
+  richPages?: boolean | "soft" | "editorial" | "studio" | "workshop" | "sneaker" | "mono" | "jewel";
+  /** "Collection tiles": each category's own photo (default) or its newest product's photo (Theme 07, whose round
+   *  category plates already show the category photos) */
+  tilePhoto?: "category" | "newest";
 }
 
 export const SITE_THEME_STYLE: Record<SiteThemeSlug, SiteThemeLook> = {
   "classic-bloom": { pageStyle: "plain", productLayout: "grid", catalogLayout: "chips", header: "simple", cardRadius: "14px", footer: "light", headingAlign: "left", card: "plain" },
-  "mono-studio": { pageStyle: "banner", productLayout: "stack", catalogLayout: "sidebar", header: "cells", cardRadius: "0px", footer: "dark", headingAlign: "left", card: "plain" },
-  theme03: { pageStyle: "card", productLayout: "centered", catalogLayout: "banner", header: "overlay", cardRadius: "12px", footer: "dark", headingAlign: "center", card: "boxed" },
+  "mono-studio": { pageStyle: "banner", productLayout: "stack", catalogLayout: "sidebar", header: "cells", cardRadius: "0px", footer: "dark", headingAlign: "left", card: "plain", menu: "mono", richPages: "mono" },
+  theme03: { pageStyle: "card", productLayout: "centered", catalogLayout: "banner", header: "overlay", cardRadius: "12px", footer: "dark", headingAlign: "center", card: "boxed", richPages: true, menu: "dark" },
   theme04: { pageStyle: "split", productLayout: "split", catalogLayout: "chips", header: "split", cardRadius: "16px", footer: "dark", headingAlign: "left", card: "hover" },
-  theme05: { pageStyle: "plain", productLayout: "stack", catalogLayout: "banner", header: "simple", cardRadius: "6px", footer: "light", headingAlign: "left", card: "detailed", headingWeight: 400, footerWordmark: true },
-  theme06: { pageStyle: "card", productLayout: "grid", catalogLayout: "sidebar", header: "bar", cardRadius: "18px", footer: "light", headingAlign: "left", card: "notch", headingWeight: 600 },
+  theme05: { pageStyle: "plain", productLayout: "stack", catalogLayout: "banner", header: "simple", cardRadius: "6px", footer: "light", headingAlign: "left", card: "detailed", headingWeight: 400, footerWordmark: true, menu: "editorial", richPages: "sneaker" },
+  theme06: { pageStyle: "card", productLayout: "grid", catalogLayout: "sidebar", header: "bar", cardRadius: "18px", footer: "light", headingAlign: "left", card: "notch", headingWeight: 600, menu: "soft", richPages: "soft" },
   f01: { pageStyle: "split", productLayout: "centered", catalogLayout: "banner", header: "simple", cardRadius: "18px", footer: "dark", headingAlign: "left", card: "spec", headingWeight: 400 },
   f02: { pageStyle: "banner", productLayout: "split", catalogLayout: "sidebar",
     header: "bar",
@@ -157,8 +167,10 @@ export const SITE_THEME_STYLE: Record<SiteThemeSlug, SiteThemeLook> = {
     lineAspect: "1/0.9",
     headingRule: true,
     headingWeight: 400,
+    menu: "workshop",
+    richPages: "workshop",
   },
-  theme07: { pageStyle: "split", productLayout: "stack", catalogLayout: "chips", header: "bar", cardRadius: "0px", footer: "light", headingAlign: "left", card: "line", lineLayout: "stack", lineAccentName: true, lineCart: true, lineAspect: "4/5", headingWeight: 700 },
+  theme07: { pageStyle: "split", productLayout: "stack", catalogLayout: "chips", header: "bar", cardRadius: "0px", footer: "light", headingAlign: "left", card: "line", lineLayout: "stack", lineAccentName: true, lineCart: true, lineAspect: "4/5", headingWeight: 700, menu: "studio", richPages: "studio", tilePhoto: "newest" },
   theme08: { pageStyle: "card", productLayout: "split", catalogLayout: "banner",
     header: "bar",
     cardRadius: "0px",
@@ -338,6 +350,9 @@ export const SITE_THEME_STYLE: Record<SiteThemeSlug, SiteThemeLook> = {
     lineLayout: "stack",
     lineAspect: "4/5",
     headingWeight: 600,
+    menu: "jewel",
+    richPages: "jewel",
+    announceReel: true,
   },
   theme22: {
     pageStyle: "banner",
@@ -467,7 +482,18 @@ export type SiteSectionType =
   | "wave-signup"
   | "promo-trio"
   | "pet-picker"
-  | "pastel-tiles";
+  | "pastel-tiles"
+  | "glaze-picker"
+  | "care-guide"
+  | "batch-calendar"
+  | "review-board"
+  | "word-story"
+  | "scatter-gallery"
+  | "studio-prints"
+  | "wood-planks"
+  | "table-sizer"
+  | "spec-index"
+  | "drop-clock";
 
 export interface SiteSection {
   id: string;
@@ -520,6 +546,19 @@ export interface SiteContent {
     catalogLabel: string;
     aboutLabel: string;
     contactLabel: string;
+    /** "Home" link, on headers that show one */
+    homeLabel: string;
+    /** "Sale" link (on-sale products), on headers that show one */
+    saleLabel: string;
+    /** "Shop all", "Search", "Bag" and "Account" words, on headers that write them out */
+    shopAllLabel: string;
+    searchLabel: string;
+    bagLabel: string;
+    accountLabel: string;
+    /** the wishlist page's name, in headers that write it out and on the page itself */
+    wishlistLabel: string;
+    /** "Orders" link (order tracking), on headers that show one */
+    ordersLabel: string;
     searchPlaceholder: string;
     /** optional highlighted pill link in the menu, e.g. "Find your fit" */
     ctaLabel: string;
@@ -528,6 +567,8 @@ export interface SiteContent {
   footer: { about: string; newsletterHeading: string; copyright: string };
   sections: SiteSection[];
   pages: Record<SitePageId, SitePage>;
+  /** settings only the current theme has (see THEME_OPTIONS); always filled with the theme's defaults */
+  options: Record<string, string>;
 }
 
 export interface SectionField {
@@ -629,6 +670,8 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
       { key: "statLabel", label: "Text under the number", kind: "text", help: "e.g. Trusted brands" },
       { key: "secondButtonLabel", label: "Second button text", kind: "text", help: "Optional outline button next to the first." },
       { key: "secondButtonLink", label: "Second button link", kind: "link" },
+      { key: "spotSource", label: "Product on the small card", kind: "source", help: "On layouts with a product card beside the photo." },
+      { key: "spotButton", label: "Small card: button word", kind: "text", help: "Shown before the price, e.g. Buy." },
     ],
   },
   "collection-split": {
@@ -682,6 +725,20 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
       { key: "promoText", label: "Promo tile: text", kind: "text" },
       { key: "promoButton", label: "Promo tile: button text", kind: "text" },
       { key: "promoLink", label: "Promo tile: link", kind: "link" },
+      { key: "allLabel", label: "First tab name", kind: "text", help: "The tab that shows everything, on layouts with category tabs." },
+      {
+        key: "limit",
+        label: "Products to show",
+        kind: "select",
+        help: "How many products the row or grid shows.",
+        options: [
+          { value: "4", label: "4" },
+          { value: "5", label: "5" },
+          { value: "6", label: "6" },
+          { value: "8", label: "8" },
+          { value: "12", label: "12" },
+        ],
+      },
     ],
   },
   banners: {
@@ -825,6 +882,7 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
       HEADING_SIZE,
       { key: "subheading", label: "Text under heading", kind: "text" },
       { key: "buttonLabel", label: "Link text", kind: "text", help: "e.g. Check all categories" },
+      { key: "buttonShort", label: "Link text on phones", kind: "text", help: "A shorter version for small screens." },
     ],
   },
   "offer-split": {
@@ -992,7 +1050,7 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
   },
   "colour-chips": {
     label: "Shop by colour",
-    description: "Round colour chips; each one searches your shop for that colour",
+    description: "Round colour chips; each one opens your shop's page for that colour",
     fields: [
       { key: "heading", label: "Heading", kind: "textarea" },
       HEADING_SIZE,
@@ -1055,6 +1113,17 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
       { key: "source", label: "Products to show", kind: "source" },
       { key: "buttonLabel", label: "Button text", kind: "text" },
       { key: "buttonLink", label: "Button link", kind: "link" },
+      {
+        key: "style",
+        design: true,
+        label: "Layout",
+        kind: "select",
+        options: [
+          { value: "split", label: "One big product with three more under it" },
+          { value: "drops", label: "Numbered list of new pairs; the one picked shows big" },
+        ],
+      },
+      { key: "badge", label: "Sticker on the big photo", kind: "text", help: "Numbered list layout, e.g. Just in." },
     ],
   },
   "promo-banner": {
@@ -1118,6 +1187,19 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
     fields: [
       { key: "source", label: "Product to show", kind: "source", help: "The first product from here is shown." },
       { key: "image", label: "Photo (optional)", kind: "image", help: "Leave empty to use the product's own photo." },
+      {
+        key: "style",
+        design: true,
+        label: "Layout",
+        kind: "select",
+        options: [
+          { value: "wide", label: "Wide photo, tabs with details and reviews" },
+          { value: "boutique", label: "Framed photo, quiet details and one review" },
+        ],
+      },
+      { key: "label", label: "Small label above the name", kind: "text", help: "Framed layout, e.g. The icon." },
+      { key: "buttonLabel", label: "Button", kind: "text", help: "Framed layout, e.g. Add to bag." },
+      { key: "linkLabel", label: "Link to the product page", kind: "text", help: "Framed layout, e.g. View details." },
     ],
   },
   steps: {
@@ -1155,6 +1237,18 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
       { key: "a4", label: "Answer 4", kind: "textarea" },
       { key: "q5", label: "Question 5", kind: "text" },
       { key: "a5", label: "Answer 5", kind: "textarea" },
+      {
+        key: "style",
+        label: "Style",
+        kind: "select",
+        options: [
+          { value: "list", label: "A simple list" },
+          { value: "cards", label: "Numbered cards with a help card beside them" },
+        ],
+      },
+      { key: "helpTitle", label: "Help card: heading", kind: "text", help: "On the card style." },
+      { key: "helpText", label: "Help card: text", kind: "textarea" },
+      { key: "helpButton", label: "Help card: button", kind: "text", help: "Opens WhatsApp when your shop has a number, otherwise your Contact page." },
     ],
   },
   highlights: {
@@ -1271,6 +1365,15 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
       { key: "heading", label: "Heading", kind: "text" },
       HEADING_SIZE,
       { key: "text", label: "Text beside the heading", kind: "textarea" },
+      {
+        key: "align",
+        label: "Layout",
+        kind: "select",
+        options: [
+          { value: "left", label: "Heading on the left" },
+          { value: "center", label: "Everything in the middle" },
+        ],
+      },
     ],
   },
   "edge-tiles": {
@@ -1329,6 +1432,15 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
       { key: "source", label: "Products to show", kind: "source" },
       { key: "buttonLabel", label: "Button text", kind: "text" },
       { key: "buttonLink", label: "Button link", kind: "link" },
+      {
+        key: "align",
+        label: "Layout",
+        kind: "select",
+        options: [
+          { value: "left", label: "Heading on the left" },
+          { value: "center", label: "Everything in the middle" },
+        ],
+      },
     ],
   },
   "guide-row": {
@@ -1402,6 +1514,19 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
       HEADING_SIZE,
       { key: "endsAt", label: "Deals end at", kind: "text", help: "Time of day, e.g. 23:59. The clock restarts every day." },
       { key: "source", label: "Products to show", kind: "source" },
+      {
+        key: "style",
+        design: true,
+        label: "Layout",
+        kind: "select",
+        options: [
+          { value: "row", label: "A row of deals with a small clock" },
+          { value: "board", label: "Deal of the day: a big clock and the best deal, on a dark card" },
+        ],
+      },
+      { key: "label", label: "Small label", kind: "text", help: "Deal of the day layout: e.g. Deal of the day." },
+      { key: "buttonLabel", label: "Button", kind: "text", help: "Deal of the day layout: on the best deal." },
+      { key: "moreLabel", label: "Link to more deals", kind: "text", help: "Deal of the day layout." },
     ],
   },
   "spotlight-cards": {
@@ -1428,6 +1553,16 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
       { key: "image", label: "Photo", kind: "image" },
       { key: "text", label: "Quote to show before you have reviews", kind: "textarea" },
       { key: "name", label: "Name under that quote", kind: "text" },
+      {
+        key: "style",
+        design: true,
+        label: "Layout",
+        kind: "select",
+        options: [
+          { value: "band", label: "Dark band with a photo beside the review" },
+          { value: "boutique", label: "Quiet and centred, with a small round photo" },
+        ],
+      },
     ],
   },
   "menu-board": {
@@ -1750,6 +1885,17 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
       HEADING_SIZE,
       { key: "ranges", label: "Price ranges", kind: "textarea", help: "One per line as Label: from-to in rupees, e.g. Under ₹999: 0-999. Leave the end empty for no limit, e.g. ₹2000+: 2000-" },
       { key: "buttonLabel", label: "Link under the products", kind: "text" },
+      { key: "text", label: "Text under the heading", kind: "text", help: "Shows on the panel style." },
+      {
+        key: "style",
+        label: "Style",
+        kind: "select",
+        options: [
+          { value: "cards", label: "Product cards under the ranges" },
+          { value: "panel", label: "Coloured panel with compact product rows" },
+          { value: "boutique", label: "Quiet band: ranges as tabs, product cards under them" },
+        ],
+      },
     ],
   },
   "size-finder": {
@@ -1762,6 +1908,9 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
       { key: "sizes", label: "Sizes", kind: "textarea", help: "One per line as Size: bust / waist / hip in inches, e.g. M: 36 / 30 / 39" },
       { key: "buttonLabel", label: "Button text", kind: "text" },
       { key: "buttonLink", label: "Button link", kind: "link" },
+      { key: "measureNames", label: "Measurement names", kind: "text", help: "Separated by /, in the same order as the sizes' numbers, e.g. Bust / Waist / Hip." },
+      { key: "unitNote", label: "Words after the size", kind: "text", help: "e.g. fits, in inches. Leave empty for none." },
+      { key: "unitMark", label: "Mark after each number", kind: "text", help: "e.g. ″ for inches. Leave empty for none." },
     ],
   },
   "look-trio": {
@@ -1939,6 +2088,16 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
       { key: "p3Text", label: "Promise 3: text", kind: "text" },
       { key: "p4Title", label: "Promise 4: title", kind: "text" },
       { key: "p4Text", label: "Promise 4: text", kind: "text" },
+      {
+        key: "style",
+        design: true,
+        label: "Layout",
+        kind: "select",
+        options: [
+          { value: "cards", label: "Soft panel with big icons" },
+          { value: "strip", label: "Small dark strip with bright icons" },
+        ],
+      },
     ],
   },
   statement: {
@@ -1959,6 +2118,33 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
       { key: "subheading", label: "Text under heading", kind: "text" },
       { key: "featureText", label: "Text on the big tile", kind: "text" },
       { key: "featureButton", label: "Button on the big tile", kind: "text" },
+      {
+        key: "count",
+        label: "Tiles to show",
+        kind: "select",
+        help: "Your categories fill the tiles first; the extra tiles below top them up. Six at most.",
+        options: [
+          { value: "3", label: "3 tiles" },
+          { value: "4", label: "4 tiles" },
+          { value: "5", label: "5 tiles" },
+          { value: "6", label: "6 tiles" },
+        ],
+      },
+      {
+        key: "tone",
+        label: "Background",
+        kind: "select",
+        options: [
+          { value: "light", label: "Page colour" },
+          { value: "dark", label: "Black band" },
+        ],
+      },
+      { key: "x1Image", label: "Extra tile 1: photo", kind: "image", help: "Your own tile, e.g. a sale or a new drop. Shows when there are fewer categories than tiles." },
+      { key: "x1Title", label: "Extra tile 1: title", kind: "text" },
+      { key: "x1Link", label: "Extra tile 1: link", kind: "link" },
+      { key: "x2Image", label: "Extra tile 2: photo", kind: "image" },
+      { key: "x2Title", label: "Extra tile 2: title", kind: "text" },
+      { key: "x2Link", label: "Extra tile 2: link", kind: "link" },
     ],
   },
   "image-text": {
@@ -2022,6 +2208,249 @@ export const SITE_SECTION_TYPES: Record<SiteSectionType, { label: string; descri
       HEADING_SIZE,
       { key: "text", label: "Text", kind: "textarea" },
       { key: "image", label: "Background photo", kind: "image", help: "Optional. Shows the section as a dark band." },
+      { key: "placeholder", label: "Email box text", kind: "text" },
+      { key: "buttonLabel", label: "Button text", kind: "text" },
+      { key: "doneText", label: "Thank-you message", kind: "text", help: "Shown after someone signs up." },
+    ],
+  },
+  "glaze-picker": {
+    label: "Glaze picker",
+    description: "Round glaze swatches; picking one shows its colour, a few words and the products made in it",
+    fields: [
+      { key: "heading", label: "Heading", kind: "text" },
+      HEADING_SIZE,
+      { key: "text", label: "Text under heading", kind: "textarea" },
+      ...[1, 2, 3, 4, 5].flatMap((n): SectionField[] => [
+        { key: `g${n}Name`, label: `Glaze ${n}: name`, kind: "text", help: n === 1 ? "Leave a name empty to hide that glaze." : undefined },
+        { key: `g${n}Colour`, label: `Glaze ${n}: colour`, kind: "text", help: n === 1 ? "A colour code like #8FB3C9." : undefined },
+        { key: `g${n}Text`, label: `Glaze ${n}: a few words`, kind: "textarea" },
+        { key: `g${n}Match`, label: `Glaze ${n}: word to find its products`, kind: "text", help: n === 1 ? "Products whose name or description has this word show under the glaze, e.g. speckled." : undefined },
+      ]),
+      { key: "emptyText", label: "Text when no product matches", kind: "text" },
+      { key: "linkLabel", label: "Link to see them all", kind: "text" },
+    ],
+  },
+  "care-guide": {
+    label: "Care guide",
+    description: "Up to six care tiles, each with an icon, a stamp like Safe or Avoid, and a line of advice",
+    fields: [
+      { key: "heading", label: "Heading", kind: "text" },
+      HEADING_SIZE,
+      { key: "text", label: "Text under heading", kind: "textarea" },
+      { key: "note", label: "Note under the text", kind: "textarea" },
+      ...[1, 2, 3, 4, 5, 6].flatMap((n): SectionField[] => [
+        { key: `c${n}Title`, label: `Tile ${n}: title`, kind: "text", help: n === 1 ? "Leave a title empty to hide that tile." : undefined },
+        {
+          key: `c${n}Icon`,
+          label: `Tile ${n}: icon`,
+          kind: "select",
+          options: [
+            { value: "dishwasher", label: "Water drops" },
+            { value: "microwave", label: "Microwave" },
+            { value: "oven", label: "Flame" },
+            { value: "freezer", label: "Snowflake" },
+            { value: "hand", label: "Hand" },
+            { value: "shine", label: "Sparkle" },
+          ],
+        },
+        { key: `c${n}Stamp`, label: `Tile ${n}: stamp word`, kind: "text", help: n === 1 ? "A short word like Safe, Avoid or Gently." : undefined },
+        {
+          key: `c${n}Tone`,
+          label: `Tile ${n}: stamp colour`,
+          kind: "select",
+          options: [
+            { value: "yes", label: "Green (yes)" },
+            { value: "care", label: "Accent (careful)" },
+            { value: "no", label: "Dark (no)" },
+          ],
+        },
+        { key: `c${n}Text`, label: `Tile ${n}: advice`, kind: "textarea" },
+      ]),
+    ],
+  },
+  "spec-index": {
+    label: "Product index",
+    description: "Your products as a numbered list like a catalogue page; pointing at a row shows its photo",
+    fields: [
+      { key: "heading", label: "Heading", kind: "text" },
+      HEADING_SIZE,
+      { key: "text", label: "Text beside the heading", kind: "textarea" },
+      { key: "source", label: "Products", kind: "source" },
+      {
+        key: "count",
+        label: "How many rows",
+        kind: "select",
+        options: [
+          { value: "4", label: "4" },
+          { value: "6", label: "6" },
+          { value: "8", label: "8" },
+          { value: "10", label: "10" },
+        ],
+      },
+      { key: "colNo", label: "Column title: number", kind: "text" },
+      { key: "colName", label: "Column title: name", kind: "text" },
+      { key: "colDetail", label: "Column title: detail", kind: "text" },
+      { key: "colType", label: "Column title: category", kind: "text" },
+      { key: "colPrice", label: "Column title: price", kind: "text" },
+      { key: "linkLabel", label: "Link under the list", kind: "text" },
+      { key: "linkUrl", label: "Link", kind: "link" },
+    ],
+  },
+  "drop-clock": {
+    label: "Drop countdown",
+    description: "A big clock counting down to your next drop on a dark band, with a few words and a button",
+    fields: [
+      { key: "label", label: "Small text above the heading", kind: "text" },
+      { key: "heading", label: "Heading", kind: "text" },
+      HEADING_SIZE,
+      { key: "text", label: "Text", kind: "textarea" },
+      { key: "endsAt", label: "When the drop lands", kind: "text", help: "A date and time like 2026-12-01 18:00. Leave it empty (or let it pass) to count to every Friday at 6 pm." },
+      { key: "buttonLabel", label: "Button text", kind: "text" },
+      { key: "buttonLink", label: "Button link", kind: "link" },
+      { key: "daysLabel", label: "Word under days", kind: "text" },
+      { key: "hoursLabel", label: "Word under hours", kind: "text" },
+      { key: "minutesLabel", label: "Word under minutes", kind: "text" },
+      { key: "secondsLabel", label: "Word under seconds", kind: "text" },
+    ],
+  },
+  "wood-planks": {
+    label: "Wood planks",
+    description: "Your woods or materials as planks side by side; the open one widens to show its name, a note and its story",
+    fields: [
+      { key: "heading", label: "Heading", kind: "text" },
+      HEADING_SIZE,
+      { key: "text", label: "Text beside the heading", kind: "textarea" },
+      ...[1, 2, 3, 4, 5].flatMap((n): SectionField[] => [
+        { key: `w${n}Name`, label: `Plank ${n}: name`, kind: "text", help: n === 1 ? "Leave a name empty to hide that plank." : undefined },
+        { key: `w${n}Colour`, label: `Plank ${n}: wood colour`, kind: "text", help: n === 1 ? "A colour code like #B98A5A. The grain is drawn over it." : undefined },
+        { key: `w${n}Note`, label: `Plank ${n}: small note`, kind: "text" },
+        { key: `w${n}Text`, label: `Plank ${n}: its story`, kind: "textarea" },
+        { key: `w${n}Link`, label: `Plank ${n}: link`, kind: "link" },
+      ]),
+      { key: "linkLabel", label: "Link text", kind: "text" },
+    ],
+  },
+  "table-sizer": {
+    label: "Table sizer",
+    description: "Buyers pick how many people sit down and see the table and chairs drawn from above, with sizes and a link",
+    fields: [
+      { key: "heading", label: "Heading", kind: "text" },
+      HEADING_SIZE,
+      { key: "text", label: "Text under heading", kind: "textarea" },
+      ...[1, 2, 3, 4].flatMap((n): SectionField[] => [
+        { key: `z${n}Label`, label: `Size ${n}: button`, kind: "text", help: n === 1 ? "Like 6 seats. Leave it empty to hide that size." : undefined },
+        { key: `z${n}Seats`, label: `Size ${n}: number of chairs drawn`, kind: "text" },
+        { key: `z${n}Table`, label: `Size ${n}: table size`, kind: "text" },
+        { key: `z${n}Room`, label: `Size ${n}: room it needs`, kind: "text" },
+        { key: `z${n}Link`, label: `Size ${n}: link`, kind: "link" },
+      ]),
+      { key: "sizeLabel", label: "Label for the table size", kind: "text" },
+      { key: "roomLabel", label: "Label for the room size", kind: "text" },
+      { key: "linkLabel", label: "Link text", kind: "text", help: "{seats} becomes the number of seats." },
+    ],
+  },
+  "studio-prints": {
+    label: "Pinned prints",
+    description: "Two photos as tilted prints with handwritten captions, beside a short letter with a signature and a link",
+    fields: [
+      { key: "label", label: "Small text above the heading", kind: "text" },
+      { key: "heading", label: "Heading", kind: "text" },
+      HEADING_SIZE,
+      { key: "text", label: "First paragraph", kind: "textarea" },
+      { key: "text2", label: "Second paragraph", kind: "textarea" },
+      { key: "image", label: "Print 1: photo", kind: "image" },
+      { key: "caption", label: "Print 1: caption", kind: "text" },
+      { key: "image2", label: "Print 2: photo", kind: "image" },
+      { key: "caption2", label: "Print 2: caption", kind: "text" },
+      { key: "signature", label: "Signed by", kind: "text" },
+      { key: "linkLabel", label: "Link text", kind: "text" },
+      { key: "linkUrl", label: "Link", kind: "link" },
+    ],
+  },
+  "word-story": {
+    label: "Word story",
+    description: "Pins while buyers scroll through it: big words change on each side and the picture wipes from one product to the next",
+    fields: [
+      { key: "w1Left", label: "Step 1: word on the left", kind: "text" },
+      { key: "w1Right", label: "Step 1: word on the right", kind: "text" },
+      { key: "w2Left", label: "Step 2: word on the left", kind: "text" },
+      { key: "w2Right", label: "Step 2: word on the right", kind: "text" },
+      { key: "w3Left", label: "Step 3: word on the left", kind: "text" },
+      { key: "w3Right", label: "Step 3: word on the right", kind: "text" },
+      { key: "w4Left", label: "Step 4: word on the left", kind: "text", help: "Leave step 4 empty for three steps." },
+      { key: "w4Right", label: "Step 4: word on the right", kind: "text" },
+      { key: "source", label: "Products to show", kind: "source" },
+      { key: "buttonLabel", label: "Link on the product", kind: "text" },
+    ],
+  },
+  "scatter-gallery": {
+    label: "Scatter collage",
+    description: "Photos piled behind a big title that spread into a mosaic filling the band as buyers scroll",
+    fields: [
+      { key: "heading", label: "Title", kind: "textarea", help: "One word or two per line." },
+      HEADING_SIZE,
+      { key: "text", label: "Text under the title", kind: "text" },
+      { key: "buttonLabel", label: "Button", kind: "text" },
+      { key: "buttonLink", label: "Button link", kind: "link" },
+      { key: "g1Image", label: "Photo 1", kind: "image" },
+      { key: "g2Image", label: "Photo 2", kind: "image" },
+      { key: "g3Image", label: "Photo 3", kind: "image" },
+      { key: "g4Image", label: "Photo 4", kind: "image" },
+      { key: "g5Image", label: "Photo 5", kind: "image" },
+      { key: "g6Image", label: "Photo 6", kind: "image" },
+      { key: "g7Image", label: "Photo 7", kind: "image" },
+      { key: "g8Image", label: "Photo 8", kind: "image" },
+      { key: "g9Image", label: "Photo 9", kind: "image" },
+      { key: "g10Image", label: "Photo 10", kind: "image", help: "The mosaic has ten tiles; with fewer photos they repeat." },
+      {
+        key: "tone",
+        design: true,
+        label: "Colour",
+        kind: "select",
+        options: [
+          { value: "dark", label: "Dark band" },
+          { value: "light", label: "Soft panel" },
+        ],
+      },
+    ],
+  },
+  "review-board": {
+    label: "Review slider",
+    description: "Your reviews on a dark band as rounded cards that slide sideways, with your average rating on top",
+    fields: [
+      { key: "label", label: "Small text above the heading", kind: "text" },
+      { key: "heading", label: "Heading", kind: "text" },
+      HEADING_SIZE,
+      { key: "summary", label: "Line under the rating", kind: "text", help: "{avg} becomes the average rating and {n} the number of reviews." },
+      { key: "verifiedLabel", label: "Words under a verified buyer's name", kind: "text" },
+    ],
+  },
+  "batch-calendar": {
+    label: "Batch calendar",
+    description: "Your next three drops side by side, each with its date and marked open, coming soon or sold out",
+    fields: [
+      { key: "heading", label: "Heading", kind: "text" },
+      HEADING_SIZE,
+      { key: "text", label: "Text under heading", kind: "textarea" },
+      ...[1, 2, 3].flatMap((n): SectionField[] => [
+        { key: `b${n}Date`, label: `Batch ${n}: date`, kind: "text", help: n === 1 ? "Like 14 Nov. Leave the title empty to hide a batch." : undefined },
+        { key: `b${n}Title`, label: `Batch ${n}: title`, kind: "text" },
+        { key: `b${n}Note`, label: `Batch ${n}: a line about it`, kind: "text" },
+        {
+          key: `b${n}Status`,
+          label: `Batch ${n}: status`,
+          kind: "select",
+          options: [
+            { value: "open", label: "Open" },
+            { value: "soon", label: "Coming soon" },
+            { value: "sold", label: "Sold out" },
+          ],
+        },
+        { key: `b${n}Link`, label: `Batch ${n}: link`, kind: "link" },
+      ]),
+      { key: "openLabel", label: "Word for open batches", kind: "text" },
+      { key: "soonLabel", label: "Word for coming batches", kind: "text" },
+      { key: "soldLabel", label: "Word for sold-out batches", kind: "text" },
     ],
   },
 };
@@ -2144,7 +2573,7 @@ export function defaultSectionSettings(type: SiteSectionType, storeName = "Your 
         text: "We offer more than clothing and footwear: a canvas for who you are. Every piece is chosen for style and comfort, so you can make a statement with every step.",
       };
     case "collection-grid":
-      return { heading: "Featured collections", subheading: "Mix and match. Find the pieces that are you.", featureText: "New season styles are in", featureButton: "Discover" };
+      return { heading: "Featured collections", subheading: "Mix and match. Find the pieces that are you.", featureText: "New season styles are in", featureButton: "Discover", count: "6", tone: "light" };
     case "image-text":
       return {
         heading: "Made to last",
@@ -2157,7 +2586,7 @@ export function defaultSectionSettings(type: SiteSectionType, storeName = "Your 
     case "marquee":
       return { text: "Free delivery on prepaid orders · Easy exchanges · Cash on delivery available" };
     case "newsletter":
-      return { heading: "Join the list", text: "New drops and offers, straight to your inbox. No spam." };
+      return { heading: "Join the list", text: "New drops and offers, straight to your inbox. No spam.", placeholder: "Your email", buttonLabel: "Subscribe", doneText: "Thanks, you're on the list." };
     case "category-cards":
       return { heading: "Featured categories", subheading: "Shop by your favourite category in seconds.", buttonLabel: "Check all categories" };
     case "offer-split":
@@ -2804,6 +3233,144 @@ export function defaultSectionSettings(type: SiteSectionType, storeName = "Your 
       };
     case "pastel-tiles":
       return { heading: "Top *categories*" };
+    case "glaze-picker":
+      return {
+        heading: "Pick a colour",
+        text: "Tap a colour to see it up close and the pieces made in it.",
+        g1Name: "Cream",
+        g1Colour: "#E6DACB",
+        g1Text: "Warm and easy to live with.",
+        g1Match: "white",
+        g2Name: "Blue",
+        g2Colour: "#8FB3C9",
+        g2Text: "Soft and calm.",
+        g2Match: "blue",
+        g3Name: "Yellow",
+        g3Colour: "#E9B949",
+        g3Text: "Bright and cheerful.",
+        g3Match: "yellow",
+        emptyText: "Nothing in this colour right now.",
+        linkLabel: "See them all",
+      };
+    case "care-guide":
+      return {
+        heading: "Caring for your pieces",
+        text: "A little care keeps them looking new for years.",
+        c1Title: "Dishwasher",
+        c1Icon: "dishwasher",
+        c1Stamp: "Safe",
+        c1Tone: "yes",
+        c1Text: "Fine on a normal wash.",
+        c2Title: "Microwave",
+        c2Icon: "microwave",
+        c2Stamp: "Safe",
+        c2Tone: "yes",
+        c2Text: "Fine for warming.",
+        c3Title: "Sudden heat",
+        c3Icon: "oven",
+        c3Stamp: "Avoid",
+        c3Tone: "no",
+        c3Text: "Let it warm up slowly.",
+      };
+    case "spec-index":
+      return { heading: "The index", text: "Everything we make, in one list.", source: "bestsellers", count: "6", colNo: "No.", colName: "Piece", colDetail: "Detail", colType: "Type", colPrice: "Price", linkLabel: "Full catalog", linkUrl: "/catalog" };
+    case "drop-clock":
+      return {
+        label: "Next drop",
+        heading: "Coming soon",
+        text: "New pieces land every Friday at 6 pm.",
+        endsAt: "",
+        buttonLabel: "Get notified",
+        buttonLink: "/catalog",
+        daysLabel: "Days",
+        hoursLabel: "Hours",
+        minutesLabel: "Minutes",
+        secondsLabel: "Seconds",
+      };
+    case "wood-planks":
+      return {
+        heading: "What it's made of",
+        text: "The materials we choose, and why.",
+        w1Name: "Oak",
+        w1Colour: "#C49A6C",
+        w1Note: "Strong and light",
+        w1Text: "A hard, pale wood that lasts for generations.",
+        w2Name: "Walnut",
+        w2Colour: "#6B4A33",
+        w2Note: "Rich and dark",
+        w2Text: "A deep brown wood with a soft sheen.",
+        w3Name: "Ash",
+        w3Colour: "#D8C3A0",
+        w3Note: "Pale and springy",
+        w3Text: "A light wood with a lively grain.",
+        linkLabel: "See pieces",
+      };
+    case "table-sizer":
+      return {
+        heading: "Which size fits?",
+        text: "Pick how many people sit down.",
+        z1Label: "4 seats",
+        z1Seats: "4",
+        z1Table: "140 × 85 cm",
+        z1Room: "2.8 × 2.4 m",
+        z1Link: "/catalog",
+        z2Label: "6 seats",
+        z2Seats: "6",
+        z2Table: "180 × 90 cm",
+        z2Room: "3.4 × 2.6 m",
+        z2Link: "/catalog",
+        sizeLabel: "Table",
+        roomLabel: "Room you need",
+        linkLabel: "See {seats}-seat tables",
+      };
+    case "studio-prints":
+      return {
+        label: "Our story",
+        heading: "Made with care",
+        text: "Every piece is made by hand, in small batches.",
+        image: PHOTO("photo-1508269151431-a34449ca161d", 900),
+        caption: "In the studio",
+        image2: PHOTO("photo-1532570204726-145c7199f10e", 900),
+        caption2: "Fresh from the kiln",
+        signature: storeName,
+        linkLabel: "Our story",
+        linkUrl: "/pages/about",
+      };
+    case "word-story":
+      return { w1Left: "Made", w1Right: "to last", w2Left: "Worn", w2Right: "every day", w3Left: "Loved", w3Right: "for years", w4Left: "", w4Right: "", source: "bestsellers", buttonLabel: "Shop" };
+    case "scatter-gallery":
+      return {
+        heading: "Styled\nby you",
+        text: "Tag us to be featured.",
+        buttonLabel: "Follow us",
+        buttonLink: "",
+        g1Image: PHOTO("photo-1441984904996-e0b6ba687e04", 700),
+        g2Image: "",
+        g3Image: "",
+        g4Image: "",
+        g5Image: "",
+        g6Image: "",
+        tone: "dark",
+      };
+    case "review-board":
+      return { label: "Reviews", heading: "What customers say", summary: "{avg} out of 5 from {n} reviews", verifiedLabel: "Verified buyer" };
+    case "batch-calendar":
+      return {
+        heading: "Coming soon",
+        text: "Our next drops, so you never miss one.",
+        b1Date: "14 Nov",
+        b1Title: "New collection",
+        b1Note: "A small batch, made by hand",
+        b1Status: "open",
+        b1Link: "/catalog",
+        b2Date: "28 Nov",
+        b2Title: "Next drop",
+        b2Note: "Coming soon",
+        b2Status: "soon",
+        openLabel: "Open now",
+        soonLabel: "Coming soon",
+        soldLabel: "Sold out",
+      };
     case "impact":
       return {
         heading: "Every order counts",
@@ -2898,8 +3465,8 @@ const THEME_KIND: Record<SiteThemeSlug, ShopKind> = {
   "mono-studio": "fashion",
   theme03: "fashion",
   theme04: "fashion",
-  theme05: "fashion",
-  theme06: "fashion",
+  theme05: "shoes",
+  theme06: "tech",
   f01: "furniture",
   f02: "furniture",
   theme07: "ceramics",
@@ -3008,7 +3575,7 @@ function kindPages(kind: ShopKind, name: string): Partial<Record<SitePageId, Par
     case "jewellery":
       return {
         about: { title: "Our world", body: `${name} designs gold jewellery to be worn every day, layered, stacked and passed on.\n\nEvery piece is made by skilled craftspeople and finished by hand before it reaches you.` },
-        contact: { title: "Stores & services", body: "Want an engraving, a piercing appointment or help choosing a gift? Message us and we'll reply within a day." },
+        contact: { title: "Contact", body: "Want an engraving, help choosing a gift or news about your order? Message us and we'll reply within a day." },
         returns: { title: "Returns & care", body: "Unworn pieces can be returned within 14 days in their original box. Engraved and made-to-order pieces can't be returned.\n\nKeep your jewellery dry and store it in its pouch to keep it shining." },
       };
     case "fragrance":
@@ -3112,16 +3679,16 @@ export function getDefaultSiteContent(theme: string = "mono-studio", storeName =
   const heroPhoto = content.sections.find((x) => x.type === "hero")?.settings.image || "";
   pages.about = { ...pages.about, image: pages.about.image || heroPhoto };
   pages.contact = { ...pages.contact, image: pages.contact.image || heroPhoto };
-  return { ...content, pages };
+  return { ...content, pages, options: themeOptionDefaults(theme) };
 }
 
-function themeDefaultContent(theme: string, storeName: string): SiteContent {
+function themeDefaultContent(theme: string, storeName: string): Omit<SiteContent, "options"> {
   const section = (id: string, type: SiteSectionType, extra: Record<string, string> = {}): SiteSection => ({
     id,
     type,
     settings: { ...defaultSectionSettings(type, storeName), ...extra },
   });
-  const header = { catalogLabel: "Catalog", aboutLabel: "About", contactLabel: "Contact", searchPlaceholder: "Search products", ctaLabel: "", ctaLink: "/catalog" };
+  const header = { catalogLabel: "Catalog", aboutLabel: "About", contactLabel: "Contact", homeLabel: "Home", saleLabel: "Sale", shopAllLabel: "Shop all", searchLabel: "Search", bagLabel: "Bag", accountLabel: "Account", wishlistLabel: "Wishlist", ordersLabel: "Orders", searchPlaceholder: "Search products", ctaLabel: "", ctaLink: "/catalog" };
   const footer = {
     about: `${storeName}. Thoughtfully made clothing, shipped across India.`,
     newsletterHeading: "Get new drops first",
@@ -3159,23 +3726,74 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
         }),
         section("rows", "category-rows", { heading: "Choose a category" }),
         section("hits", "product-row", { heading: "Bestsellers", subheading: "", source: "bestsellers", display: "grid", buttonLabel: "See all", buttonLink: "/catalog" }),
-        section("wood", "highlights", {
-          eyebrow: "Why solid wood",
-          heading: "Made to be handed down",
-          text: "Every table and chair is built from solid timber, joined the old way and finished by hand.",
-          h1Image: PHOTO("photo-1657524398377-567034729507", 700),
-          h1Title: "Solid oak",
-          h1Text: "No veneer, no chipboard. Just wood that gets better with age.",
-          h2Image: PHOTO("photo-1705320678447-78c5fe2615a7", 700),
-          h2Title: "Soft seats",
-          h2Text: "Cushions in washable cotton and linen blends.",
-          h3Image: PHOTO("photo-1614014246201-14644e9b9c06", 700),
-          h3Title: "Classic joinery",
-          h3Text: "Mortise and tenon joints that never wobble.",
-          h4Image: PHOTO("photo-1611486212355-d276af4581c0", 700),
-          h4Title: "Oil finish",
-          h4Text: "Natural oils that you can refresh at home.",
+        // the woods as planks that open, in place of four more product photos
+        section("wood", "wood-planks", {
+          heading: "Woods we work with",
+          text: "Every table and chair is built from solid timber, joined the old way and finished by hand. No veneer, no chipboard.",
+          w1Name: "Oak",
+          w1Colour: "#C49A6C",
+          w1Note: "Hard · pale · steady",
+          w1Text: "Our everyday wood. Strong enough for a lifetime of dinners, and it turns honey-gold with age.",
+          w1Link: "/category/dining-tables",
+          w2Name: "Walnut",
+          w2Colour: "#6B4A33",
+          w2Note: "Rich · dark · soft sheen",
+          w2Text: "Deep brown with a chocolate grain. We save it for chairs you'll want to run your hand over.",
+          w2Link: "/category/dining-chairs",
+          w3Name: "Smoked oak",
+          w3Colour: "#3B2E25",
+          w3Note: "Oak, darkened by smoke",
+          w3Text: "The same strong oak, smoked until it's almost black. No stain, so scratches stay the same colour.",
+          w3Link: "/category/dining-tables",
+          w4Name: "Ash",
+          w4Colour: "#D9C4A1",
+          w4Note: "Light · springy · lively grain",
+          w4Text: "Bends without breaking, which is why our curved chair backs are made from it.",
+          w4Link: "/category/dining-chairs",
+          linkLabel: "See pieces",
         }),
+        section("room", "room-shop", {
+          heading: "Set for eight",
+          text: "Tap a dot to see the piece.",
+          image: PHOTO("photo-1505409628601-edc9af17fda6", 1800),
+          source: "bestsellers",
+          h1X: "58",
+          h1Y: "60",
+          h2X: "40",
+          h2Y: "68",
+          h3X: "74",
+          h3Y: "66",
+          h4X: "50",
+          h4Y: "76",
+        }),
+        section("sizer", "table-sizer", {
+          heading: "Which table\nfits your room?",
+          text: "Pick how many people sit down. We'll show the table, the chairs around it, and the room you need to pull them out comfortably.",
+          z1Label: "4 seats",
+          z1Seats: "4",
+          z1Table: "140 × 85 cm",
+          z1Room: "2.8 × 2.4 m",
+          z1Link: "/category/dining-tables",
+          z2Label: "6 seats",
+          z2Seats: "6",
+          z2Table: "180 × 90 cm",
+          z2Room: "3.4 × 2.6 m",
+          z2Link: "/category/dining-tables",
+          z3Label: "8 seats",
+          z3Seats: "8",
+          z3Table: "220 × 95 cm",
+          z3Room: "3.9 × 2.7 m",
+          z3Link: "/category/dining-tables",
+          z4Label: "10 seats",
+          z4Seats: "10",
+          z4Table: "260 × 100 cm",
+          z4Room: "4.4 × 2.8 m",
+          z4Link: "/category/dining-tables",
+          sizeLabel: "Table",
+          roomLabel: "Room you need",
+          linkLabel: "See {seats}-seat tables",
+        }),
+        section("chairs", "product-row", { heading: "Shop by piece", subheading: "", source: "newest", display: "tabs", allLabel: "Everything", buttonLabel: "" }),
         section("offer", "offer-split", {
           image: PHOTO("photo-1547062200-f195b1c77e30", 1400),
           eyebrow: storeName,
@@ -3190,9 +3808,11 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
           tone: "dark",
           imageSide: "right",
         }),
+        section("reviews", "reviews", { heading: "From dining rooms across India", subheading: "" }),
         section("faq", "faq", {
           heading: "Delivery & care",
           text: "",
+          style: "cards",
           q1: "How is furniture delivered?",
           a1: "Our team brings it to your room, assembles it and takes the packaging away.",
           q2: "How long does delivery take?",
@@ -3201,10 +3821,18 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
           a3: "Wipe with a damp cloth and re-oil once a year. We include a care kit.",
           q4: "Is there a warranty?",
           a4: "Every frame has a 5-year warranty.",
+          helpTitle: "Measuring your room?",
+          helpText: "Send us a photo and the size of your space. We'll reply with what fits, usually within a day.",
+          helpButton: "Ask the workshop",
         }),
         section("newsletter", "newsletter", { heading: "First to know", text: "New collections, offers and workshop news, once a month." }),
       ],
-      pages: defaultPages(storeName),
+      pages: {
+        ...defaultPages(storeName),
+        // About shows a set dining room, Contact a small dining corner, so the two pages don't look alike
+        about: { ...defaultPages(storeName).about, image: PHOTO("photo-1617806118233-18e1de247200", 1800) },
+        contact: { ...defaultPages(storeName).contact, image: PHOTO("photo-1577140917170-285929fb55b7", 1800) },
+      },
     };
   }
 
@@ -3236,40 +3864,154 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
           secondButtonLabel: "",
           image: PHOTO("photo-1656626277991-0fd06ae52d5c", 1400),
           imageLayout: "split-word",
-          tile1Image: PHOTO("photo-1784901390624-cdf457c30168", 500),
+          tile1Image: PHOTO("photo-1565193566173-7a0ee3dbe261", 500),
           tile1Label: "Catalog",
           tile1Link: "/catalog",
         }),
+        section("ticker", "marquee", { text: "Thrown by hand · Lead-free glazes · Safe for the dishwasher · Fired at 1240°C · Wrapped in paper, never plastic", colour: "" }),
         section("collections", "collection-tiles", {
           heading: "New collections",
           text: "Discover our new ceramic collections, made with love and an eye for detail. Each piece is a small work of art that brings warmth to your home.",
         }),
         section("best", "product-row", { heading: "Bestsellers", subheading: "", source: "bestsellers", display: "mosaic", buttonLabel: "Go to catalog", buttonLink: "/catalog" }),
-        section("process", "steps", {
-          eyebrow: "In the studio",
-          heading: "From clay\nto your table",
-          image: PHOTO("photo-1508269151431-a34449ca161d", 1200),
-          s1Title: "Thrown",
-          s1Text: "Each piece is shaped by hand on the wheel.",
-          s2Title: "Trimmed",
-          s2Text: "Left to dry, then trimmed and smoothed.",
-          s3Title: "Glazed",
-          s3Text: "Dipped in our lead-free glazes.",
-          s4Title: "Fired",
-          s4Text: "Fired twice, up to 1240°C, so it lasts for years.",
+        section("glazes", "glaze-picker", {
+          heading: "Pick your\nglaze",
+          text: "We mix every glaze in the studio. Tap a colour to see it up close and the pieces we've dipped in it.",
+          g1Name: "Speckled oat",
+          g1Colour: "#E6DACB",
+          g1Text: "Our everyday glaze: warm cream with iron speckles that come through in the second firing.",
+          g1Match: "speckled",
+          g2Name: "Sea blue",
+          g2Colour: "#8FB3C9",
+          g2Text: "A soft, watery blue that pools darker where the clay dips.",
+          g2Match: "blue",
+          g3Name: "Sunshine",
+          g3Colour: "#E9B949",
+          g3Text: "Bright and glossy, for the pieces that should make you smile.",
+          g3Match: "yellow",
+          g4Name: "Blush",
+          g4Colour: "#E7B3AE",
+          g4Text: "A dusty pink, satin to the touch.",
+          g4Match: "pink",
+          g5Name: "Chalk white",
+          g5Colour: "#F2EEE7",
+          g5Text: "A quiet matte white that lets the shape of the piece speak.",
+          g5Match: "white",
+          emptyText: "Nothing in this glaze right now. Ask us and we'll fire one for you.",
+          linkLabel: "See all in this glaze",
         }),
-        section("about", "about-split", {
+        section("imperfect", "statement", {
+          heading: "Imperfect\non purpose",
+          text: "A thumbprint in the clay, a glaze that pooled a little thicker on one side. No two of our pieces come out of the kiln the same, and we wouldn't want them to.",
+        }),
+        // categories as round plates: a different shape from the arched collection tiles and the square product cards
+        section("shapes", "category-circles", { heading: "Shop by shape" }),
+        section("fresh", "product-row", { heading: "Fresh from\nthe kiln", subheading: "This week's small batch. Once they're gone, they're gone.", source: "newest", display: "beside", buttonLabel: "See what's new", buttonLink: "/catalog" }),
+        // the batch calendar starts switched off: sellers turn it on with the eye button in the editor's section list
+        {
+          ...section("batches", "batch-calendar", {
+            heading: "Next out\nof the kiln",
+            text: "We fire in small batches. Here's what's coming, so you never miss a drop.",
+            b1Date: "14 Nov",
+            b1Title: "Speckled mugs, batch 41",
+            b1Note: "60 mugs in speckled oat and sea blue",
+            b1Status: "open",
+            b1Link: "/category/cups-mugs",
+            b2Date: "22 Nov",
+            b2Title: "Pasta bowls for winter",
+            b2Note: "Wide, deep bowls in chalk white",
+            b2Status: "soon",
+            b2Link: "",
+            b3Date: "05 Dec",
+            b3Title: "The festive table",
+            b3Note: "Plates, jugs and bud vases in sunshine yellow",
+            b3Status: "soon",
+            b3Link: "",
+            openLabel: "Open now",
+            soonLabel: "Coming soon",
+            soldLabel: "Sold out",
+          }),
+          hidden: true,
+        },
+        section("commission", "custom-order", {
+          heading: "Make it\nyour set",
+          noteLabel: "Made to order",
+          note: "Pick the piece, the glaze and how many. We'll reply on WhatsApp with a price and a firing date.",
+          o1Label: "Piece",
+          o1Options: "Mugs, Dinner plates, Pasta bowls, Bud vases",
+          o2Label: "Glaze",
+          o2Options: "Speckled oat, Sea blue, Sunshine, Blush, Chalk white",
+          o3Label: "How many",
+          o3Options: "2, 4, 6, 8, 12",
+          o4Label: "Finish",
+          o4Options: "Glossy, Satin, Raw clay outside",
+          image: PHOTO("photo-1590422749897-47036da0b0ff", 800),
+          buttonLabel: "Ask on WhatsApp",
+        }),
+        section("reviews", "review-board", {
+          label: "From our customers",
+          heading: "Kind words",
+          summary: "{avg} out of 5 from {n} reviews",
+          verifiedLabel: "Verified buyer",
+        }),
+        // the studio story as two tilted prints pinned beside a short letter, not another photo-and-text block
+        section("about", "studio-prints", {
           label: "From our studio",
           heading: "*Made by hand*\nin small batches",
-          image: PHOTO("photo-1508269151431-a34449ca161d", 1200),
-          image2: PHOTO("photo-1532570204726-145c7199f10e", 1200),
+          image: PHOTO("photo-1508269151431-a34449ca161d", 900),
+          caption: "Carving the foot of a bowl",
+          image2: PHOTO("photo-1532570204726-145c7199f10e", 900),
+          caption2: "Cups cooling on the kiln shelf",
           text: "Every piece is thrown, glazed and fired by hand, so no two are exactly alike.",
           text2: "We use lead-free glazes that are safe for food and the dishwasher.",
+          signature: "Meera & the studio",
           linkLabel: "Our story",
+          linkUrl: "/pages/about",
         }),
         section("newsletter", "newsletter", { heading: "Studio notes", text: "New collections and small-batch drops, before anyone else." }),
+        // the care guide closes the page
+        section("care", "care-guide", {
+          heading: "Caring for\nyour ceramics",
+          text: "Handmade pieces are strong. A little care keeps them that way for years.",
+          note: "Every glaze we use is lead-free and food-safe, tested batch by batch.",
+          c1Title: "Dishwasher",
+          c1Icon: "dishwasher",
+          c1Stamp: "Safe",
+          c1Tone: "yes",
+          c1Text: "Glazed pieces go in. Raw clay outside? Wash by hand.",
+          c2Title: "Microwave",
+          c2Icon: "microwave",
+          c2Stamp: "Safe",
+          c2Tone: "yes",
+          c2Text: "Fine for warming, except pieces with a gold rim.",
+          c3Title: "Oven",
+          c3Icon: "oven",
+          c3Stamp: "Gently",
+          c3Tone: "care",
+          c3Text: "Up to 180°C, starting from a cold oven.",
+          c4Title: "Freezer to stove",
+          c4Icon: "freezer",
+          c4Stamp: "Avoid",
+          c4Tone: "no",
+          c4Text: "Sudden heat or cold can crack even strong clay.",
+          c5Title: "Hand washing",
+          c5Icon: "hand",
+          c5Stamp: "Best",
+          c5Tone: "yes",
+          c5Text: "A soft sponge keeps the glaze glossy longest.",
+          c6Title: "Scratches",
+          c6Icon: "shine",
+          c6Stamp: "Gently",
+          c6Tone: "care",
+          c6Text: "Cutlery marks lift with a little baking soda.",
+        }),
       ],
-      pages: defaultPages(storeName),
+      pages: {
+        ...defaultPages(storeName),
+        // About shows the workshop, Contact the finished cups, so the two pages don't look alike
+        about: { ...defaultPages(storeName).about, image: PHOTO("photo-1595351298020-038700609878", 1800) },
+        contact: { ...defaultPages(storeName).contact, image: PHOTO("photo-1610701596007-11502861dcfa", 1800) },
+      },
     };
   }
 
@@ -4247,7 +4989,7 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
         uppercaseHeadings: "yes",
         productPhotos: "fill",
       },
-      header: { ...header, catalogLabel: "Shop", aboutLabel: "Our world", contactLabel: "Stores & services", searchPlaceholder: "Search", ctaLabel: "" },
+      header: { ...header, catalogLabel: "Shop", aboutLabel: "Our world", contactLabel: "Contact", searchPlaceholder: "Search", ctaLabel: "" },
       footer: { ...footer, about: `${storeName}. Demi-fine gold jewellery made to be layered and loved.`, newsletterHeading: "Be first to new drops" },
       sections: [
         section("hero", "hero", {
@@ -4260,48 +5002,97 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
           image: PHOTO("photo-1633555234296-657a18d8b81a", 2000),
           imageLayout: "look",
         }),
-        section("edits", "edge-tiles"),
+        section("promise", "claims-strip", { text: "18k gold plated · Hypoallergenic · Nickel free · Water resistant · 1-year warranty" }),
+        section("categories", "collection-circles", {
+          eyebrow: "Shop by category",
+          heading: "Find your\n*shine*",
+          text: "Hoops, chains, stacks and rings, made to be worn every day.",
+          buttonLabel: "View all",
+          buttonLink: "/catalog",
+        }),
         section("trending", "product-row", { heading: "Trending", subheading: "", source: "bestsellers", display: "slider", buttonLabel: "" }),
-        section("services", "edge-tiles", {
-          t1Image: PHOTO("photo-1616121341778-0dd435d03d23", 1000),
-          t1Title: "Wedding studio",
-          t1Button: "Discover more",
-          t1Link: "/pages/contact",
-          t2Image: PHOTO("photo-1778000000743-87e855360c51", 1000),
-          t2Title: "Come get welded",
-          t2Button: "Book an appointment",
-          t2Link: "/pages/contact",
-          t3Image: PHOTO("photo-1728034261686-26d2878f1c2d", 1000),
-          t3Title: "Come get pierced",
-          t3Button: "Book an appointment",
-          t3Link: "/pages/contact",
+        section("story", "word-story", {
+          w1Left: "Everyday",
+          w1Right: "gold",
+          w2Left: "Stack",
+          w2Right: "them up",
+          w3Left: "Quietly",
+          w3Right: "brilliant",
+          w4Left: "Made",
+          w4Right: "to keep",
+          source: "bestsellers",
+          buttonLabel: "Shop",
+        }),
+        section("edits", "edge-tiles", {
+          t1Image: PHOTO("photo-1777817117657-d2fa6aacef06", 900),
+          t1Title: "Stack it up",
+          t1Button: "Shop bracelets",
+          t1Link: "/category/bracelets",
+          t2Image: PHOTO("photo-1786052337650-9e1c0dd01f5e", 900),
+          t2Title: "Most wanted",
+          t2Button: "Shop necklaces",
+          t2Link: "/category/necklaces",
+          t3Image: "",
+          t3Title: "",
+          t3Button: "",
+          t3Link: "",
           t4Image: "",
           t4Title: "",
           t4Button: "",
           t4Link: "",
         }),
-        section("iconic", "product-row", { heading: "Our most iconic pieces", subheading: "", source: "newest", display: "slider", buttonLabel: "" }),
+        section("budget", "budget-picker", {
+          heading: "Gifts by *budget*",
+          text: "Pick a price and we'll show the pieces that fit.",
+          ranges: "Under ₹4,000: 0-3999\n₹4,000 – ₹6,000: 4000-6000\nOver ₹6,000: 6001-",
+          buttonLabel: "See all gifts",
+          style: "boutique",
+        }),
         section("engrave", "engraving"),
-        section("styled", "gallery", {
-          heading: "Styled by you",
+        section("services", "offset-pair", {
+          aImage: PHOTO("photo-1778000000743-87e855360c51", 1000),
+          aEyebrow: "In store",
+          aTitle: "Come get welded",
+          aButton: "Book an appointment",
+          aLink: "/pages/contact",
+          bImage: PHOTO("photo-1728034261686-26d2878f1c2d", 1000),
+          bEyebrow: "In store",
+          bTitle: "Come get pierced",
+          bButton: "Book an appointment",
+          bLink: "/pages/contact",
+        }),
+        section("icon", "product-spotlight", { source: "bestsellers", image: "", style: "boutique", label: "The icon", buttonLabel: "Add to bag", linkLabel: "View details" }),
+        section("reviews", "review-spotlight", {
+          label: "Worn and loved",
+          style: "boutique",
+          image: PHOTO("photo-1616121341778-0dd435d03d23", 900),
+          text: "I haven't taken my hoops off in months. They still shine like the day they arrived.",
+          name: "Ananya, Mumbai",
+        }),
+        section("styled", "scatter-gallery", {
+          heading: "Styled\nby you",
+          text: "Tag us to be featured. Our favourite looks from your feed.",
           buttonLabel: "Follow us",
           buttonLink: "",
           g1Image: PHOTO("photo-1787410507883-541bef9c7fb2", 700),
-          g1Caption: "",
           g2Image: PHOTO("photo-1785273926014-ca2f71ea856a", 700),
-          g2Caption: "",
           g3Image: PHOTO("photo-1787410544499-605c94d86a0e", 700),
-          g3Caption: "",
           g4Image: PHOTO("photo-1786520995818-db8a1620531e", 700),
-          g4Caption: "",
           g5Image: PHOTO("photo-1671644730555-916aa8d8157f", 700),
-          g5Caption: "",
           g6Image: PHOTO("photo-1764974345389-09da4244809c", 700),
-          g6Caption: "",
+          g7Image: PHOTO("photo-1633555234296-657a18d8b81a", 900),
+          g8Image: PHOTO("photo-1708220040824-b273dd0a17cc", 700),
+          g9Image: PHOTO("photo-1777817117657-d2fa6aacef06", 700),
+          g10Image: PHOTO("photo-1786052337650-9e1c0dd01f5e", 700),
+          tone: "dark",
         }),
         section("newsletter", "newsletter", { heading: "Join the club", text: "Early access to new collections and members-only offers." }),
       ],
-      pages: defaultPages(storeName),
+      pages: {
+        ...defaultPages(storeName),
+        about: { ...defaultPages(storeName).about, image: PHOTO("photo-1787410544499-605c94d86a0e", 1800) },
+        contact: { ...defaultPages(storeName).contact, title: "Contact", image: PHOTO("photo-1616121341778-0dd435d03d23", 1400) },
+      },
     };
   }
 
@@ -4802,7 +5593,7 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
         uppercaseHeadings: "yes",
         productPhotos: "fill",
       },
-      header: { ...header, catalogLabel: "Shop", aboutLabel: "About", contactLabel: "Contact", ctaLabel: "Build a box", ctaLink: "/catalog" },
+      header: { ...header, catalogLabel: "Shop", aboutLabel: "About", contactLabel: "Contact" },
       footer: { ...footer, about: `${storeName}. Fermented fruit sodas, low in sugar and full of flavour.`, newsletterHeading: "New flavours, first" },
       sections: [
         section("hero", "hero", {
@@ -4816,7 +5607,18 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
         }),
         section("claims", "claims-strip"),
         section("flavours", "product-row", { heading: "Shop flavours", subheading: "", source: "bestsellers", display: "slider", buttonLabel: "" }),
+        section("spotlight", "product-spotlight", { source: "newest", image: "" }),
         section("reviews", "reviews", { subheading: "", heading: "Fans say" }),
+        section("numbers", "impact", {
+          heading: "Small cans,\nbig numbers",
+          text: "What a little fizz adds up to.",
+          n1Value: "2.5L+",
+          n1Label: "Cans sipped so far",
+          n2Value: "35",
+          n2Label: "Calories in a can",
+          n3Value: "5g",
+          n3Label: "Sugar in a can",
+        }),
         section("inside", "facts", {
           eyebrow: "What's inside",
           heading: "Good for you,\ngreat to drink",
@@ -4826,12 +5628,61 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
           buttonLabel: "Shop flavours",
           buttonLink: "/catalog",
         }),
+        section("how", "steps", {
+          eyebrow: "How it works",
+          heading: "Fresh fizz in\nthree steps",
+          image: PHOTO("photo-1781560150438-2bc2bf7c4434", 1200),
+          s1Title: "Pick your flavours",
+          s1Text: "Mix single cans or grab a ready pack.",
+          s2Title: "We ship it cold",
+          s2Text: "Packed in insulated boxes and out within 24 hours.",
+          s3Title: "Chill and sip",
+          s3Text: "Best ice cold, straight from the can.",
+          s4Title: "",
+          s4Text: "",
+        }),
+        section("combo", "combo-builder", {
+          heading: "Build a box of three",
+          text: "Pick one from each list and we'll add all three to your bag.",
+          c1Label: "First can",
+          c1Source: "category:cans",
+          c2Label: "Second can",
+          c2Source: "newest",
+          c3Label: "Add a pack",
+          c3Source: "category:packs",
+          buttonLabel: "Add my box",
+        }),
+        section("fans", "tilt-gallery", {
+          heading: "Sip it your way",
+          p1Image: PHOTO("photo-1781560149889-21e394a4175f", 900),
+          p1Title: "Ice cold",
+          p2Image: PHOTO("photo-1781559310925-3f34116c0636", 900),
+          p2Title: "Picnic ready",
+          p3Image: PHOTO("photo-1781560149414-bd24871a00d3", 900),
+          p3Title: "Party size",
+        }),
+        section("deals", "countdown-deals", { heading: "Today's deals", endsAt: "23:59", source: "category:packs" }),
         section("box", "promo-banner", {
           image: PHOTO("photo-1781560150113-156cf60751fc", 1800),
           heading: "Every flavour,\none box",
           text: "Mix 12 cans any way you like.",
           buttonLabel: "Build a box",
           buttonLink: "/catalog",
+        }),
+        section("tags", "tag-cloud", { text: "Pineapple · Mandarin · Guava · Strawberry · Orange zest · Live cultures · Low sugar · No caffeine · Real fruit · Gut friendly" }),
+        section("faq", "faq", {
+          heading: "Questions?",
+          text: "Can't find your answer? Message us on WhatsApp.",
+          q1: "How should I store the cans?",
+          a1: "Keep them in the fridge. The live cultures love the cold.",
+          q2: "Is there any caffeine?",
+          a2: "No. Every flavour is caffeine free.",
+          q3: "How fast is delivery?",
+          a3: "We ship within 24 hours and most orders arrive in 2 to 5 days.",
+          q4: "Can I mix flavours in one box?",
+          a4: "Yes. Build a box with any flavours you like.",
+          q5: "",
+          a5: "",
         }),
       ],
       pages: defaultPages(storeName),
@@ -5229,7 +6080,7 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
         productPhotos: "fill",
       },
       header: { ...header, catalogLabel: "Shop", ctaLabel: "Shop now", ctaLink: "/catalog" },
-      footer: { ...footer, about: `${storeName}. Everyday tech, home and style picks, delivered across India.`, newsletterHeading: "Get new picks and offers first" },
+      footer: { ...footer, about: `${storeName}. Everyday tech, picked with care and delivered across India.`, newsletterHeading: "Get new picks and offers first" },
       sections: [
         section("hero", "hero", {
           heading: storeName,
@@ -5237,6 +6088,8 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
           tag: "",
           stat: "70+",
           statLabel: "Trusted brands",
+          spotSource: "newest",
+          spotButton: "Buy",
           buttonLabel: "",
           secondButtonLabel: "",
           image: PHOTO("photo-1771732267144-2890ccee7076", 1800),
@@ -5249,28 +6102,99 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
           source: "bestsellers",
           display: "tabs",
           buttonLabel: "",
-          promoImage: PHOTO("photo-1631016378206-28999fe2fd9d", 800),
+          promoImage: PHOTO("photo-1764137399490-418e64d6ddbb", 800),
           promoText: "Explore 50+ more picks",
           promoButton: "View collection",
           promoLink: "/catalog",
+          limit: "5",
         }),
-        section("perks", "perks"),
-        section("offer", "offer-split"),
+        section("brands", "brand-strip", { names: "Sonix · Lumen · Orbit · Kestrel · Halo · Vantage" }),
+        section("budget", "budget-picker", {
+          heading: "Shop by budget",
+          ranges: "Under ₹2,000: 0-1999\n₹2,000 – ₹4,000: 2000-3999\n₹4,000 – ₹6,000: 4000-5999\n₹6,000 and up: 6000-",
+          buttonLabel: "See everything",
+          text: "Pick a price range and add straight to your bag.",
+          style: "panel",
+        }),
+        section("offer", "offer-split", {
+          eyebrow: "Limited time only",
+          heading: "Save 40% on\nselect audio.",
+          text: "Headphones, earbuds and speakers at their best price this season.",
+          buttonLabel: "Shop the sale",
+          buttonLink: "/catalog?sale=1",
+        }),
+        section("setup", "room-shop", {
+          heading: "Shop the desk setup",
+          text: "Tap a dot to see what's on the desk.",
+          image: PHOTO("photo-1593062096033-9a26b09da705", 1800),
+          source: "bestsellers",
+          h1X: "30",
+          h1Y: "62",
+          h2X: "52",
+          h2Y: "40",
+          h3X: "74",
+          h3Y: "58",
+          h4X: "14",
+          h4Y: "40",
+        }),
+        section("pricelist", "menu-board", {
+          heading: "The price list",
+          text: "Every product, every price. Tap a category and add straight to your bag.",
+          note: "Prices include GST. Free delivery on orders over ₹999.",
+        }),
+        section("finder", "scent-quiz", {
+          heading: "Find your gear",
+          text: "Pick what you need it for.",
+          options: "Listening: headphone\nWorkouts: workout\nPhotos: camera\nParties: speaker\nStaying charged: charge",
+          buttonLabel: "See all products",
+        }),
+        section("stage", "stage", {
+          heading: "Sound you\ncan feel",
+          image: PHOTO("photo-1505740420928-5e560c06d30e", 1200),
+          word: "AUDIO",
+          buttonLabel: "Shop audio",
+          buttonLink: "/category/audio",
+        }),
+        section("bento", "bento-benefits", {
+          eyebrow: "Why shop with us",
+          heading: "Picked with care,\n*delivered fast*",
+          b1Title: "Genuine products",
+          b1Text: "Every gadget arrives sealed, with its brand warranty.",
+          b2Title: "Fast delivery",
+          b2Text: "Most orders reach you in 3 to 5 days.",
+          b3Title: "Easy returns",
+          b3Text: "Changed your mind? Return it within 7 days.",
+          p1Image: PHOTO("photo-1535157412991-2ef801c1748b", 900),
+          p2Image: PHOTO("photo-1591290619618-904f6dd935e3", 900),
+          p3Image: PHOTO("photo-1572569511254-d8f925fe2cbb", 900),
+          p4Image: PHOTO("photo-1786103776067-2df6237af61d", 900),
+        }),
         section("reviews", "reviews", { subheading: "", heading: "What our customers say" }),
         section("faq", "faq", {
           heading: "Good to know",
-          text: "Sizing, delivery and returns, answered.",
-          q1: "How do I find my size?",
-          a1: "Every product page has a size guide. Between sizes? Go one up for a relaxed fit.",
+          text: "Warranty, delivery and returns, answered.",
+          q1: "Do products come with a warranty?",
+          a1: "Yes. Every gadget arrives sealed, with its brand warranty card.",
           q2: "When will my order arrive?",
           a2: "Most orders arrive in 3–5 days. You'll get a tracking link once it ships.",
-          q3: "Can I exchange an item?",
-          a3: "Yes, within 7 days of delivery, unworn and with tags attached.",
+          q3: "Can I return a product?",
+          a3: "Yes, within 7 days of delivery, unused and in its original box.",
           q4: "Do you offer cash on delivery?",
           a4: "Yes, on most orders across India.",
+          q5: "Do you deliver everywhere in India?",
+          a5: "Yes, to over 19,000 PIN codes. Enter yours at checkout to see the delivery date.",
+          style: "cards",
+          helpTitle: "Still have questions?",
+          helpText: "Our team replies on WhatsApp within an hour, Monday to Saturday.",
+          helpButton: "Chat with us",
         }),
+        section("perks", "perks"),
       ],
-      pages: defaultPages(storeName),
+      pages: {
+        ...defaultPages(storeName),
+        about: { ...defaultPages(storeName).about, image: PHOTO("photo-1498050108023-c5249f4df085", 1800) },
+        contact: { ...defaultPages(storeName).contact, image: PHOTO("photo-1527443224154-c4a3942d3acf", 1800) },
+      },
     };
   }
 
@@ -5284,15 +6208,15 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
         accentText: "#FFFFFF",
         panel: "#F1F1F1",
         textSize: "100",
-        headingFont: "Inter Tight",
-        displayFont: "Instrument Serif",
+        headingFont: "Bricolage Grotesque",
+        displayFont: "Bricolage Grotesque",
         bodyFont: "Inter",
         buttonShape: "pill",
         uppercaseHeadings: "no",
         productPhotos: "fill",
       },
       header: { ...header, catalogLabel: "Shop", ctaLabel: "Find your fit", ctaLink: "/catalog" },
-      footer: { ...footer, newsletterHeading: "Join our list for new drops and offers" },
+      footer: { ...footer, about: `${storeName}. Comfortable sneakers for every day, shipped across India.`, newsletterHeading: "Join our list for new drops and offers" },
       sections: [
         section("hero", "hero", {
           tag: "Up to 30% off",
@@ -5304,26 +6228,113 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
           image: PHOTO("photo-1491553895911-0055eca6402d", 1400),
           imageLayout: "panel",
         }),
+        section("promises", "marquee", { text: "Free size exchanges · 7-day returns · Cash on delivery · Delivered in 3 to 5 days", colour: "" }),
         section("everyday", "product-row", { heading: "Explore *every day*", source: "newest", buttonLabel: "" }),
-        section("story", "image-text", {
-          heading: "Work. Fun. Daily sprints.\nAll in the *same pieces.*",
-          text: "Versatile, durable and super comfortable. Perfect for busy days, last-minute plans and relaxed walks.",
-          buttonLabel: "Find your fit",
+        section("ranges", "category-panels", { heading: "Shop the *range*", buttonLabel: "Shop now" }),
+        section("colours", "colour-chips", {
+          heading: "Shop by\n*colour*",
+          colours: "White #F4F4F2\nBlack #1B1B1B\nRed #D7262E\nGreen #2F6B3F\nGrey #9A9A9A\nYellow #E3D23A",
+        }),
+        section("collage", "type-collage", {
+          line1: "Light on",
+          line2: "*your* feet,",
+          line3: "all day long.",
+          image: PHOTO("photo-1542291026-7eec264c27ff", 900),
+          noteLeft: "Foam soles that bounce back, mile after mile.",
+          noteRight: "Breathable uppers that keep you cool from the morning run to the late night out.",
+        }),
+        section("anatomy", "facts", {
+          eyebrow: "Inside every pair",
+          heading: "Anatomy of\na *sneaker*",
+          image: PHOTO("photo-1491553895911-0055eca6402d", 1200),
+          rows: "Upper: Breathable knit mesh\nCushioning: Springy foam midsole\nOutsole: Rubber grip, built to last\nInsole: Soft, removable footbed\nWeight: About 280 g a shoe",
+          note: "Details differ a little from pair to pair.",
+          buttonLabel: "Find your pair",
           buttonLink: "/catalog",
-          image: PHOTO("photo-1516826957135-700dedea698c", 1600),
-          imageSide: "left",
-          imageWidth: "wide",
+        }),
+        section("featured", "featured-product", {
+          heading: "Fresh off\nthe *shelf*",
+          text: "Our newest pairs, picked for comfort from the first step to the last.",
+          source: "newest",
+          buttonLabel: "See all pairs",
+          buttonLink: "/catalog",
+          style: "drops",
+          badge: "Just in",
+        }),
+        section("sizes", "size-finder", {
+          heading: "Find your *size*",
+          text: "Tap your usual size to see how it measures.",
+          measureNames: "Foot length / EU / US",
+          unitNote: "measures",
+          unitMark: "",
+          sizes: "UK 6: 24.5 cm / 40 / 7\nUK 7: 25.4 cm / 41 / 8\nUK 8: 26.2 cm / 42 / 9\nUK 9: 27.1 cm / 43 / 10\nUK 10: 27.9 cm / 44 / 11",
+          buttonLabel: "Shop all sneakers",
+          buttonLink: "/catalog",
+        }),
+        section("deal", "countdown-deals", {
+          heading: "Grab it before\n*midnight*",
+          label: "Deal of the day",
+          endsAt: "23:59",
+          source: "sale",
+          style: "board",
+          buttonLabel: "Grab this deal",
+          moreLabel: "More deals",
+        }),
+        section("street", "tilt-gallery", {
+          heading: "Spotted on the *street*",
+          p1Image: PHOTO("photo-1641997465126-c73cc4070337", 900),
+          p1Title: "#StrideDaily",
+          p2Image: PHOTO("photo-1582898967731-b5834427fd66", 900),
+          p2Title: "Night run",
+          p3Image: PHOTO("photo-1575537302964-96cd47c06b1b", 900),
+          p3Title: "Weekend fit",
+        }),
+        section("activity", "occasion-mosaic", {
+          heading: "Shop by *activity*",
+          buttonLabel: "View all",
+          buttonLink: "/catalog",
+          o1Image: PHOTO("photo-1456613820599-bfe244172af5", 900),
+          o1Title: "Trail days",
+          o1Text: "Shop grip",
+          o1Link: "/category/running",
+          o2Image: PHOTO("photo-1542291026-7eec264c27ff", 1200),
+          o2Title: "Morning runs",
+          o2Text: "Shop runners",
+          o2Link: "/category/running",
+          o3Image: PHOTO("photo-1608229751021-ed4bd8677753", 700),
+          o3Title: "Everyday",
+          o3Text: "Shop sneakers",
+          o3Link: "/category/sneakers",
+          o4Image: PHOTO("photo-1582898967731-b5834427fd66", 700),
+          o4Title: "Night out",
+          o4Text: "Shop dark pairs",
+          o4Link: "/catalog",
+          o5Image: PHOTO("photo-1585499583264-491df5142e83", 1200),
+          o5Title: "Comfy feet",
+          o5Text: "Shop socks",
+          o5Link: "/category/socks",
         }),
         section("reviews", "reviews", { heading: `Customers *love* ${storeName}` }),
-        section("features", "features", { heading: "Made for *all-day*\ncomfort" }),
-        section("picked", "product-row", { heading: "Picked *for you*", subheading: "Our most loved pieces right now.", source: "bestsellers", buttonLabel: "" }),
-        section("details", "feature-cards", { heading: "Made down to the *last detail*" }),
-        section("gallery", "gallery", { heading: `${storeName} in *everyday*` }),
-        section("quote", "quote", { text: "“The most *thoughtfully made* pieces we have tried.”" }),
-        section("founder", "story-split"),
-        section("banners", "banners"),
+        section("searches", "popular-searches", {
+          heading: "Popular searches",
+          terms: "White sneakers: white\nRunning shoes: running\nHigh-tops: high-top\nCanvas: canvas\nSocks: socks",
+        }),
+        section("perks", "perks", { style: "strip",
+          p1Title: "Free size exchange",
+          p1Text: "Swap your size within 7 days",
+          p2Title: "Cash on delivery",
+          p2Text: "Pay when your pair arrives",
+          p3Title: "Fast delivery",
+          p3Text: "3 to 5 days across India",
+          p4Title: "Here to help",
+          p4Text: "Chat with us on WhatsApp",
+        }),
       ],
-      pages: defaultPages(storeName),
+      pages: {
+        ...defaultPages(storeName),
+        about: { ...defaultPages(storeName).about, image: PHOTO("photo-1613972798457-45fc5237ae32", 1800) },
+        contact: { ...defaultPages(storeName).contact, image: PHOTO("photo-1516826957135-700dedea698c", 1800) },
+      },
     };
   }
 
@@ -5426,15 +6437,104 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
           image: PHOTO("photo-1441986300917-64674bd600d8", 1600),
           imageSide: "left",
         }),
-        section("collections", "collection-grid"),
+        section("collections", "collection-grid", {
+          count: "6",
+          tone: "dark",
+          x1Image: PHOTO("photo-1483721310020-03333e577078", 1000),
+          x1Title: "Sale",
+          x1Link: "/catalog?sale=1",
+          x2Image: PHOTO("photo-1501785888041-af3ef285b470", 1000),
+          x2Title: "New in",
+          x2Link: "/catalog",
+        }),
         section("banners", "banners"),
+        section("ticker", "marquee", { text: "Built for the trail · Free delivery over ₹1,999 · Easy 7-day exchange · Made to move", colour: "" }),
+        section("shop-by", "category-strip", { heading: "Shop by activity", text: "Hiking, running or just the daily commute. Start with what you do.", align: "center" }),
+        section("best", "collection-slider", {
+          heading: "Trail favourites",
+          text: "The pieces our customers take on every trip, tested on real trails.",
+          source: "bestsellers",
+          buttonLabel: "Shop all",
+          buttonLink: "/catalog",
+          align: "center",
+        }),
+        section("stories", "feature-slider", {
+          f1Image: PHOTO("photo-1551632811-561732d1e306", 1400),
+          f1Title: "Into the hills",
+          f1Text: "Layers that breathe on the climb and keep you warm at the top.",
+          f1Button: "Shop jackets",
+          f1Link: "/category/jackets",
+          f2Image: PHOTO("photo-1586022045497-31fcf76fa6cc", 1400),
+          f2Title: "Packed for the peak",
+          f2Text: "Light packs with room for everything a long day needs.",
+          f2Button: "Shop bags",
+          f2Link: "/category/bags",
+          f3Image: PHOTO("photo-1575987116913-e96e7d490b8a", 1400),
+          f3Title: "Grip on every step",
+          f3Text: "Boots and trail runners with soles made for loose ground.",
+          f3Button: "Shop footwear",
+          f3Link: "/category/footwear",
+        }),
+        section("tiles", "edge-tiles", {
+          t1Image: PHOTO("photo-1578964046312-69d266a3e739", 900),
+          t1Title: "City cold",
+          t1Button: "Puffers",
+          t1Link: "/category/jackets",
+          t2Image: PHOTO("photo-1580058572462-98e2c0e0e2f0", 900),
+          t2Title: "Trail days",
+          t2Button: "Runners",
+          t2Link: "/category/footwear",
+          t3Image: PHOTO("photo-1501555088652-021faa106b9b", 900),
+          t3Title: "Long hauls",
+          t3Button: "Backpacks",
+          t3Link: "/category/bags",
+          t4Image: PHOTO("photo-1576871337632-b9aef4c17ab9", 900),
+          t4Title: "Little extras",
+          t4Button: "Gear",
+          t4Link: "/category/gear",
+        }),
+        section("voices", "review-spotlight", {
+          label: "What our customers say",
+          image: PHOTO("photo-1551524559-8af4e6624178", 1200),
+          text: "Wore the windbreaker up three passes in a week. Light, warm enough and it still looks new.",
+          name: "Aditya, Manali",
+        }),
+        section("why", "why-stats", {
+          heading: "Made to keep up",
+          text: "Every piece is tested outdoors before it reaches our shop.",
+          image: PHOTO("photo-1506905925346-21bda4d32df4", 1800),
+          n1Value: "500+",
+          n1Label: "Trails tested",
+          n1Text: "From city parks to the high passes.",
+          n2Value: "4.8★",
+          n2Label: "Average rating",
+          n2Text: "From buyers across India.",
+          n3Value: "7 days",
+          n3Label: "Easy exchange",
+          n3Text: "If the fit isn't right, swap it.",
+        }),
+        section("promises", "perks", {
+          p1Title: "Free delivery",
+          p1Text: "On orders over ₹1,999",
+          p2Title: "Easy exchange",
+          p2Text: "Within 7 days of delivery",
+          p3Title: "Cash on delivery",
+          p3Text: "Pay when it arrives",
+          p4Title: "Trail tested",
+          p4Text: "Every piece, every season",
+        }),
         section("newsletter", "newsletter", {
           heading: "Sign up to our newsletter",
           text: "Get the latest drops, offers and stories first.",
           image: PHOTO("photo-1464822759023-fed622ff2c3b"),
         }),
       ],
-      pages: defaultPages(storeName),
+      pages: {
+        ...defaultPages(storeName),
+        // About and Contact each get their own photo (not the opening one), so the two pages don't look alike
+        about: { ...defaultPages(storeName).about, image: PHOTO("photo-1551632811-561732d1e306", 1800) },
+        contact: { ...defaultPages(storeName).contact, image: PHOTO("photo-1454496522488-7a8e488e8606", 1800) },
+      },
     };
   }
 
@@ -5476,6 +6576,87 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
     };
   }
 
+  // Mono Studio: black and white everyday basics. Fewer photo posters; categories, an index, sizes and a drop clock.
+  if (toSiteTheme(theme) === "mono-studio") {
+    return {
+      announcement: "",
+      settings: {
+        background: "#FFFFFF",
+        text: "#111111",
+        accent: "#1A1A1A",
+        accentText: "#FFFFFF",
+        panel: "#ECECEC",
+        textSize: "100",
+        headingFont: "Unbounded",
+        displayFont: "Unbounded",
+        bodyFont: "Inter",
+        buttonShape: "pill",
+        uppercaseHeadings: "yes",
+        productPhotos: "fill",
+      },
+      header,
+      footer: { ...footer, about: `${storeName}. Heavyweight basics in black, white and grey, made to be worn every day.` },
+      sections: [
+        section("hero", "hero", {
+          heading: storeName,
+          subheading: "Heavyweight basics.\nMade to be worn every day.",
+          buttonLabel: "Shop the essentials",
+          buttonLink: "/catalog",
+        }),
+        section("marquee", "marquee", { text: "240 GSM cotton · Boxy fits · Free shipping over ₹1,999 · Made in Tiruppur · 7-day exchange", colour: "" }),
+        section("categories", "categories", { heading: "Collections" }),
+        section("bestsellers", "product-row", { heading: "Essentials", subheading: "", source: "bestsellers", display: "grid", buttonLabel: "Shop all", buttonLink: "/catalog" }),
+        section("index", "spec-index", {
+          heading: "The index",
+          text: "Every piece we make, with what it's made of. Point at a row to see it.",
+          source: "newest",
+          count: "8",
+          colNo: "No.",
+          colName: "Piece",
+          colDetail: "Made of",
+          colType: "Type",
+          colPrice: "Price",
+          linkLabel: "Open the full catalog",
+          linkUrl: "/catalog",
+        }),
+        section("statement", "statement", {
+          heading: "Fewer,\nbetter basics.",
+          text: "We make a small number of pieces and make them properly: heavy cotton, clean seams, colours that go with everything you already own.",
+        }),
+        section("sizes", "size-finder", {
+          heading: "Find your *size*",
+          text: "Our tees and hoodies are cut boxy. Pick a size to see it measured flat.",
+          sizes: "S: 21 / 27 / 19\nM: 22 / 28 / 20\nL: 23 / 29 / 21\nXL: 24 / 30 / 22\n2XL: 25 / 31 / 23",
+          measureNames: "Chest / Length / Shoulder",
+          unitNote: "Inches, measured flat across the garment",
+          buttonLabel: "Shop tees",
+          buttonLink: "/category/t-shirts",
+        }),
+        section("newest", "product-row", { heading: "New in", subheading: "", source: "newest", display: "slider", buttonLabel: "" }),
+        section("reviews", "reviews", { heading: "Worn daily", subheading: "" }),
+        section("drop", "drop-clock", {
+          label: "Drop 07",
+          heading: "Next drop\nlands Friday",
+          text: "New colours and one new cut, in small runs. When they're gone, they're gone.",
+          endsAt: "",
+          buttonLabel: "See what's coming",
+          buttonLink: "/catalog",
+          daysLabel: "Days",
+          hoursLabel: "Hours",
+          minutesLabel: "Min",
+          secondsLabel: "Sec",
+        }),
+        section("newsletter", "newsletter", { heading: "Join the list", text: "Drop dates and restocks, before anyone else." }),
+      ],
+      pages: {
+        ...defaultPages(storeName),
+        // About shows the rack of tees, Contact the shop floor, so the two pages don't look alike
+        about: { ...defaultPages(storeName).about, image: PHOTO("photo-1489987707025-afc232f7ea0f", 1800) },
+        contact: { ...defaultPages(storeName).contact, image: PHOTO("photo-1441984904996-e0b6ba687e04", 1800) },
+      },
+    };
+  }
+
   return {
     announcement: "",
     settings: {
@@ -5511,6 +6692,449 @@ function themeDefaultContent(theme: string, storeName: string): SiteContent {
 
 export const SITE_PAGE_IDS: SitePageId[] = ["about", "contact", "shipping", "returns", "privacy", "terms"];
 export const SITE_COLOR_KEYS: (keyof SiteColors)[] = ["background", "text", "accent", "accentText", "panel"];
+
+// --- Settings only one theme has ------------------------------------------------------------------
+// Things a theme draws that no other theme does (its own card colours, sticker words, button text).
+// The editor shows them only for that theme, grouped under their `group` name.
+
+export interface ThemeOptionField {
+  key: string;
+  label: string;
+  kind: "text" | "color" | "select";
+  /** the editor row this field is listed under, e.g. "Product cards" */
+  group: string;
+  default: string;
+  help?: string;
+  /** longest text allowed (text fields) */
+  max?: number;
+  /** the choices (select fields) */
+  options?: { value: string; label: string; help?: string }[];
+  /** the shop page the editor previews while this setting is open, e.g. "/pages/about" */
+  page?: string;
+}
+
+export const THEME_OPTIONS: Partial<Record<SiteThemeSlug, ThemeOptionField[]>> = {
+  theme21: [
+    {
+      group: "Scroll effects",
+      key: "motion",
+      label: "How sections appear as buyers scroll",
+      kind: "select",
+      default: "shimmer",
+      options: [
+        { value: "shimmer", label: "Shimmer", help: "Like opening a jewellery box: headings unfold letter by letter, round photos turn in like gems, a soft gold light passes over product photos and pictures rise from below." },
+        { value: "calm", label: "Calm", help: "Sections simply fade and rise into place." },
+      ],
+    },
+    { group: "Gold", key: "goldColour", label: "Gold colour", kind: "color", default: "#B08D57", help: "Words between stars in headings, the lines and diamonds on About and Contact, and the review stars." },
+    { group: "Product cards", key: "cardHeart", label: "Wishlist heart on the photo", kind: "select", default: "show", options: [{ value: "show", label: "Show" }, { value: "hide", label: "Hide" }] },
+    { group: "Product cards", key: "cardSaleBadge", label: "Sale badge", kind: "text", default: "−{n}%", max: 20, help: "{n} becomes the discount, e.g. −20%." },
+    { group: "Product cards", key: "cardSoldOut", label: "Sold out badge", kind: "text", default: "Sold out", max: 20 },
+    { group: "Product cards", key: "cardBadgeBackground", label: "Badge colour", kind: "color", default: "#FFFFFF" },
+    { group: "Product cards", key: "cardBadgeText", label: "Badge text colour", kind: "color", default: "#121212" },
+    { group: "About page", page: "/pages/about", key: "aboutEyebrow", label: "Small text above the title", kind: "text", default: "The house", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutMaterialsHeading", label: "Materials heading", kind: "text", default: "What it's made of", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutMat1Title", label: "Material 1", kind: "text", default: "18k gold plating", max: 40, help: "Shown beside a gold swatch. Leave empty to hide." },
+    { group: "About page", page: "/pages/about", key: "aboutMat1Text", label: "Material 1: text", kind: "text", default: "A thick layer of real gold that keeps its warm shine.", max: 120 },
+    { group: "About page", page: "/pages/about", key: "aboutMat2Title", label: "Material 2", kind: "text", default: "925 sterling silver", max: 40, help: "Shown beside a silver swatch." },
+    { group: "About page", page: "/pages/about", key: "aboutMat2Text", label: "Material 2: text", kind: "text", default: "A solid base that is gentle on sensitive skin.", max: 120 },
+    { group: "About page", page: "/pages/about", key: "aboutMat3Title", label: "Material 3", kind: "text", default: "Freshwater pearls", max: 40, help: "Shown beside a pearl swatch." },
+    { group: "About page", page: "/pages/about", key: "aboutMat3Text", label: "Material 3: text", kind: "text", default: "Each one slightly different, picked by hand.", max: 120 },
+    { group: "About page", page: "/pages/about", key: "aboutStat1Value", label: "Number 1", kind: "text", default: "2019", max: 12, help: "Three numbers between gold diamonds. Leave a number empty to hide it." },
+    { group: "About page", page: "/pages/about", key: "aboutStat1Label", label: "Number 1: what it means", kind: "text", default: "Our first piece", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutStat2Value", label: "Number 2", kind: "text", default: "40k+", max: 12 },
+    { group: "About page", page: "/pages/about", key: "aboutStat2Label", label: "Number 2: what it means", kind: "text", default: "Pieces worn every day", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutStat3Value", label: "Number 3", kind: "text", default: "1 year", max: 12 },
+    { group: "About page", page: "/pages/about", key: "aboutStat3Label", label: "Number 3: what it means", kind: "text", default: "Warranty on every piece", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutValuesHeading", label: "Promises heading", kind: "text", default: "Our promises", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutValue1Title", label: "Promise 1: title", kind: "text", default: "Made to be worn", max: 40, help: "Each promise hangs on a tag." },
+    { group: "About page", page: "/pages/about", key: "aboutValue1Text", label: "Promise 1: text", kind: "text", default: "Shower, gym or sleep: our pieces are made for every day.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutValue2Title", label: "Promise 2: title", kind: "text", default: "Kind to skin", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutValue2Text", label: "Promise 2: text", kind: "text", default: "Nickel free and hypoallergenic, even for sensitive ears.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutValue3Title", label: "Promise 3: title", kind: "text", default: "Cared for", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutValue3Text", label: "Promise 3: text", kind: "text", default: "A year's warranty and a free polish whenever you visit.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutCtaHeading", label: "Closing heading", kind: "text", default: "Find a piece to keep", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutCtaButton", label: "Closing button", kind: "text", default: "Shop the collection", max: 30 },
+    { group: "Contact page", page: "/pages/contact", key: "contactEyebrow", label: "Small text above the title", kind: "text", default: "Visit or write", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactWaysHeading", label: "Heading above the contact cards", kind: "text", default: "Write to us", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactNoteTitle", label: "Note card heading", kind: "text", default: "Write us a note", max: 50 },
+    { group: "Contact page", page: "/pages/contact", key: "contactTopics", label: "Topics to pick from", kind: "text", default: "A gift / An order / Sizing / Something else", max: 100, help: "Separate with /." },
+    { group: "Contact page", page: "/pages/contact", key: "contactNoteButton", label: "Note card button", kind: "text", default: "Send note", max: 30 },
+    { group: "Contact page", page: "/pages/contact", key: "contactNoteThanks", label: "Words after sending", kind: "text", default: "Thank you. Your note is ready to send, and we'll reply soon.", max: 120 },
+    { group: "Contact page", page: "/pages/contact", key: "contactVisitTitle", label: "Visit heading", kind: "text", default: "Visit the store", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactHours", label: "Opening hours", kind: "text", default: "Every day, 11 am to 8 pm", max: 80 },
+  ],
+  theme05: [
+    {
+      group: "Scroll effects",
+      key: "motion",
+      label: "How sections appear as buyers scroll",
+      kind: "select",
+      default: "editorial",
+      options: [
+        { value: "editorial", label: "Editorial", help: "Like turning the pages of a magazine: headlines rise line by line out of a mask, photos open like a page turning, cards slide in one after another." },
+        { value: "calm", label: "Calm", help: "Sections simply fade and rise into place." },
+      ],
+    },
+    { group: "Highlights", key: "markColour", label: "Highlight colour", kind: "color", default: "#D4F56A", help: "The marker stroke behind words written between stars in headings, like *colour*." },
+    { group: "Product cards", key: "dBadgeBg", label: "Badge colour", kind: "color", default: "#FFFFFF", help: "The small badge on the photo." },
+    { group: "Product cards", key: "dBadgeText", label: "Badge text colour", kind: "color", default: "#141414" },
+    { group: "Product cards", key: "dSale", label: "Badge on sale products", kind: "text", default: "{n}% off", max: 20, help: "{n} becomes the discount." },
+    { group: "Product cards", key: "dBest", label: "Badge on top sellers", kind: "text", default: "Bestseller", max: 20 },
+    { group: "Product cards", key: "dNew", label: "Badge on new products", kind: "text", default: "New", max: 20 },
+    { group: "Product cards", key: "dSoldOut", label: "Badge on sold out products", kind: "text", default: "Sold out", max: 20 },
+    { group: "Product cards", key: "dDesc", label: "First line of the description", kind: "select", default: "show", options: [{ value: "show", label: "Show" }, { value: "hide", label: "Hide" }] },
+    { group: "Product cards", key: "dDots", label: "Colour dots", kind: "select", default: "show", options: [{ value: "show", label: "Show" }, { value: "hide", label: "Hide" }] },
+    { group: "About page", page: "/pages/about", key: "aboutEyebrow", label: "Small text above the title", kind: "text", default: "Our story", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutStoryLabel", label: "Label beside the story", kind: "text", default: "How it started", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutStat1Value", label: "Number 1", kind: "text", default: "2018", max: 12, help: "Printed on a shoe-box size label. Leave a number empty to hide it." },
+    { group: "About page", page: "/pages/about", key: "aboutStat1Label", label: "Number 1: what it means", kind: "text", default: "Our first pair", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutStat2Value", label: "Number 2", kind: "text", default: "60k", max: 12 },
+    { group: "About page", page: "/pages/about", key: "aboutStat2Label", label: "Number 2: what it means", kind: "text", default: "Pairs on happy feet", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutStat3Value", label: "Number 3", kind: "text", default: "7 days", max: 12 },
+    { group: "About page", page: "/pages/about", key: "aboutStat3Label", label: "Number 3: what it means", kind: "text", default: "To swap your size", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutValuesHeading", label: "Values heading", kind: "text", default: "What every pair promises", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutValue1Title", label: "Value 1: title", kind: "text", default: "All-day comfort", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutValue1Text", label: "Value 1: text", kind: "text", default: "Cushioned soles tested on real streets, not just in a lab.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutValue2Title", label: "Value 2: title", kind: "text", default: "The right fit", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutValue2Text", label: "Value 2: text", kind: "text", default: "A size guide on every pair, and free size swaps if you need them.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutValue3Title", label: "Value 3: title", kind: "text", default: "Made to last", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutValue3Text", label: "Value 3: text", kind: "text", default: "Stitched uppers and tough outsoles that keep their shape.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutCtaHeading", label: "Closing heading", kind: "text", default: "Find the pair you'll live in", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutCtaButton", label: "Closing button", kind: "text", default: "Shop all pairs", max: 30 },
+    { group: "Contact page", page: "/pages/contact", key: "contactEyebrow", label: "Small text above the title", kind: "text", default: "Say hello", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactCardTitle", label: "Heading above the contact tiles", kind: "text", default: "Find us here", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactFormTitle", label: "Form heading", kind: "text", default: "Need help with a size or an order?", max: 50 },
+    { group: "Contact page", page: "/pages/contact", key: "contactFormButton", label: "Form button", kind: "text", default: "Send message", max: 30 },
+    { group: "Contact page", page: "/pages/contact", key: "contactHoursTitle", label: "Hours heading", kind: "text", default: "Opening hours", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactHours", label: "Opening hours", kind: "text", default: "Every day, 10 am to 9 pm", max: 80 },
+    { group: "Contact page", page: "/pages/contact", key: "contactReplyTitle", label: "Reply heading", kind: "text", default: "Reply time", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactReply", label: "How fast you reply", kind: "text", default: "Within a few hours", max: 80 },
+  ],
+  theme06: [
+    {
+      group: "Scroll effects",
+      key: "motion",
+      label: "How sections appear as buyers scroll",
+      kind: "select",
+      default: "glide",
+      options: [
+        { value: "glide", label: "Glide", help: "Soft and premium: cards open from their price corner, tiles tip up in 3D, promos settle in from a slight zoom, the photo row fans out." },
+        { value: "calm", label: "Calm", help: "Sections simply fade and rise into place." },
+      ],
+    },
+    { group: "Product cards", key: "notchBadge", label: "Badge colour", kind: "color", default: "#F26B3A", help: "The small badge on the photo: New, a discount or Sold out." },
+    { group: "Product cards", key: "notchBadgeText", label: "Badge text colour", kind: "color", default: "#FFFFFF" },
+    { group: "Product cards", key: "notchNew", label: "Badge on new products", kind: "text", default: "New", max: 20, help: "Shown on products added in the last 30 days." },
+    { group: "Product cards", key: "notchSale", label: "Badge on sale products", kind: "text", default: "{n}% off", max: 20, help: "{n} becomes the discount." },
+    { group: "Product cards", key: "notchSoldOut", label: "Badge on sold out products", kind: "text", default: "Sold out", max: 20 },
+    { group: "Product cards", key: "notchAdd", label: "Add button text", kind: "text", default: "Add to bag", max: 24 },
+    { group: "Product cards", key: "notchChoose", label: "Add button text when a size must be picked", kind: "text", default: "Choose size", max: 24 },
+    { group: "Product cards", key: "notchHeart", label: "Wishlist heart", kind: "select", default: "show", options: [{ value: "show", label: "Show" }, { value: "hide", label: "Hide" }] },
+    { group: "Benefit cards", key: "bento1Bg", label: "Card 1 colour", kind: "color", default: "#6D3FE0", help: "The three coloured cards in the benefit grid." },
+    { group: "Benefit cards", key: "bento1Text", label: "Card 1 text colour", kind: "color", default: "#FFFFFF" },
+    { group: "Benefit cards", key: "bento2Bg", label: "Card 2 colour", kind: "color", default: "#EDE7FD" },
+    { group: "Benefit cards", key: "bento2Text", label: "Card 2 text colour", kind: "color", default: "#2B1A5C" },
+    { group: "Benefit cards", key: "bento3Bg", label: "Card 3 colour", kind: "color", default: "#1F1A2E" },
+    { group: "Benefit cards", key: "bento3Text", label: "Card 3 text colour", kind: "color", default: "#FFFFFF" },
+    { group: "Product stage", key: "stageColour", label: "Heading and big word colour", kind: "color", default: "#6D3FE0", help: "The section with one product photo between a heading and a big word." },
+    { group: "About page", page: "/pages/about", key: "aboutEyebrow", label: "Small text above the title", kind: "text", default: "Our story", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutStoryLabel", label: "Label beside the story", kind: "text", default: "Why we started", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutStat1Value", label: "Number 1", kind: "text", default: "2021", max: 12, help: "Three big numbers on a soft band. Leave a number empty to hide it." },
+    { group: "About page", page: "/pages/about", key: "aboutStat1Label", label: "Number 1: what it means", kind: "text", default: "The year we started", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutStat2Value", label: "Number 2", kind: "text", default: "12k+", max: 12 },
+    { group: "About page", page: "/pages/about", key: "aboutStat2Label", label: "Number 2: what it means", kind: "text", default: "Gadgets delivered", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutStat3Value", label: "Number 3", kind: "text", default: "4.8★", max: 12 },
+    { group: "About page", page: "/pages/about", key: "aboutStat3Label", label: "Number 3: what it means", kind: "text", default: "Average rating", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutValuesHeading", label: "Values heading", kind: "text", default: "What we promise", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutValue1Title", label: "Value 1: title", kind: "text", default: "Genuine only", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutValue1Text", label: "Value 1: text", kind: "text", default: "Every product arrives sealed, with its brand warranty.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutValue2Title", label: "Value 2: title", kind: "text", default: "Set up in minutes", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutValue2Text", label: "Value 2: text", kind: "text", default: "Clear guides, and help on WhatsApp if you get stuck.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutValue3Title", label: "Value 3: title", kind: "text", default: "Fair prices", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutValue3Text", label: "Value 3: text", kind: "text", default: "We check prices every week so you don't have to.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutCtaHeading", label: "Closing heading", kind: "text", default: "Find your next favourite gadget", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutCtaButton", label: "Closing button", kind: "text", default: "Shop all tech", max: 30 },
+    { group: "Contact page", page: "/pages/contact", key: "contactEyebrow", label: "Small text above the title", kind: "text", default: "We're here to help", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactCardTitle", label: "Heading on the coloured card", kind: "text", default: "Talk to us", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactFormTitle", label: "Form heading", kind: "text", default: "Ask us anything", max: 50 },
+    { group: "Contact page", page: "/pages/contact", key: "contactFormButton", label: "Form button", kind: "text", default: "Send message", max: 30 },
+    { group: "Contact page", page: "/pages/contact", key: "contactHoursTitle", label: "Hours heading", kind: "text", default: "Opening hours", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactHours", label: "Opening hours", kind: "text", default: "Mon to Sat, 10 am to 8 pm", max: 80 },
+    { group: "Contact page", page: "/pages/contact", key: "contactReplyTitle", label: "Reply heading", kind: "text", default: "Reply time", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactReply", label: "How fast you reply", kind: "text", default: "Within an hour on WhatsApp", max: 80 },
+  ],
+  theme03: [
+    {
+      group: "Scroll effects",
+      key: "motion",
+      label: "How sections appear as buyers scroll",
+      kind: "select",
+      default: "sporty",
+      options: [
+        { value: "sporty", label: "Sporty", help: "Fast, sharp moves: headings speed in on a slant, photos zoom out of a blur, cards race in from the side, panels slide open like doors." },
+        { value: "calm", label: "Calm", help: "Sections simply fade and rise into place." },
+      ],
+    },
+    { group: "Product cards", key: "cardHeart", label: "Wishlist heart on the photo", kind: "select", default: "show", options: [{ value: "show", label: "Show" }, { value: "hide", label: "Hide" }] },
+    { group: "Product cards", key: "cardQuickAdd", label: "Quick add button beside the price", kind: "select", default: "show", options: [{ value: "show", label: "Show" }, { value: "hide", label: "Hide" }] },
+    { group: "Product cards", key: "cardSaleBadge", label: "Sale badge", kind: "text", default: "−{n}%", max: 20, help: "{n} becomes the discount, e.g. −20%. Leave as is to keep the short form." },
+    { group: "Product cards", key: "cardSoldOut", label: "Sold out badge", kind: "text", default: "Sold out", max: 20 },
+    { group: "Product cards", key: "cardBadgeBackground", label: "Badge colour", kind: "color", default: "#FFFFFF" },
+    { group: "Product cards", key: "cardBadgeText", label: "Badge text colour", kind: "color", default: "#737373" },
+    { group: "About page", page: "/pages/about", key: "aboutEyebrow", label: "Small text above the title", kind: "text", default: "Our story", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutStoryLabel", label: "Label beside the story", kind: "text", default: "How it started", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutStat1Value", label: "Number 1", kind: "text", default: "2019", max: 12, help: "Three big numbers on a black band. Leave a number empty to hide it." },
+    { group: "About page", page: "/pages/about", key: "aboutStat1Label", label: "Number 1: what it means", kind: "text", default: "The year we started", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutStat2Value", label: "Number 2", kind: "text", default: "500+", max: 12 },
+    { group: "About page", page: "/pages/about", key: "aboutStat2Label", label: "Number 2: what it means", kind: "text", default: "Trails our gear is tested on", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutStat3Value", label: "Number 3", kind: "text", default: "40k", max: 12 },
+    { group: "About page", page: "/pages/about", key: "aboutStat3Label", label: "Number 3: what it means", kind: "text", default: "Happy customers across India", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutValuesHeading", label: "Values heading", kind: "text", default: "What we stand for", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutValue1Title", label: "Value 1: title", kind: "text", default: "Made to move", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutValue1Text", label: "Value 1: text", kind: "text", default: "Cuts and fabrics that stretch, breathe and keep up with you.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutValue2Title", label: "Value 2: title", kind: "text", default: "Honest materials", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutValue2Text", label: "Value 2: text", kind: "text", default: "We tell you what every piece is made of, and why.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutValue3Title", label: "Value 3: title", kind: "text", default: "Built to last", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutValue3Text", label: "Value 3: text", kind: "text", default: "Fewer, better pieces that stay with you season after season.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutCtaHeading", label: "Closing heading", kind: "text", default: "Ready for your next trip?", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutCtaButton", label: "Closing button", kind: "text", default: "Shop the collection", max: 30 },
+    { group: "Contact page", page: "/pages/contact", key: "contactEyebrow", label: "Small text above the title", kind: "text", default: "Get in touch", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactCardTitle", label: "Heading on the black card", kind: "text", default: "Reach us", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactFormTitle", label: "Form heading", kind: "text", default: "Send us a message", max: 50 },
+    { group: "Contact page", page: "/pages/contact", key: "contactFormButton", label: "Form button", kind: "text", default: "Send message", max: 30 },
+    { group: "Contact page", page: "/pages/contact", key: "contactHoursTitle", label: "Hours heading", kind: "text", default: "Opening hours", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactHours", label: "Opening hours", kind: "text", default: "Mon to Sat, 10 am to 7 pm", max: 80 },
+    { group: "Contact page", page: "/pages/contact", key: "contactReplyTitle", label: "Reply heading", kind: "text", default: "Reply time", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactReply", label: "How fast you reply", kind: "text", default: "Usually within a few hours", max: 80 },
+  ],
+  "mono-studio": [
+    {
+      group: "Scroll effects",
+      key: "motion",
+      label: "How sections appear as buyers scroll",
+      kind: "select",
+      default: "shutter",
+      options: [
+        { value: "shutter", label: "Shutter", help: "Sharp and graphic: photos open like a camera shutter, headings rise out of a line, product photos turn from grey to colour, index rows are ruled in, the clock's digits flip." },
+        { value: "calm", label: "Calm", help: "Sections simply fade and rise into place." },
+      ],
+    },
+    { group: "Product cards", key: "cardHeart", label: "Wishlist heart on the photo", kind: "select", default: "show", options: [{ value: "show", label: "Show" }, { value: "hide", label: "Hide" }] },
+    { group: "Product cards", key: "cardSaleBadge", label: "Sale badge", kind: "text", default: "−{n}%", max: 20, help: "{n} becomes the discount, e.g. −20%." },
+    { group: "Product cards", key: "cardSoldOut", label: "Sold out badge", kind: "text", default: "Sold out", max: 20 },
+    { group: "Phone menu", key: "menuEyebrow", label: "Small text above the categories", kind: "text", default: "Shop", max: 30 },
+    { group: "Phone menu", key: "menuNote", label: "Note at the bottom", kind: "text", default: "Free shipping over ₹1,999 · 7-day exchange", max: 80 },
+    { group: "About page", page: "/pages/about", key: "aboutEyebrow", label: "Small text above the title", kind: "text", default: "About the studio", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutPointsHeading", label: "Manifesto heading", kind: "text", default: "What we believe", max: 50, help: "Up to four numbered points. Leave a title empty to hide a point." },
+    { group: "About page", page: "/pages/about", key: "aboutPoint1Title", label: "Point 1: title", kind: "text", default: "Fewer pieces", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutPoint1Text", label: "Point 1: text", kind: "text", default: "We'd rather make ten things well than a hundred things quickly.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutPoint2Title", label: "Point 2: title", kind: "text", default: "Heavier cotton", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutPoint2Text", label: "Point 2: text", kind: "text", default: "240 GSM for tees, 380 for hoodies. They hold their shape wash after wash.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutPoint3Title", label: "Point 3: title", kind: "text", default: "No loud logos", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutPoint3Text", label: "Point 3: text", kind: "text", default: "Black, white, grey and olive. Clothes that go with everything.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutPoint4Title", label: "Point 4: title", kind: "text", default: "Made close to home", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutPoint4Text", label: "Point 4: text", kind: "text", default: "Cut and sewn in Tiruppur by a team we know by name.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutTag1Label", label: "Tag line 1", kind: "text", default: "Fabric", max: 20, help: "A garment tag on a black band. Leave a value empty to hide a line." },
+    { group: "About page", page: "/pages/about", key: "aboutTag1Value", label: "Tag line 1: detail", kind: "text", default: "100% cotton", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutTag2Label", label: "Tag line 2", kind: "text", default: "Weight", max: 20 },
+    { group: "About page", page: "/pages/about", key: "aboutTag2Value", label: "Tag line 2: detail", kind: "text", default: "240 GSM", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutTag3Label", label: "Tag line 3", kind: "text", default: "Fit", max: 20 },
+    { group: "About page", page: "/pages/about", key: "aboutTag3Value", label: "Tag line 3: detail", kind: "text", default: "Boxy, dropped shoulder", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutTag4Label", label: "Tag line 4", kind: "text", default: "Made in", max: 20 },
+    { group: "About page", page: "/pages/about", key: "aboutTag4Value", label: "Tag line 4: detail", kind: "text", default: "Tiruppur, India", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutTag5Label", label: "Tag line 5", kind: "text", default: "Wash", max: 20 },
+    { group: "About page", page: "/pages/about", key: "aboutTag5Value", label: "Tag line 5: detail", kind: "text", default: "Cold, inside out", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutCtaHeading", label: "Closing link", kind: "text", default: "Shop the essentials", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactEyebrow", label: "Small text above the title", kind: "text", default: "Get in touch", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactCardTitle", label: "Heading on the black card", kind: "text", default: "Talk to us", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactFormTitle", label: "Form heading", kind: "text", default: "Send a message", max: 50 },
+    { group: "Contact page", page: "/pages/contact", key: "contactFormButton", label: "Form button", kind: "text", default: "Send", max: 30 },
+    { group: "Contact page", page: "/pages/contact", key: "contactHoursTitle", label: "Hours heading", kind: "text", default: "Studio hours", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactHours", label: "Opening hours", kind: "text", default: "Mon to Sat, 11 am to 7 pm", max: 80 },
+    { group: "Contact page", page: "/pages/contact", key: "contactReplyTitle", label: "Reply heading", kind: "text", default: "Reply time", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactReply", label: "How fast you reply", kind: "text", default: "Same day on WhatsApp", max: 80 },
+  ],
+  f02: [
+    {
+      group: "Scroll effects",
+      key: "motion",
+      label: "How sections appear as buyers scroll",
+      kind: "select",
+      default: "grain",
+      options: [
+        { value: "grain", label: "Along the grain", help: "Calm and crafted: headings are planed in from the left, photos slide open like drawers, cards are set down gently, wood planks grow up from the floor, chairs pull up to the table." },
+        { value: "calm", label: "Calm", help: "Sections simply fade and rise into place." },
+      ],
+    },
+    { group: "Product cards", key: "cardHeart", label: "Wishlist heart on the photo", kind: "select", default: "show", options: [{ value: "show", label: "Show" }, { value: "hide", label: "Hide" }] },
+    { group: "Product cards", key: "cardQuickAdd", label: "Bag button on the photo", kind: "select", default: "show", options: [{ value: "show", label: "Show" }, { value: "hide", label: "Hide" }] },
+    { group: "Product cards", key: "cardSaleBadge", label: "Sale badge", kind: "text", default: "−{n}%", max: 20, help: "{n} becomes the discount, e.g. −15%." },
+    { group: "Product cards", key: "cardSoldOut", label: "Sold out badge", kind: "text", default: "Sold out", max: 20 },
+    { group: "Product cards", key: "cardBadgeBackground", label: "Badge colour", kind: "color", default: "#F1EDE4" },
+    { group: "Product cards", key: "cardBadgeText", label: "Badge text colour", kind: "color", default: "#2B2620" },
+    { group: "Phone menu", key: "menuEyebrow", label: "Small text above the categories", kind: "text", default: "Browse the workshop", max: 40 },
+    { group: "Phone menu", key: "menuHelp", label: "Words on the WhatsApp bar at the bottom", kind: "text", default: "Not sure what fits? Ask us", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutEyebrow", label: "Small text above the title", kind: "text", default: "The workshop", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutSpecHeading", label: "Spec sheet heading", kind: "text", default: "How we build", max: 40, help: "A short spec sheet beside your story. Leave a line's value empty to hide it." },
+    { group: "About page", page: "/pages/about", key: "aboutSpec1Label", label: "Spec 1", kind: "text", default: "Wood", max: 30 },
+    { group: "About page", page: "/pages/about", key: "aboutSpec1Value", label: "Spec 1: detail", kind: "text", default: "Solid oak, walnut and ash", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutSpec2Label", label: "Spec 2", kind: "text", default: "Joinery", max: 30 },
+    { group: "About page", page: "/pages/about", key: "aboutSpec2Value", label: "Spec 2: detail", kind: "text", default: "Mortise and tenon, no metal brackets", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutSpec3Label", label: "Spec 3", kind: "text", default: "Finish", max: 30 },
+    { group: "About page", page: "/pages/about", key: "aboutSpec3Value", label: "Spec 3: detail", kind: "text", default: "Hand-rubbed natural oil", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutSpec4Label", label: "Spec 4", kind: "text", default: "Made in", max: 30 },
+    { group: "About page", page: "/pages/about", key: "aboutSpec4Value", label: "Spec 4: detail", kind: "text", default: "Our workshop in Jodhpur", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutSpec5Label", label: "Spec 5", kind: "text", default: "Warranty", max: 30 },
+    { group: "About page", page: "/pages/about", key: "aboutSpec5Value", label: "Spec 5: detail", kind: "text", default: "5 years on every frame", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutStepsHeading", label: "Making heading", kind: "text", default: "The making of a table", max: 50, help: "Up to four steps along a ruler. Leave a title empty to hide a step." },
+    { group: "About page", page: "/pages/about", key: "aboutStep1Mark", label: "Step 1: when", kind: "text", default: "Week 1", max: 20 },
+    { group: "About page", page: "/pages/about", key: "aboutStep1Title", label: "Step 1: title", kind: "text", default: "Choosing the boards", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutStep1Text", label: "Step 1: text", kind: "text", default: "We match the grain so the top reads as one piece.", max: 120 },
+    { group: "About page", page: "/pages/about", key: "aboutStep2Mark", label: "Step 2: when", kind: "text", default: "Week 2", max: 20 },
+    { group: "About page", page: "/pages/about", key: "aboutStep2Title", label: "Step 2: title", kind: "text", default: "Cutting the joints", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutStep2Text", label: "Step 2: text", kind: "text", default: "Every mortise is cut and fitted by hand.", max: 120 },
+    { group: "About page", page: "/pages/about", key: "aboutStep3Mark", label: "Step 3: when", kind: "text", default: "Week 3", max: 20 },
+    { group: "About page", page: "/pages/about", key: "aboutStep3Title", label: "Step 3: title", kind: "text", default: "Oiling, three coats", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutStep3Text", label: "Step 3: text", kind: "text", default: "Rubbed in by hand, a day apart.", max: 120 },
+    { group: "About page", page: "/pages/about", key: "aboutStep4Mark", label: "Step 4: when", kind: "text", default: "Week 4", max: 20 },
+    { group: "About page", page: "/pages/about", key: "aboutStep4Title", label: "Step 4: title", kind: "text", default: "Delivered and set up", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutStep4Text", label: "Step 4: text", kind: "text", default: "Our team carries it in and places it for you.", max: 120 },
+    { group: "About page", page: "/pages/about", key: "aboutStat1Value", label: "Number 1", kind: "text", default: "2,400+", max: 12, help: "Three numbers between thin rules. Leave a number empty to hide it." },
+    { group: "About page", page: "/pages/about", key: "aboutStat1Label", label: "Number 1: what it means", kind: "text", default: "Tables delivered", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutStat2Value", label: "Number 2", kind: "text", default: "12", max: 12 },
+    { group: "About page", page: "/pages/about", key: "aboutStat2Label", label: "Number 2: what it means", kind: "text", default: "Makers in the workshop", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutStat3Value", label: "Number 3", kind: "text", default: "5 yrs", max: 12 },
+    { group: "About page", page: "/pages/about", key: "aboutStat3Label", label: "Number 3: what it means", kind: "text", default: "Warranty on every frame", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutCtaHeading", label: "Closing heading", kind: "text", default: "Find the table you'll gather around", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutCtaButton", label: "Closing button", kind: "text", default: "Open the catalog", max: 30 },
+    { group: "Contact page", page: "/pages/contact", key: "contactEyebrow", label: "Small text above the title", kind: "text", default: "Visit or write", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactCardTitle", label: "Heading on the olive card", kind: "text", default: "Talk to the workshop", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactFormTitle", label: "Form heading", kind: "text", default: "Tell us about your room", max: 50 },
+    { group: "Contact page", page: "/pages/contact", key: "contactFormButton", label: "Form button", kind: "text", default: "Send", max: 30 },
+    { group: "Contact page", page: "/pages/contact", key: "contactHoursTitle", label: "Hours heading", kind: "text", default: "Showroom hours", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactHours", label: "Opening hours", kind: "text", default: "Tue to Sun, 11 am to 7 pm", max: 80 },
+    { group: "Contact page", page: "/pages/contact", key: "contactReplyTitle", label: "Reply heading", kind: "text", default: "Reply time", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactReply", label: "How fast you reply", kind: "text", default: "Within a day, with photos if you ask", max: 80 },
+  ],
+  theme07: [
+    {
+      group: "Scroll effects",
+      key: "motion",
+      label: "How sections appear as buyers scroll",
+      kind: "select",
+      default: "wheel",
+      options: [
+        { value: "wheel", label: "Potter's wheel", help: "Handmade and unhurried: photos are glazed in from the top, cards turn up as if on the wheel, round photos spin into place, numbers settle like stacked plates." },
+        { value: "calm", label: "Calm", help: "Sections simply fade and rise into place." },
+      ],
+    },
+    { group: "Product cards", key: "cardHeart", label: "Wishlist heart on the photo", kind: "select", default: "show", options: [{ value: "show", label: "Show" }, { value: "hide", label: "Hide" }] },
+    { group: "Product cards", key: "cardQuickAdd", label: "Bag button beside the name", kind: "select", default: "show", options: [{ value: "show", label: "Show" }, { value: "hide", label: "Hide" }] },
+    { group: "Product cards", key: "cardSaleBadge", label: "Sale badge", kind: "text", default: "−{n}%", max: 20, help: "{n} becomes the discount, e.g. −20%." },
+    { group: "Product cards", key: "cardSoldOut", label: "Sold out badge", kind: "text", default: "Sold out", max: 20 },
+    { group: "Product cards", key: "cardBadgeBackground", label: "Badge colour", kind: "color", default: "#FFFFFF" },
+    { group: "Product cards", key: "cardBadgeText", label: "Badge text colour", kind: "color", default: "#2A1D18" },
+    { group: "Phone menu", key: "menuEyebrow", label: "Small text above the categories", kind: "text", default: "Shop the studio", max: 40 },
+    { group: "Phone menu", key: "menuNote", label: "Note at the bottom", kind: "text", default: "Thrown, glazed and fired by hand in small batches.", max: 120 },
+    { group: "About page", page: "/pages/about", key: "aboutEyebrow", label: "Small text above the title", kind: "text", default: "Our studio", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutStamp", label: "Words around the turning maker's mark", kind: "text", default: "Handmade · small batch · since 2016 ·", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutStoryLabel", label: "Label beside the story", kind: "text", default: "How it started", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutYear1Value", label: "Year 1", kind: "text", default: "2016", max: 12, help: "Up to four years on a line, each with a glaze dot. Leave a year empty to hide it." },
+    { group: "About page", page: "/pages/about", key: "aboutYear1Title", label: "Year 1: what happened", kind: "text", default: "A wheel in a garage", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutYear1Text", label: "Year 1: a line about it", kind: "text", default: "One second-hand wheel and a lot of wobbly bowls.", max: 120 },
+    { group: "About page", page: "/pages/about", key: "aboutYear2Value", label: "Year 2", kind: "text", default: "2018", max: 12 },
+    { group: "About page", page: "/pages/about", key: "aboutYear2Title", label: "Year 2: what happened", kind: "text", default: "Our first kiln", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutYear2Text", label: "Year 2: a line about it", kind: "text", default: "Fired our first full batch of mugs, and sold out in a week.", max: 120 },
+    { group: "About page", page: "/pages/about", key: "aboutYear3Value", label: "Year 3", kind: "text", default: "2021", max: 12 },
+    { group: "About page", page: "/pages/about", key: "aboutYear3Title", label: "Year 3: what happened", kind: "text", default: "A real studio", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutYear3Text", label: "Year 3: a line about it", kind: "text", default: "Moved into a sunny studio with room for four wheels.", max: 120 },
+    { group: "About page", page: "/pages/about", key: "aboutYear4Value", label: "Year 4", kind: "text", default: "Today", max: 12 },
+    { group: "About page", page: "/pages/about", key: "aboutYear4Title", label: "Year 4: what happened", kind: "text", default: "38 glazes and counting", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutYear4Text", label: "Year 4: a line about it", kind: "text", default: "Still mixed by hand, still fired twice.", max: 120 },
+    { group: "About page", page: "/pages/about", key: "aboutStat1Value", label: "Number 1", kind: "text", default: "12,000+", max: 12, help: "Three big numbers side by side. Leave a number empty to hide it." },
+    { group: "About page", page: "/pages/about", key: "aboutStat1Label", label: "Number 1: what it means", kind: "text", default: "Pieces thrown by hand", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutStat2Value", label: "Number 2", kind: "text", default: "4", max: 12 },
+    { group: "About page", page: "/pages/about", key: "aboutStat2Label", label: "Number 2: what it means", kind: "text", default: "Potters at the wheel", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutStat3Value", label: "Number 3", kind: "text", default: "38", max: 12 },
+    { group: "About page", page: "/pages/about", key: "aboutStat3Label", label: "Number 3: what it means", kind: "text", default: "Glazes mixed in the studio", max: 50 },
+    { group: "About page", page: "/pages/about", key: "aboutValuesHeading", label: "Values heading", kind: "text", default: "How we make", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutValue1Title", label: "Value 1: title", kind: "text", default: "Slow by choice", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutValue1Text", label: "Value 1: text", kind: "text", default: "Each piece takes about three weeks, from the wheel to the second firing.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutValue2Title", label: "Value 2: title", kind: "text", default: "Safe to use", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutValue2Text", label: "Value 2: text", kind: "text", default: "Lead-free, food-safe glazes, tested batch by batch.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutValue3Title", label: "Value 3: title", kind: "text", default: "Made to be used", max: 40 },
+    { group: "About page", page: "/pages/about", key: "aboutValue3Text", label: "Value 3: text", kind: "text", default: "Not for the shelf: for coffee, dal, flowers and long dinners.", max: 140 },
+    { group: "About page", page: "/pages/about", key: "aboutCtaHeading", label: "Closing heading", kind: "text", default: "Bring a piece home", max: 60 },
+    { group: "About page", page: "/pages/about", key: "aboutCtaButton", label: "Closing button", kind: "text", default: "Shop the catalog", max: 30 },
+    { group: "Contact page", page: "/pages/contact", key: "contactEyebrow", label: "Small text above the title", kind: "text", default: "Say hello", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactCardTitle", label: "Heading on the red card", kind: "text", default: "Visit the studio", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactFormTitle", label: "Form heading", kind: "text", default: "Write to us", max: 50 },
+    { group: "Contact page", page: "/pages/contact", key: "contactFormButton", label: "Form button", kind: "text", default: "Send message", max: 30 },
+    { group: "Contact page", page: "/pages/contact", key: "contactHoursTitle", label: "Hours heading", kind: "text", default: "Studio hours", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactHours", label: "Opening hours", kind: "text", default: "Thu to Sun, 11 am to 6 pm", max: 80 },
+    { group: "Contact page", page: "/pages/contact", key: "contactReplyTitle", label: "Reply heading", kind: "text", default: "Reply time", max: 40 },
+    { group: "Contact page", page: "/pages/contact", key: "contactReply", label: "How fast you reply", kind: "text", default: "Within a day, between firings", max: 80 },
+  ],
+  theme15: [
+    {
+      group: "Scroll effects",
+      key: "motion",
+      label: "How sections appear as buyers scroll",
+      kind: "select",
+      default: "bold",
+      options: [
+        { value: "bold", label: "Bold", help: "Each section makes its own entrance: lines slide in, the claims ribbon swings in, cards drop in like cans, reviews glide in, photos wipe open." },
+        { value: "calm", label: "Calm", help: "Sections simply fade and rise into place." },
+      ],
+    },
+    { group: "Product cards", key: "cardBackground", label: "Card background", kind: "color", default: "#FFFDF8" },
+    { group: "Product cards", key: "flavour1", label: "Card colour 1", kind: "color", default: "#1E88C8", help: "Each product gets one of these six colours for its border, name and buttons." },
+    { group: "Product cards", key: "flavour2", label: "Card colour 2", kind: "color", default: "#13995A" },
+    { group: "Product cards", key: "flavour3", label: "Card colour 3", kind: "color", default: "#F06A1D" },
+    { group: "Product cards", key: "flavour4", label: "Card colour 4", kind: "color", default: "#E2526B" },
+    { group: "Product cards", key: "flavour5", label: "Card colour 5", kind: "color", default: "#7B4BC4" },
+    { group: "Product cards", key: "flavour6", label: "Card colour 6", kind: "color", default: "#C99A0E" },
+    { group: "Product cards", key: "addLabel", label: "Add button text", kind: "text", default: "Add to cart", max: 24 },
+    { group: "Product cards", key: "chooseLabel", label: "Add button text when sizes or options must be picked", kind: "text", default: "Choose options", max: 24 },
+    { group: "Product cards", key: "viewLabel", label: "Second button text", kind: "text", default: "Shop now", max: 24 },
+    { group: "Card stickers", key: "stickerColour", label: "Sticker colour", kind: "color", default: "#FFE14D", help: "The band across the top of every product card." },
+    { group: "Card stickers", key: "stickerText", label: "Sticker text colour", kind: "color", default: "#2A2320" },
+    { group: "Card stickers", key: "stickerSale", label: "On sale", kind: "text", default: "{n}% off!", max: 30, help: "{n} becomes the discount, e.g. 20% off!" },
+    { group: "Card stickers", key: "stickerBest", label: "Top 3 sellers", kind: "text", default: "Best seller!", max: 30 },
+    { group: "Card stickers", key: "stickerNew", label: "Added in the last 30 days", kind: "text", default: "New flavour!", max: 30 },
+    { group: "Card stickers", key: "stickerDefault", label: "Every other product", kind: "text", default: "Fan favourite!", max: 30 },
+    { group: "Card stickers", key: "stickerSoldOut", label: "Sold out", kind: "text", default: "Sold out", max: 30 },
+  ],
+};
+
+/** The settings only this theme has (uploaded themes use their base theme's). */
+export function themeOptionFields(theme: string): ThemeOptionField[] {
+  return THEME_OPTIONS[toSiteTheme(theme)] || [];
+}
+
+export function themeOptionDefaults(theme: string): Record<string, string> {
+  return Object.fromEntries(themeOptionFields(theme).map((f) => [f.key, f.default]));
+}
+
+/** Saved theme settings laid over the defaults: unknown keys dropped, colours checked, text capped. */
+export function cleanThemeOptions(theme: string, saved: unknown): Record<string, string> {
+  const out = themeOptionDefaults(theme);
+  if (!saved || typeof saved !== "object" || Array.isArray(saved)) return out;
+  const given = saved as Record<string, unknown>;
+  for (const f of themeOptionFields(theme)) {
+    const v = given[f.key];
+    if (typeof v !== "string") continue;
+    if (f.kind === "color") {
+      if (/^#[0-9a-fA-F]{6}$/.test(v)) out[f.key] = v;
+    } else if (f.kind === "select") {
+      if (f.options?.some((o) => o.value === v)) out[f.key] = v;
+    } else if (v.trim()) {
+      out[f.key] = v.slice(0, f.max || 60);
+    }
+  }
+  return out;
+}
 
 /** The theme's own sections that this content no longer has, in the theme's order. */
 export function removedThemeSections(content: SiteContent, theme: string, storeName?: string): SiteSection[] {
@@ -5593,6 +7217,7 @@ export function resolveSiteContent(saved: unknown, theme: string = "mono-studio"
     footer: pick(base.footer, saved.footer),
     sections,
     pages,
+    options: cleanThemeOptions(theme, saved.options),
   };
 }
 

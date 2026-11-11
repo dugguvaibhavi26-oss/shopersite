@@ -68,7 +68,7 @@ describe("Storefront themes", () => {
     expect(SITE_THEME_STYLE.theme04).toMatchObject({ header: "split", card: "hover" });
     expect(toSiteTheme("theme04")).toBe("theme04");
     const t5 = getDefaultSiteContent("theme05", "Roxten");
-    expect(t5.sections.map((s) => s.type)).toEqual(expect.arrayContaining(["reviews", "features", "feature-cards", "gallery", "quote", "story-split"]));
+    expect(t5.sections.map((s) => s.type)).toEqual(expect.arrayContaining(["reviews", "colour-chips", "type-collage", "size-finder", "occasion-mosaic"]));
     expect(t5.sections[0].settings.imageLayout).toBe("panel");
     expect(t5.header.ctaLabel).toBe("Find your fit");
     expect(SITE_THEME_STYLE.theme05).toMatchObject({ card: "detailed", footerWordmark: true });
@@ -165,7 +165,7 @@ describe("E01 (theme06)", () => {
     expect(toSiteTheme("theme06")).toBe("theme06");
     expect(SITE_THEME_STYLE.theme06).toMatchObject({ header: "bar", card: "notch" });
     const c = getDefaultSiteContent("theme06", "Fabrid");
-    expect(c.sections.map((x) => x.type)).toEqual(["hero", "category-cards", "product-row", "perks", "offer-split", "reviews", "faq"]);
+    expect(c.sections.map((x) => x.type)).toEqual(["hero", "category-cards", "product-row", "brand-strip", "budget-picker", "offer-split", "room-shop", "menu-board", "scent-quiz", "stage", "bento-benefits", "reviews", "faq", "perks"]);
     expect(c.sections[0].settings).toMatchObject({ heading: "Fabrid", imageLayout: "notch", stat: "70+" });
     expect(c.sections[2].settings).toMatchObject({ display: "tabs", promoButton: "View collection" });
     for (const type of ["category-cards", "offer-split", "perks"] as const) expect(SITE_SECTION_TYPES[type].fields.length).toBeGreaterThan(0);
@@ -198,7 +198,7 @@ describe("F02 and Themes 07–09", () => {
     const { demoCatalogFor } = await import("@/lib/demo-store");
     const cases = [
       { slug: "f02", hero: "banner", types: ["category-rows", "offer-split"] },
-      { slug: "theme07", hero: "split-word", types: ["collection-tiles", "about-split"] },
+      { slug: "theme07", hero: "split-word", types: ["collection-tiles", "studio-prints"] },
       { slug: "theme08", hero: "poster", types: ["brand-story", "contact-block"] },
       { slug: "theme09", hero: "center", types: ["collection-feature", "stories", "quote"] },
     ];
@@ -344,7 +344,7 @@ describe("Themes 21–23", () => {
   it("each have at least seven sections of their own, their own pages and a sample catalog", async () => {
     const { demoCatalogFor } = await import("@/lib/demo-store");
     const cases = [
-      { slug: "theme21", hero: "look", types: ["edge-tiles", "engraving", "gallery"], about: /gold jewellery/i },
+      { slug: "theme21", hero: "look", types: ["edge-tiles", "engraving", "scatter-gallery"], about: /gold jewellery/i },
       { slug: "theme22", hero: "center", types: ["type-collage", "collection-slider", "guide-row", "quote"], about: /gold jewellery/i },
       { slug: "theme23", hero: "inset", types: ["duo-promo", "offset-pair", "scent-quiz", "collection-tiles"], about: /fragrances/i },
     ];

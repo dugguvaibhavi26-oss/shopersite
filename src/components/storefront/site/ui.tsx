@@ -76,6 +76,9 @@ function BoxedCard({ product, className }: { product: ProductData; className?: s
   const fit = content.settings.productPhotos === "fit";
   const needsChoice = (product.options || []).some((o) => o.options?.length);
   const to = `/products/${product.slug || product.id}`;
+  // Theme 3 lets the seller word and colour the badge and hide the heart or quick add; other themes keep the defaults
+  const o = content.options;
+  const badge = soldOut ? o.cardSoldOut || "Sold out" : (o.cardSaleBadge || "−{n}%").split("{n}").join(String(off));
   return (
     <div className={cn("group relative min-w-0", className)}>
       <MLink to={to} className="m-panel m-card relative block aspect-[4/5] overflow-hidden">
@@ -92,11 +95,15 @@ function BoxedCard({ product, className }: { product: ProductData; className?: s
           />
         )}
         {(soldOut || off > 0) && (
-          <span className="absolute left-2.5 top-2.5 rounded-md bg-white/85 px-2 py-0.5 text-[length:calc(10px*var(--m-scale))] font-medium text-neutral-500 backdrop-blur">
-            {soldOut ? "Sold out" : `−${off}%`}
+          <span
+            className="absolute left-2.5 top-2.5 rounded-md px-2 py-0.5 text-[length:calc(10px*var(--m-scale))] font-medium backdrop-blur"
+            style={{ background: o.cardBadgeBackground ? `color-mix(in srgb, ${o.cardBadgeBackground} 85%, transparent)` : "rgba(255,255,255,0.85)", color: o.cardBadgeText || "#737373" }}
+          >
+            {badge}
           </span>
         )}
       </MLink>
+      {o.cardHeart !== "hide" && (
       <button
         type="button"
         onClick={() => toggleWish(product.id)}
@@ -106,6 +113,7 @@ function BoxedCard({ product, className }: { product: ProductData; className?: s
       >
         <Heart className={cn("h-4 w-4", wished && "fill-red-500 text-red-500")} strokeWidth={1.6} />
       </button>
+      )}
       <div className="mt-2.5 flex items-start justify-between gap-2">
         <MLink to={to} className="min-w-0">
           <span className="block truncate text-[length:calc(12.5px*var(--m-scale))]">{product.title}</span>
@@ -114,7 +122,7 @@ function BoxedCard({ product, className }: { product: ProductData; className?: s
             {off > 0 && <span className="m-faint ml-1.5 font-normal line-through">{rupees(product.compareAtPrice!)}</span>}
           </span>
         </MLink>
-        {!soldOut && (
+        {!soldOut && o.cardQuickAdd !== "hide" && (
           <button
             type="button"
             aria-label={needsChoice ? `Choose options for ${product.title}` : `Add ${product.title} to bag`}
@@ -206,7 +214,8 @@ function DetailedCard({ product, className }: { product: ProductData; className?
   const sold = unitsSold(store);
   const isBestseller = (sold[product.id] || 0) > 0 && Object.values(sold).sort((a, b) => b - a).slice(0, 3).includes(sold[product.id]);
   const isNew = Date.now() - new Date(product.createdAt || 0).getTime() < 30 * 86400000;
-  const badge = soldOut ? "Sold out" : off > 0 ? `${off}% off` : isBestseller ? "Bestseller" : isNew ? "New" : "";
+  const o = content.options;
+  const badge = soldOut ? o.dSoldOut || "Sold out" : off > 0 ? (o.dSale || "{n}% off").split("{n}").join(String(off)) : isBestseller ? o.dBest || "Bestseller" : isNew ? o.dNew || "New" : "";
   const colours = product.colorSwatches || [];
   const colourOption = (product.options || []).find((o) => /colou?r|shade/i.test(o.name));
   const colourCount = colours.length || colourOption?.options.length || 0;
@@ -223,7 +232,11 @@ function DetailedCard({ product, className }: { product: ProductData; className?
             className={cn("absolute inset-0 h-full w-full transition duration-700", fit ? "object-contain p-[8%] mix-blend-multiply group-hover:scale-[1.04]" : "object-cover group-hover:scale-[1.03]")}
           />
         )}
-        {badge && <span className="absolute left-2 top-2 rounded bg-white px-1.5 py-0.5 text-[length:calc(10px*var(--m-scale))] font-semibold text-black shadow-sm">{badge}</span>}
+        {badge && (
+          <span className="absolute left-2 top-2 rounded px-1.5 py-0.5 text-[length:calc(10px*var(--m-scale))] font-semibold shadow-sm" style={{ background: o.dBadgeBg || "#FFFFFF", color: o.dBadgeText || "#000000" }}>
+            {badge}
+          </span>
+        )}
       </MLink>
       <button
         type="button"
@@ -246,8 +259,8 @@ function DetailedCard({ product, className }: { product: ProductData; className?
           {rupees(product.price)}
           {off > 0 && <span className="m-faint ml-1.5 line-through">{rupees(product.compareAtPrice!)}</span>}
         </span>
-        {product.description && <span className="m-muted mt-1.5 block truncate text-[length:calc(12px*var(--m-scale))]">{product.description.split(/[.\n]/)[0]}</span>}
-        {colours.length > 0 ? (
+        {product.description && o.dDesc !== "hide" && <span className="m-muted mt-1.5 block truncate text-[length:calc(12px*var(--m-scale))]">{product.description.split(/[.\n]/)[0]}</span>}
+        {o.dDots === "hide" ? null : colours.length > 0 ? (
           <span className="mt-2 flex items-center gap-1">
             {colours.slice(0, 6).map((c) => (
               <span key={c} className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10" style={{ backgroundColor: c }} />
@@ -273,7 +286,8 @@ function NotchCard({ product, className }: { product: ProductData; className?: s
   const reviews = canUseReviews(store.planId) ? (store.reviews || []).filter((r) => r.productId === product.id && r.status === "approved") : [];
   const avg = reviews.length ? reviews.reduce((n, r) => n + r.rating, 0) / reviews.length : 0;
   const isNew = Date.now() - new Date(product.createdAt || 0).getTime() < 30 * 86400000;
-  const badge = soldOut ? "Sold out" : off > 0 ? `${off}% off` : isNew ? "New" : "";
+  const o = content.options;
+  const badge = soldOut ? o.notchSoldOut || "Sold out" : off > 0 ? (o.notchSale || "{n}% off").split("{n}").join(String(off)) : isNew ? o.notchNew ?? "New" : "";
   const to = `/products/${product.slug || product.id}`;
   const buy = () => (needsChoice ? router.push(href(to)) : addToBag(product));
   return (
@@ -294,7 +308,10 @@ function NotchCard({ product, className }: { product: ProductData; className?: s
           )}
         </MLink>
         {badge && (
-          <span className="pointer-events-none absolute left-2.5 top-2.5 rounded-full bg-[#F26B3A] px-2.5 py-1 text-[length:calc(10.5px*var(--m-scale))] font-semibold leading-none text-white">
+          <span
+            className="pointer-events-none absolute left-2.5 top-2.5 rounded-full px-2.5 py-1 text-[length:calc(10.5px*var(--m-scale))] font-semibold leading-none"
+            style={{ background: o.notchBadge || "#F26B3A", color: o.notchBadgeText || "#FFFFFF" }}
+          >
             {badge}
           </span>
         )}
@@ -309,7 +326,7 @@ function NotchCard({ product, className }: { product: ProductData; className?: s
             className="absolute bottom-2 right-2 flex h-9 min-h-0 w-9 items-center justify-center gap-1.5 rounded-full bg-white text-[length:calc(12px*var(--m-scale))] font-semibold text-black shadow-[0_6px_20px_-8px_rgba(0,0,0,0.35)] transition duration-300 lg:inset-x-2.5 lg:bottom-2.5 lg:w-auto lg:translate-y-2 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
           >
             <Plus className="h-4 w-4 lg:h-3.5 lg:w-3.5" strokeWidth={2.4} />
-            <span className="hidden lg:inline">{needsChoice ? "Choose size" : "Add to bag"}</span>
+            <span className="hidden lg:inline">{needsChoice ? o.notchChoose || "Choose size" : o.notchAdd || "Add to bag"}</span>
           </button>
         )}
       </div>
@@ -325,6 +342,7 @@ function NotchCard({ product, className }: { product: ProductData; className?: s
             off > 0 && <span className="m-faint mt-0.5 block text-[length:calc(12px*var(--m-scale))] line-through">{rupees(product.compareAtPrice!)}</span>
           )}
         </MLink>
+        {o.notchHeart !== "hide" && (
         <button
           type="button"
           onClick={() => toggleWish(product.id)}
@@ -334,6 +352,7 @@ function NotchCard({ product, className }: { product: ProductData; className?: s
         >
           <Heart className={cn("h-4 w-4", wished && "fill-[var(--m-accent)] text-[var(--m-accent)]")} strokeWidth={1.7} />
         </button>
+        )}
       </div>
     </div>
   );
@@ -458,7 +477,9 @@ function LineCard({ product, className, aspect }: { product: ProductData; classN
       {rupees(product.price)}
     </span>
   );
-  const cart = look.lineCart && !soldOut && (
+  // Theme 07's own card settings; every other line-card theme keeps these defaults
+  const lo = content.options;
+  const cart = look.lineCart && lo.cardQuickAdd !== "hide" && !soldOut && (
     <button type="button" onClick={buy} aria-label={needsChoice ? `Choose options for ${product.title}` : `Add ${product.title} to bag`} className={cn(icon, "shrink-0")}>
       <ShoppingBag className="h-4 w-4" strokeWidth={1.6} />
     </button>
@@ -477,13 +498,20 @@ function LineCard({ product, className, aspect }: { product: ProductData; classN
           )}
         </MLink>
         {(soldOut || off > 0) && (
-          <span className="pointer-events-none absolute left-2 top-2 bg-[var(--m-bg)] px-1.5 py-0.5 text-[length:calc(10px*var(--m-scale))] font-medium">{soldOut ? "Sold out" : `−${off}%`}</span>
+          <span
+            className="pointer-events-none absolute left-2 top-2 bg-[var(--m-bg)] px-1.5 py-0.5 text-[length:calc(10px*var(--m-scale))] font-medium"
+            style={lo.cardBadgeBackground ? { background: lo.cardBadgeBackground, color: lo.cardBadgeText } : undefined}
+          >
+            {soldOut ? lo.cardSoldOut || "Sold out" : (lo.cardSaleBadge || "−{n}%").split("{n}").join(String(off))}
+          </span>
         )}
         {/* a soft circle behind the icons keeps them readable on dark photos */}
         <div className="absolute right-1.5 top-1.5 flex flex-col gap-1 [&>button]:bg-[color-mix(in_srgb,var(--m-bg)_78%,transparent)] [&>button]:backdrop-blur-sm">
-          <button type="button" onClick={() => toggleWish(product.id)} aria-label={wished ? "Remove from wishlist" : "Add to wishlist"} aria-pressed={wished} className={icon}>
-            <Heart className={cn("h-4 w-4", wished && "fill-current")} strokeWidth={1.6} />
-          </button>
+          {lo.cardHeart !== "hide" && (
+            <button type="button" onClick={() => toggleWish(product.id)} aria-label={wished ? "Remove from wishlist" : "Add to wishlist"} aria-pressed={wished} className={icon}>
+              <Heart className={cn("h-4 w-4", wished && "fill-current")} strokeWidth={1.6} />
+            </button>
+          )}
           {row && cart}
         </div>
       </div>
@@ -615,31 +643,49 @@ function JarCard({ product, className }: { product: ProductData; className?: str
 }
 
 // Theme 15's flavour cards each take a colour of their own
-const FLAVOR_COLOURS = ["#1E88C8", "#13995A", "#F06A1D", "#E2526B", "#7B4BC4", "#C99A0E"];
-
-function flavourColour(id: string) {
+/** Theme 15: each product gets one of the six card colours (set in the editor), the same one every time. */
+function flavourColour(id: string, colours: string[]) {
   let h = 0;
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return FLAVOR_COLOURS[h % FLAVOR_COLOURS.length];
+  return colours[h % colours.length];
 }
 
 /** Theme 15: a coloured card with a label band, the name in its colour, stars, a description, Add to cart and Shop now. */
 function FlavorCard({ product, className }: { product: ProductData; className?: string }) {
-  const { store } = useSite();
+  const { store, content } = useSite();
+  const o = content.options;
   const { to, buy, needsChoice, soldOut, off } = useCardBuy(product);
-  const colour = flavourColour(product.id);
+  const colour = flavourColour(product.id, [o.flavour1, o.flavour2, o.flavour3, o.flavour4, o.flavour5, o.flavour6].filter(Boolean) as string[]);
+  const fit = content.settings.productPhotos === "fit";
   const reviews = canUseReviews(store.planId) ? (store.reviews || []).filter((r) => r.productId === product.id && r.status === "approved") : [];
   const avg = reviews.length ? reviews.reduce((n, r) => n + r.rating, 0) / reviews.length : 0;
   const sold = unitsSold(store);
   const top = (sold[product.id] || 0) > 0 && Object.values(sold).sort((a, b) => b - a).slice(0, 3).includes(sold[product.id]);
-  const label = soldOut ? "Sold out" : off > 0 ? `${off}% off!` : top ? "Best seller!" : Date.now() - new Date(product.createdAt || 0).getTime() < 30 * 86400000 ? "New flavour!" : "Fan favourite!";
+  const label = soldOut
+    ? o.stickerSoldOut
+    : off > 0
+      ? (o.stickerSale || "").split("{n}").join(String(off))
+      : top
+        ? o.stickerBest
+        : Date.now() - new Date(product.createdAt || 0).getTime() < 30 * 86400000
+          ? o.stickerNew
+          : o.stickerDefault;
   return (
-    <div className={cn("group flex min-w-0 flex-col border-2 bg-[#FFFDF8] transition duration-300 lg:hover:-translate-y-1.5 lg:hover:rotate-[-0.6deg]", className)} style={{ borderColor: colour }}>
-      <p className="truncate bg-[#FFE14D] px-2.5 py-1 text-[length:calc(10px*var(--m-scale))] font-bold uppercase tracking-[0.06em] text-[#2A2320]">{label}</p>
+    <div className={cn("group flex min-w-0 flex-col border-2 transition duration-300 lg:hover:-translate-y-1.5 lg:hover:rotate-[-0.6deg]", className)} style={{ borderColor: colour, background: o.cardBackground }}>
+      {label && (
+        <p className="truncate px-2.5 py-1 text-[length:calc(10px*var(--m-scale))] font-bold uppercase tracking-[0.06em]" style={{ background: o.stickerColour, color: o.stickerText }}>
+          {label}
+        </p>
+      )}
       <MLink to={to} className="relative block aspect-[4/3.2] overflow-hidden" aria-label={product.title}>
         {product.images?.[0] && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={product.images[0]} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-[1.06]" />
+          <img
+            src={product.images[0]}
+            alt=""
+            loading="lazy"
+            className={cn("absolute inset-0 h-full w-full transition duration-700", fit ? "object-contain p-[8%] group-hover:scale-[1.04]" : "object-cover group-hover:scale-[1.06]")}
+          />
         )}
       </MLink>
       <div className="flex flex-1 flex-col p-3 sm:p-4">
@@ -662,11 +708,11 @@ function FlavorCard({ product, className }: { product: ProductData; className?: 
           </span>
           {!soldOut && (
             <button type="button" onClick={() => buy()} className="flex h-9 min-h-0 items-center justify-center text-[length:calc(11px*var(--m-scale))] font-bold uppercase tracking-[0.06em] text-white transition hover:opacity-85" style={{ background: colour }}>
-              {needsChoice ? "Choose options" : "Add to cart"}
+              {needsChoice ? o.chooseLabel : o.addLabel}
             </button>
           )}
           <MLink to={to} className="flex h-9 min-h-0 items-center justify-center border-2 text-[length:calc(11px*var(--m-scale))] font-bold uppercase tracking-[0.06em] transition hover:bg-black/5" style={{ borderColor: colour, color: colour }}>
-            Shop now
+            {o.viewLabel}
           </MLink>
         </div>
       </div>
@@ -1222,9 +1268,10 @@ export function ProductCard({ product, className, aspect }: { product: ProductDa
             // eslint-disable-next-line @next/next/no-img-element
             <img src={second} alt="" loading="lazy" className={cn(photo, "opacity-0 group-hover:opacity-100")} />
           )}
-          {soldOut && (
+          {/* Mono Studio's own badge words (and a sale badge) come from its settings; other plain-card themes keep "Sold out" only */}
+          {(soldOut || (off > 0 && content.options.cardSaleBadge)) && (
             <span className="m-cap absolute left-0 top-0 bg-[var(--m-text)] px-2 py-1 text-[length:calc(10px*var(--m-scale))] font-medium tracking-wider text-[var(--m-bg)]">
-              Sold out
+              {soldOut ? content.options.cardSoldOut || "Sold out" : (content.options.cardSaleBadge || "").split("{n}").join(String(off))}
             </span>
           )}
         </div>
@@ -1237,27 +1284,30 @@ export function ProductCard({ product, className, aspect }: { product: ProductDa
           </span>
         </div>
       </MLink>
-      <button
-        type="button"
-        onClick={() => toggleWish(product.id)}
-        aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
-        aria-pressed={wished}
-        data-on={wished}
-        className="absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center transition-opacity sm:opacity-0 sm:group-hover:opacity-100 data-[on=true]:opacity-100"
-      >
-        <Heart className={cn("h-[17px] w-[17px]", wished && "fill-current")} strokeWidth={1.5} />
-      </button>
+      {content.options.cardHeart !== "hide" && (
+        <button
+          type="button"
+          onClick={() => toggleWish(product.id)}
+          aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
+          aria-pressed={wished}
+          data-on={wished}
+          className="absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center transition-opacity sm:opacity-0 sm:group-hover:opacity-100 data-[on=true]:opacity-100"
+        >
+          <Heart className={cn("h-[17px] w-[17px]", wished && "fill-current")} strokeWidth={1.5} />
+        </button>
+      )}
     </div>
   );
 }
 
-export function ProductGrid({ products, extra }: { products: ProductData[]; extra?: React.ReactNode }) {
+export function ProductGrid({ products, extra, threeUp }: { products: ProductData[]; extra?: React.ReactNode; threeUp?: boolean }) {
   const { look } = useSite();
   return (
     <div
       className={cn(
         "m-stagger grid grid-cols-2",
-        look.card === "spec" || look.card === "jar" || look.card === "blob" || look.card === "print" ? "lg:grid-cols-3" : look.card === "drape" ? "md:grid-cols-3 lg:grid-cols-5" : "md:grid-cols-3 lg:grid-cols-4",
+        // threeUp: a count that fills rows of three evenly (six tiles) stays at three across
+        threeUp || look.card === "spec" || look.card === "jar" || look.card === "blob" || look.card === "print" ? "md:grid-cols-3" : look.card === "drape" ? "md:grid-cols-3 lg:grid-cols-5" : "md:grid-cols-3 lg:grid-cols-4",
         look.card === "plain" ? "gap-x-1.5 gap-y-7 sm:gap-x-2" : look.card === "notch" ? "gap-x-2.5 gap-y-6 sm:gap-x-4 sm:gap-y-8" : look.card === "spec" ? "gap-2.5 sm:gap-4" : look.card === "line" ? "gap-x-3 gap-y-7 sm:gap-x-4 sm:gap-y-9" : look.card === "jar" ? "gap-3 sm:gap-5 lg:gap-7" : look.card === "tile" || look.card === "flavor" ? "gap-2.5 sm:gap-3.5" : look.card === "soft" ? "gap-x-3 gap-y-8 sm:gap-x-5" : look.card === "shadow" || look.card === "tech" ? "gap-2.5 sm:gap-4" : look.card === "blob" ? "gap-4 sm:gap-6" : look.card === "drape" ? "gap-x-3 gap-y-8 sm:gap-x-5" : look.card === "ethnic" ? "gap-x-3 gap-y-7 sm:gap-x-4" : look.card === "rated" || look.card === "pastel" || look.card === "pet" ? "gap-3 sm:gap-4" : look.card === "print" ? "gap-x-4 gap-y-8 sm:gap-x-6" : "gap-x-3 gap-y-6 sm:gap-x-4"
       )}
     >

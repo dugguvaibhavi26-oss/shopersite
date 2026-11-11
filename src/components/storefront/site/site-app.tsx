@@ -14,6 +14,7 @@ import { SiteCart, SiteCheckout } from "./checkout";
 import { SiteAccount, SiteInfoPage, SiteOrder } from "./account";
 import { Container, EmptyState } from "./ui";
 import { FieldProbe } from "./field-probe";
+import { SiteWishlist } from "./wishlist";
 import { StoreTracking } from "./store-tracking";
 
 export type SiteView =
@@ -24,6 +25,7 @@ export type SiteView =
   | { name: "checkout" }
   | { name: "order"; token: string }
   | { name: "account" }
+  | { name: "wishlist" }
   | { name: "page"; id: string }
   | { name: "missing" };
 
@@ -40,6 +42,7 @@ export function siteViewFor(path: string, query: string | null): SiteView {
   if (a === "checkout") return { name: "checkout" };
   if (a === "order" && b) return { name: "order", token: b };
   if (a === "account") return { name: "account" };
+  if (a === "wishlist" || a === "saved") return { name: "wishlist" };
   if (a === "pages" && b) return { name: "page", id: b };
   return { name: "missing" };
 }
@@ -60,6 +63,8 @@ function View({ view, selectedId }: { view: SiteView; selectedId?: string }) {
       return <SiteOrder token={view.token} />;
     case "account":
       return <SiteAccount />;
+    case "wishlist":
+      return <SiteWishlist />;
     case "page":
       return <SiteInfoPage id={view.id} />;
     default:
@@ -107,6 +112,9 @@ function Frame({ view, selectedId, previewBar }: { view: SiteView; selectedId?: 
     "--m-card": look.cardRadius,
     "--m-hw": String(look.headingWeight || 600),
     "--m-scale": String((Number(s.textSize) || 100) / 100),
+    // a theme's highlight colour (Theme 5's marker stroke), when it has one
+    ...(content.options.markColour ? { "--mark": content.options.markColour } : {}),
+    ...(content.options.goldColour ? { "--gold": content.options.goldColour } : {}),
   } as React.CSSProperties;
 
   React.useEffect(() => {
@@ -162,8 +170,37 @@ function Frame({ view, selectedId, previewBar }: { view: SiteView; selectedId?: 
     return () => io.disconnect();
   }, [view, editing, sectionCount]);
 
+  // scroll-linked motion: each section on screen gets --p (0 as it enters at the bottom, 1 as it leaves at the top)
+  // and --e (how far it has scrolled off the top), so a theme's CSS can move things with the scroll, both ways.
+  // Never in the editor, and never for buyers who ask for less motion (sections then rest at --p 0.5).
+  React.useEffect(() => {
+    if (editing || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    const run = () => {
+      raf = 0;
+      const vh = window.innerHeight;
+      document.querySelectorAll<HTMLElement>(".site main [data-type]").forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.bottom < -vh || r.top > vh * 2) return;
+        el.style.setProperty("--p", Math.min(1, Math.max(0, (vh - r.top) / (vh + r.height))).toFixed(4));
+        el.style.setProperty("--e", Math.min(1, Math.max(0, -r.top / Math.max(1, r.height))).toFixed(4));
+      });
+    };
+    const on = () => {
+      if (!raf) raf = requestAnimationFrame(run);
+    };
+    run();
+    window.addEventListener("scroll", on, { passive: true });
+    window.addEventListener("resize", on);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", on);
+      window.removeEventListener("resize", on);
+    };
+  }, [view, editing, sectionCount]);
+
   return (
-    <div className="site flex min-h-screen flex-col" style={style} data-theme={theme} data-upper={s.uppercaseHeadings} data-head={s.headingFont} data-display={s.displayFont} data-condensed={SITE_CONDENSED_FONTS.includes(s.displayFont) ? "yes" : "no"} data-head-condensed={SITE_CONDENSED_FONTS.includes(s.headingFont) ? "yes" : "no"} data-editing={editing}>
+    <div className="site flex min-h-screen flex-col" style={style} data-theme={theme} data-upper={s.uppercaseHeadings} data-head={s.headingFont} data-display={s.displayFont} data-condensed={SITE_CONDENSED_FONTS.includes(s.displayFont) ? "yes" : "no"} data-head-condensed={SITE_CONDENSED_FONTS.includes(s.headingFont) ? "yes" : "no"} data-editing={editing} data-motion={content.options.motion || undefined}>
       {previewBar && <PreviewBar />}
       <SiteHeader overHero={overHero} />
       <main key={JSON.stringify(view)} className="m-page flex-1">

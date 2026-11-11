@@ -9,6 +9,10 @@ import { canUseReviews } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 import { activeCategories, discountPercent, giftNoteKey, productsFromSource, productsInCategory, rupees, shoppableCategories, useSite, visibleProducts, whatsappLink } from "./context";
 import { BentoGrid, Container, InstagramIcon, MLink, ProductCard, ProductGrid, ProductSlider, Stars } from "./ui";
+import { BatchCalendar, CareGuide, GlazePicker, ReviewBoard, StudioPrints } from "./studio-sections";
+import { ScatterGallery, WordStory } from "./scroll-sections";
+import { TableSizer, WoodPlanks } from "./workshop-sections";
+import { DropClock, SpecIndex } from "./mono-sections";
 
 /** Splits a heading on new lines so sellers can choose where it breaks. */
 /** Heading text: new lines stay, and words between *stars* are set in the italic accent font. */
@@ -468,7 +472,9 @@ function ProductRow({ s }: { s: Record<string, string> }) {
   const current = tabCats.find((c) => c.slug === tab) || (lineTabs || pills ? undefined : tabCats[0]);
   const promo = grid && !!s.promoImage;
   // three-a-row cards fill two rows with six
-  const count = mosaic || pills ? 6 : grid ? (look.card === "spec" || look.card === "jar" || look.card === "blob" || look.card === "print" ? 6 : look.card === "drape" ? 10 : promo ? 7 : 8) : 12;
+  const auto = mosaic || pills ? 6 : grid ? (look.card === "spec" || look.card === "jar" || look.card === "blob" || look.card === "print" ? 6 : look.card === "drape" ? 10 : promo ? 7 : 8) : 12;
+  // the seller can choose how many products show (Products to show)
+  const count = Math.min(12, Math.max(1, Number(s.limit) || auto));
   const products = current ? productsInCategory(store, current).slice(0, count) : productsFromSource(store, s.source || "bestsellers", count);
   if (!products.length) return null;
   if (s.display === "beside") return <BesideRow s={s} products={products} />;
@@ -478,7 +484,7 @@ function ProductRow({ s }: { s: Record<string, string> }) {
     tabCats.length > 1 &&
     (lineTabs ? (
       <div className="m-scroll -mx-[var(--g)] flex gap-5 overflow-x-auto px-[var(--g)] md:mx-0 md:px-0 scroll-px-[var(--g)] md:scroll-px-0" role="tablist">
-        {[{ id: "", slug: "", name: "All" }, ...tabCats].map((c) => {
+        {[{ id: "", slug: "", name: s.allLabel || "All" }, ...tabCats].map((c) => {
           const on = (current?.id || "") === c.id;
           return (
             <button
@@ -511,7 +517,7 @@ function ProductRow({ s }: { s: Record<string, string> }) {
             </h2>
             {tabCats.length > 1 && (
               <div className="m-scroll -mx-[var(--g)] flex gap-1.5 overflow-x-auto px-[var(--g)] scroll-px-[var(--g)] md:mx-0 md:px-0" role="tablist">
-                {[{ id: "", slug: "", name: "All" }, ...tabCats].map((c) => {
+                {[{ id: "", slug: "", name: s.allLabel || "All" }, ...tabCats].map((c) => {
                   const on = (current?.id || "") === c.id;
                   return (
                     <button
@@ -595,7 +601,7 @@ function ProductRow({ s }: { s: Record<string, string> }) {
         ) : pills ? (
           <BentoGrid products={products} />
         ) : grid ? (
-          <ProductGrid products={products} extra={promo ? <PromoTile s={s} /> : undefined} />
+          <ProductGrid products={products} extra={promo ? <PromoTile s={s} /> : undefined} threeUp={!!s.limit && (products.length + (promo ? 1 : 0)) % 3 === 0 && (products.length + (promo ? 1 : 0)) % 4 !== 0} />
         ) : (
           <ProductSlider products={products} />
         )}
@@ -666,7 +672,7 @@ function Newsletter({ s }: { s: Record<string, string> }) {
         {s.text && <p className={cn("mx-auto mt-4 max-w-md text-[length:calc(14px*var(--m-scale))] leading-relaxed", band ? "text-white/75" : "m-muted")}>{s.text}</p>}
         {done ? (
           <p className="mt-8 inline-flex items-center gap-2 text-[length:calc(14px*var(--m-scale))] font-medium">
-            <Check className="h-4 w-4" /> Thanks, you&apos;re on the list.
+            <Check className="h-4 w-4" /> {s.doneText || "Thanks, you're on the list."}
           </p>
         ) : (
           <form
@@ -683,12 +689,12 @@ function Newsletter({ s }: { s: Record<string, string> }) {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Your email"
+              placeholder={s.placeholder || "Your email"}
               aria-label="Email"
               className={cn("m-field rounded-full px-6", band && "!border-white/40 !bg-transparent !text-white placeholder:!text-white/60 focus:!border-white")}
             />
             <button type="submit" className={cn("m-btn shrink-0", band && "!bg-white !text-black")}>
-              Subscribe
+              {s.buttonLabel || "Subscribe"}
             </button>
           </form>
         )}
@@ -697,52 +703,65 @@ function Newsletter({ s }: { s: Record<string, string> }) {
   );
 }
 
-/** Category photos in a three-column mosaic; the first tall tile carries a line of text and a button. */
+/** Category photos (topped up with the seller's own extra tiles) in a three-column mosaic; one tall tile carries a line of text and a button. */
 function CollectionGrid({ s }: { s: Record<string, string> }) {
   const { store } = useSite();
   const cats = activeCategories(store).filter((c) => !c.parentId);
-  const list = (cats.length >= 3 ? cats : shoppableCategories(store)).slice(0, 6);
+  const limit = Math.min(6, Math.max(1, Number(s.count) || 6));
+  const fromCats = (cats.length >= 3 ? cats : shoppableCategories(store)).map((c) => ({ key: c.id, title: c.name, image: c.imageUrl || "", to: `/category/${c.slug}` }));
+  const extras = [1, 2]
+    .filter((n) => s[`x${n}Image`] && s[`x${n}Title`])
+    .map((n) => ({ key: `x${n}`, title: s[`x${n}Title`], image: s[`x${n}Image`], to: s[`x${n}Link`] || "/catalog" }));
+  const list = [...fromCats.slice(0, limit - Math.min(extras.length, limit)), ...extras].slice(0, limit);
   if (!list.length) return null;
   // column by column: short + tall, tall + short, short + tall
   const columns = [list.filter((_, i) => i % 3 === 0), list.filter((_, i) => i % 3 === 1), list.filter((_, i) => i % 3 === 2)].filter((c) => c.length);
-  const tall = (col: number, row: number) => (col === 1 ? row === 0 : row === 1);
+  const tall = (col: number, row: number, len: number) => (col === 1 ? row === 0 : row === 1) || len === 1;
+  // a column that comes out shorter than the tallest one lets its last tile grow, so the columns end level
+  const height = (col: typeof list, ci: number) => col.reduce((h, _, ri) => h + (tall(ci, ri, col.length) ? 1.25 : 0.75), 0);
+  const tallest = Math.max(...columns.map((c, ci) => height(c, ci)));
+  const dark = s.tone === "dark";
   return (
-    <section className="py-[clamp(40px,6vw,96px)]">
+    <section className={cn("py-[clamp(40px,6vw,96px)]", dark && "t-dark-band bg-[#0f0f0f] text-white")}>
       <Container>
         <SectionHead s={s} />
         <div className="m-stagger grid gap-2.5 sm:gap-4" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>
-          {columns.map((col, ci) => (
-            <div key={ci} className="flex flex-col gap-2.5 sm:gap-4">
-              {col.map((c, ri) => {
-                const isTall = tall(ci, ri) || col.length === 1;
-                const feature = ci === 0 && ri === 1;
-                return (
-                  <MLink key={c.id} to={`/category/${c.slug}`} className="group block">
-                    <span className={cn("m-panel m-card relative block overflow-hidden", isTall ? "aspect-[4/5]" : "aspect-[4/3]")}>
-                    {c.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={c.imageUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
-                    ) : (
-                      <span className="m-h m-faint absolute inset-0 flex items-center justify-center text-[length:calc(28px*var(--m-scale))]">{c.name.charAt(0)}</span>
-                    )}
-                    {/* on phones the name sits under the tile; on wider screens it is written on the photo */}
-                    <span className="absolute inset-0 hidden bg-black/30 transition-colors group-hover:bg-black/40 sm:block" />
-                    <span className="absolute inset-0 hidden flex-col items-center justify-center p-4 text-center text-white sm:flex">
-                      <span className="m-h text-balance break-normal text-[length:calc(clamp(16px,1.9vw,28px)*var(--m-scale))] leading-tight">{c.name}</span>
-                      {feature && s.featureText && <span className="mt-2 hidden max-w-[16rem] text-[length:calc(12px*var(--m-scale))] text-white/85 sm:block">{s.featureText}</span>}
-                      {feature && s.featureButton && (
-                        <span className="mt-4 hidden h-9 items-center rounded-full bg-white px-6 text-[length:calc(12px*var(--m-scale))] font-semibold text-black sm:inline-flex">
-                          {s.featureButton}
+          {columns.map((col, ci) => {
+            const short = height(col, ci) < tallest - 0.01;
+            return (
+              <div key={ci} className="flex flex-col gap-2.5 sm:gap-4">
+                {col.map((t, ri) => {
+                  const isTall = tall(ci, ri, col.length);
+                  const grow = short && ri === col.length - 1;
+                  const feature = ci === 0 && ri === 1;
+                  return (
+                    <MLink key={t.key} to={t.to} className={cn("group flex flex-col", grow && "flex-1")}>
+                      <span className={cn("m-panel m-card relative block overflow-hidden", grow ? "min-h-[120px] flex-1" : isTall ? "aspect-[4/5]" : "aspect-[4/3]")}>
+                        {t.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={t.image} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
+                        ) : (
+                          <span className="m-h m-faint absolute inset-0 flex items-center justify-center text-[length:calc(28px*var(--m-scale))]">{t.title.charAt(0)}</span>
+                        )}
+                        {/* on phones the name sits under the tile; on wider screens it is written on the photo */}
+                        <span className="absolute inset-0 hidden bg-black/30 transition-colors group-hover:bg-black/40 sm:block" />
+                        <span className="absolute inset-0 hidden flex-col items-center justify-center p-4 text-center text-white sm:flex">
+                          <span className="m-h text-balance break-normal text-[length:calc(clamp(16px,1.9vw,28px)*var(--m-scale))] leading-tight">{t.title}</span>
+                          {feature && s.featureText && <span className="mt-2 hidden max-w-[16rem] text-[length:calc(12px*var(--m-scale))] text-white/85 sm:block">{s.featureText}</span>}
+                          {feature && s.featureButton && (
+                            <span className="mt-4 hidden h-9 items-center rounded-full bg-white px-6 text-[length:calc(12px*var(--m-scale))] font-semibold text-black sm:inline-flex">
+                              {s.featureButton}
+                            </span>
+                          )}
                         </span>
-                      )}
-                    </span>
-                    </span>
-                    <span className="mt-2 block truncate text-center text-[length:calc(12.5px*var(--m-scale))] font-medium sm:hidden">{c.name}</span>
-                  </MLink>
-                );
-              })}
-            </div>
-          ))}
+                      </span>
+                      <span className="mt-2 block truncate text-center text-[length:calc(12.5px*var(--m-scale))] font-medium sm:hidden">{t.title}</span>
+                    </MLink>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       </Container>
     </section>
@@ -1043,7 +1062,7 @@ function StorySplit({ s }: { s: Record<string, string> }) {
 function NotchHero({ s }: { s: Record<string, string> }) {
   const { store, addToBag, href } = useSite();
   const router = useRouter();
-  const spotlight = productsFromSource(store, "newest", 1)[0];
+  const spotlight = productsFromSource(store, s.spotSource || "newest", 1)[0] || productsFromSource(store, "newest", 1)[0];
   const name = (s.heading || "").replace(/\*/g, "");
   // long shop names get a smaller wordmark so they still fit on one or two lines
   const fit = Math.min(1, 8 / Math.max(5, name.split("\n").reduce((n, l) => Math.max(n, l.length), 0)));
@@ -1067,7 +1086,7 @@ function NotchHero({ s }: { s: Record<string, string> }) {
           onClick={buySpotlight}
           className="mt-1.5 inline-flex h-8 items-center justify-center gap-1 rounded-full bg-white px-3.5 text-[length:calc(11.5px*var(--m-scale))] font-semibold text-black md:w-full"
         >
-          <Plus className="h-3 w-3" strokeWidth={2.6} /> Buy {rupees(spotlight.price)}
+          <Plus className="h-3 w-3" strokeWidth={2.6} /> {s.spotButton || "Buy"} {rupees(spotlight.price)}
         </button>
       </div>
     </div>
@@ -1141,7 +1160,7 @@ function CategoryCards({ s }: { s: Record<string, string> }) {
           {s.buttonLabel && (
             <MLink to="/catalog" className="flex shrink-0 items-center gap-1.5 text-[length:calc(12.5px*var(--m-scale))] font-semibold hover:opacity-70">
               <span className="hidden sm:inline">{s.buttonLabel}</span>
-              <span className="sm:hidden">See all</span>
+              <span className="sm:hidden">{s.buttonShort || "See all"}</span>
               <ArrowRight className="h-4 w-4" />
             </MLink>
           )}
@@ -1251,6 +1270,31 @@ const PERK_ICONS = [Truck, ShieldCheck, RotateCcw, MessageCircle];
 function Perks({ s }: { s: Record<string, string> }) {
   const perks = [1, 2, 3, 4].filter((i) => s[`p${i}Title`]);
   if (!perks.length) return null;
+  if (s.style === "strip") {
+    // a small dark strip: bright round icons, a short title and one line each
+    return (
+      <section className="py-[clamp(20px,3vw,44px)]">
+        <Container>
+          <div className="t-perk-strip m-stagger grid grid-cols-2 gap-x-3 gap-y-4 rounded-[18px] bg-[#111111] px-4 py-4 text-white sm:px-6 lg:grid-cols-4 lg:py-5">
+            {perks.map((i, n) => {
+              const Icon = PERK_ICONS[n % PERK_ICONS.length];
+              return (
+                <div key={i} className="flex min-w-0 items-start gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--mark,#d4f56a)] text-[#111111]">
+                    <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+                  </span>
+                  <span className="min-w-0 pt-0.5">
+                    <span className="block text-[length:calc(12px*var(--m-scale))] font-semibold leading-tight">{s[`p${i}Title`]}</span>
+                    {s[`p${i}Text`] && <span className="mt-0.5 block text-[length:calc(10.5px*var(--m-scale))] leading-snug text-white/55">{s[`p${i}Text`]}</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </Container>
+      </section>
+    );
+  }
   return (
     <section className="py-[clamp(24px,4vw,56px)]">
       <Container>
@@ -1553,10 +1597,12 @@ function RuleLink({ to, label }: { to: string; label: string }) {
 
 /** Three tall photos of the categories, each with its name and an arrow under it. */
 function CollectionTiles({ s }: { s: Record<string, string> }) {
-  const { store } = useSite();
+  const { store, look } = useSite();
+  // Theme 07 shows each category's newest piece here, so these tiles don't repeat its round category photos
+  const newest = (c: Parameters<typeof productsInCategory>[1]) => [...productsInCategory(store, c)].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0]?.images?.[0];
   const tiles = activeCategories(store)
     .filter((c) => !c.parentId)
-    .map((c) => ({ c, image: c.imageUrl || productsInCategory(store, c)[0]?.images?.[0] || "" }))
+    .map((c) => ({ c, image: (look.tilePhoto === "newest" && newest(c)) || c.imageUrl || productsInCategory(store, c)[0]?.images?.[0] || "" }))
     .filter((t) => t.image)
     .slice(0, 3);
   if (!tiles.length) return null;
@@ -2047,7 +2093,7 @@ function LookCards({ s }: { s: Record<string, string> }) {
   );
 }
 
-/** "Red #E5604D" lines as round colour chips; each searches the shop for that colour. */
+/** "Red #E5604D" lines as round colour chips; each opens the shop's page for that colour. */
 function ColourChips({ s }: { s: Record<string, string> }) {
   const chips = (s.colours || "")
     .split("\n")
@@ -2197,10 +2243,95 @@ function CategoryPanels({ s }: { s: Record<string, string> }) {
 }
 
 /** A heading and text beside one big product, with three more under it. */
+/** New pairs as a numbered list; the picked one shows big. It moves on by itself until the buyer picks one. */
+function NewDrops({ s }: { s: Record<string, string> }) {
+  const { store, editing } = useSite();
+  const list = productsFromSource(store, s.source || "newest", 5);
+  const [at, setAt] = React.useState(0);
+  const [held, setHeld] = React.useState(false);
+  const count = list.length;
+  React.useEffect(() => {
+    if (count < 2 || held || editing) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const id = window.setTimeout(() => setAt((i) => (i + 1) % count), 4200);
+    return () => window.clearTimeout(id);
+  }, [at, count, held, editing]);
+  if (!count) return null;
+  const cur = list[at % count];
+  const two = (n: number) => String(n).padStart(2, "0");
+  const off = discountPercent(cur);
+  return (
+    <section className="py-[clamp(40px,6vw,96px)]">
+      <Container>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="m-h t-title">
+              <Lines text={s.heading} />
+            </h2>
+            {s.text && <p className="m-muted mt-3 max-w-sm text-[length:calc(13.5px*var(--m-scale))] leading-relaxed">{s.text}</p>}
+          </div>
+          {s.buttonLabel && (
+            <MLink to={s.buttonLink || "/catalog"} className="inline-flex items-center gap-1.5 border-b border-current pb-0.5 text-[length:calc(13px*var(--m-scale))] font-semibold">
+              {s.buttonLabel} <ArrowRight className="h-4 w-4" />
+            </MLink>
+          )}
+        </div>
+        <div className="t-drops mt-[clamp(20px,3vw,40px)] grid gap-5 md:grid-cols-[1.05fr_1fr] md:gap-10">
+          <MLink to={`/products/${cur.slug || cur.id}`} className="m-panel group relative block aspect-[4/3.4] overflow-hidden rounded-[clamp(18px,2vw,28px)] md:aspect-auto md:min-h-[clamp(380px,36vw,520px)]">
+            {cur.images?.[0] && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={cur.id} src={cur.images[0]} alt="" className="t-drop-in absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
+            )}
+            <span className="absolute left-4 top-4 rounded-full bg-[#111111] px-3 py-1.5 text-[length:calc(11px*var(--m-scale))] font-semibold tabular-nums tracking-[0.08em] text-white">
+              N°{two(at % count + 1)} <span className="text-white/45">/ {two(count)}</span>
+            </span>
+            {s.badge && (
+              <span className="absolute right-4 top-4 rotate-[8deg] rounded-full bg-[var(--mark,#d4f56a)] px-3.5 py-1.5 text-[length:calc(11px*var(--m-scale))] font-bold uppercase tracking-[0.1em] text-[#111111] shadow-md">
+                {s.badge}
+              </span>
+            )}
+            {off > 0 && (
+              <span className="absolute bottom-4 left-4 rounded-full bg-white px-3 py-1.5 text-[length:calc(11.5px*var(--m-scale))] font-semibold text-[#111111]">{off}% off</span>
+            )}
+          </MLink>
+          <ol className="flex flex-col justify-center" aria-label="New pairs">
+            {list.map((p, n) => {
+              const on = n === at % count;
+              return (
+                <li key={p.id} className="m-line relative border-b first:border-t">
+                  <button
+                    type="button"
+                    aria-current={on}
+                    onClick={() => {
+                      setAt(n);
+                      setHeld(true);
+                    }}
+                    className={cn("flex w-full items-center gap-4 py-[clamp(12px,1.4vw,18px)] text-left transition-[padding] duration-300", on && "pl-3")}
+                  >
+                    <span className={cn("w-7 shrink-0 text-[length:calc(12px*var(--m-scale))] font-semibold tabular-nums", on ? "" : "m-faint")}>{two(n + 1)}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className={cn("m-h block truncate text-[length:calc(clamp(18px,1.9vw,26px)*var(--m-scale))] transition-opacity", !on && "opacity-45")}>
+                        {on ? <span className="m-em">{p.title}</span> : p.title}
+                      </span>
+                    </span>
+                    <span className={cn("shrink-0 text-[length:calc(13px*var(--m-scale))] tabular-nums", on ? "font-semibold" : "m-muted")}>{rupees(p.price)}</span>
+                  </button>
+                  {on && !held && count > 1 && <span key={`bar-${at}`} className="t-drop-bar absolute bottom-[-1px] left-0 h-[2px] bg-[var(--m-text)]" aria-hidden />}
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      </Container>
+    </section>
+  );
+}
+
 function FeaturedProduct({ s }: { s: Record<string, string> }) {
   const { store } = useSite();
   const list = productsFromSource(store, s.source || "newest", 4);
   if (!list.length) return null;
+  if (s.style === "drops") return <NewDrops s={s} />;
   const [main, ...rest] = list;
   return (
     <section className="py-[clamp(40px,6vw,96px)]">
@@ -2430,7 +2561,12 @@ function PopHero({ s }: { s: Record<string, string> }) {
       <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/25 to-transparent" />
       <div className="m-rise relative w-full px-[var(--g)] py-[clamp(40px,6vw,96px)]">
         <h1 className="m-h m-display t-pop max-w-[14ch]">
-          <Lines text={s.heading} />
+          {/* one block per line, so each line can make its own entrance */}
+          {(s.heading || "").split(/\n/).map((line, i) => (
+            <span key={i} className="t-pop-line block" style={{ "--i": i } as React.CSSProperties}>
+              <Lines text={line} />
+            </span>
+          ))}
         </h1>
         {s.subheading && <p className="m-h mt-3 text-[length:calc(clamp(13px,1.3vw,18px)*var(--m-scale))]">{s.subheading}</p>}
         {s.buttonLabel && (
@@ -2631,6 +2767,94 @@ function ProductSpotlight({ s }: { s: Record<string, string> }) {
   const avg = reviews.length ? reviews.reduce((n, r) => n + r.rating, 0) / reviews.length : 0;
   const wished = wishlist.includes(product.id);
   const photo = s.image || product.images?.[0];
+  if (s.style === "boutique") {
+    // a framed photo like a piece in its box, quiet details, one review and a square button
+    const off = discountPercent(product);
+    const review = reviews.find((r) => r.comment);
+    return (
+      <section className="t-spot-boutique py-[clamp(44px,6vw,100px)]">
+        <Container className="grid items-center gap-8 md:grid-cols-[1fr_1fr] md:gap-[clamp(32px,6vw,96px)]">
+          <div className="bg-[var(--m-panel)] p-[clamp(10px,1.6vw,20px)]" style={{ boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--gold, var(--m-accent)) 45%, transparent)" }}>
+            <MLink to={to} className="group relative block aspect-[4/5] overflow-hidden" aria-label={product.title}>
+              {photo && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={photo} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]" />
+              )}
+            </MLink>
+          </div>
+          <div className="min-w-0">
+            {s.label && <p className="text-[length:calc(10.5px*var(--m-scale))] font-semibold uppercase tracking-[0.24em] text-[var(--gold,var(--m-accent))]">{s.label}</p>}
+            <div className="mt-3 flex items-start justify-between gap-4">
+              <MLink to={to} className="m-h min-h-0 text-[length:calc(clamp(20px,2.2vw,30px)*var(--m-scale))] leading-tight hover:opacity-70">
+                {product.title}
+              </MLink>
+              <button
+                type="button"
+                onClick={() => toggleWish(product.id)}
+                aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
+                aria-pressed={wished}
+                className="flex h-9 min-h-0 w-9 shrink-0 items-center justify-center transition hover:opacity-60"
+              >
+                <Heart className={cn("h-[18px] w-[18px]", wished && "fill-current")} strokeWidth={1.5} />
+              </button>
+            </div>
+            {reviews.length > 0 && (
+              <p className="mt-2 flex items-center gap-2 text-[length:calc(11.5px*var(--m-scale))]">
+                <Stars value={avg} className="text-[var(--gold,var(--m-accent))] [&_svg]:h-3 [&_svg]:w-3" />
+                <span className="m-muted">({reviews.length})</span>
+              </p>
+            )}
+            <p className="mt-4 text-[length:calc(15px*var(--m-scale))] tabular-nums tracking-[0.04em]">
+              {rupees(product.price)}
+              {off > 0 && <span className="m-faint ml-2.5 text-[length:calc(13px*var(--m-scale))] line-through">{rupees(product.compareAtPrice!)}</span>}
+            </p>
+            <span aria-hidden className="mt-5 flex items-center gap-2">
+              <span className="h-px w-10 bg-[var(--gold,var(--m-accent))]" />
+              <span className="h-1.5 w-1.5 rotate-45 bg-[var(--gold,var(--m-accent))]" />
+            </span>
+            {product.description && <p className="m-muted mt-5 max-w-md whitespace-pre-line text-[length:calc(13.5px*var(--m-scale))] leading-relaxed">{product.description}</p>}
+            {product.stock > 0 ? (
+              <div className="mt-6 flex max-w-md gap-2">
+                {!needsChoice && (
+                  <div className="m-line flex h-11 shrink-0 items-center border">
+                    <button type="button" aria-label="Decrease quantity" onClick={() => setQty((n) => Math.max(1, n - 1))} className="flex h-full min-h-0 w-9 items-center justify-center hover:opacity-60">
+                      <Minus className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="w-6 text-center text-[length:calc(13px*var(--m-scale))] tabular-nums" aria-live="polite">
+                      {qty}
+                    </span>
+                    <button type="button" aria-label="Increase quantity" onClick={() => setQty((n) => Math.min(99, n + 1))} className="flex h-full min-h-0 w-9 items-center justify-center hover:opacity-60">
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => (needsChoice ? router.push(href(to)) : (addToBag(product, qty), setQty(1)))}
+                  className="flex h-11 min-h-0 flex-1 items-center justify-center bg-[var(--m-text)] px-5 text-[length:calc(11.5px*var(--m-scale))] font-semibold uppercase tracking-[0.18em] text-[var(--m-bg)] transition hover:opacity-85"
+                >
+                  {needsChoice ? "Choose options" : s.buttonLabel || "Add to bag"}
+                </button>
+              </div>
+            ) : (
+              <p className="m-muted mt-6 text-[length:calc(12px*var(--m-scale))] uppercase tracking-[0.16em]">Sold out</p>
+            )}
+            {s.linkLabel && (
+              <MLink to={to} className="mt-4 inline-flex min-h-0 items-center gap-1.5 border-b border-current pb-0.5 text-[length:calc(11.5px*var(--m-scale))] font-semibold uppercase tracking-[0.14em]">
+                {s.linkLabel} <ArrowRight className="h-3.5 w-3.5" />
+              </MLink>
+            )}
+            {review && (
+              <figure className="m-line mt-8 border-t pt-5">
+                <blockquote className="text-[length:calc(13.5px*var(--m-scale))] leading-relaxed">&ldquo;{review.comment}&rdquo;</blockquote>
+                <figcaption className="mt-2 text-[length:calc(10.5px*var(--m-scale))] font-semibold uppercase tracking-[0.16em]">{review.customerName}</figcaption>
+              </figure>
+            )}
+          </div>
+        </Container>
+      </section>
+    );
+  }
   return (
     <section className="py-[clamp(40px,6vw,96px)]">
       <div className="grid md:grid-cols-[1.15fr_1fr]">
@@ -2783,9 +3007,90 @@ function Steps({ s }: { s: Record<string, string> }) {
 
 /** Common questions that open to show the answer. */
 function Faq({ s }: { s: Record<string, string> }) {
+  const { store } = useSite();
   const items = [1, 2, 3, 4, 5].map((n) => ({ q: s[`q${n}`], a: s[`a${n}`] })).filter((x) => x.q);
   const [open, setOpen] = React.useState(0);
   if (!items.length) return null;
+  if (s.style === "cards") {
+    // numbered question cards beside a help card in the accent colour (E01)
+    const wa = whatsappLink(store.contactPhone, `Hi ${store.name}! I have a question.`);
+    const help = (s.helpTitle || s.helpButton) && (
+                <div
+                  className="t-faq-help relative overflow-hidden rounded-[clamp(18px,2vw,24px)] p-[clamp(20px,2.4vw,30px)] text-[var(--m-accent-text)]"
+                  style={{ background: "linear-gradient(150deg, var(--m-accent), color-mix(in srgb, var(--m-accent) 58%, #ffffff))" }}
+                >
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20">
+                    <MessageCircle className="h-5 w-5" />
+                  </span>
+                  {s.helpTitle && <p className="m-h mt-4 text-[length:calc(clamp(18px,1.6vw,22px)*var(--m-scale))]">{s.helpTitle}</p>}
+                  {s.helpText && <p className="mt-1.5 text-[length:calc(13.5px*var(--m-scale))] leading-relaxed opacity-85">{s.helpText}</p>}
+                  {s.helpButton && (
+                    wa ? (
+                      <a href={wa} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-[var(--m-accent-text)] px-5 text-[length:calc(13px*var(--m-scale))] font-semibold text-[var(--m-accent)] transition-[gap] hover:gap-3">
+                        {s.helpButton} <ArrowRight className="h-4 w-4" />
+                      </a>
+                    ) : (
+                      <MLink to="/pages/contact" className="mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-[var(--m-accent-text)] px-5 text-[length:calc(13px*var(--m-scale))] font-semibold text-[var(--m-accent)] transition-[gap] hover:gap-3">
+                        {s.helpButton} <ArrowRight className="h-4 w-4" />
+                      </MLink>
+                    )
+                  )}
+                </div>
+    );
+    return (
+      <section className="py-[clamp(40px,6vw,96px)]">
+        <Container>
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)] lg:gap-12">
+            <div className="flex min-w-0 flex-col gap-6">
+              <div>
+                <h2 className="m-h t-title">
+                  <Lines text={s.heading} />
+                </h2>
+                {s.text && <p className="m-muted mt-3 max-w-sm text-[length:calc(14px*var(--m-scale))] leading-relaxed">{s.text}</p>}
+              </div>
+              {help && <div className="hidden lg:mt-auto lg:block">{help}</div>}
+            </div>
+            <div className="t-faq-list grid min-w-0 content-start gap-2.5">
+              {items.map((x, i) => {
+                const on = open === i;
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      "rounded-[18px] border transition-colors duration-300",
+                      on ? "border-[var(--m-accent)] bg-[var(--m-bg)] shadow-[0_18px_40px_-28px_color-mix(in_srgb,var(--m-accent)_70%,transparent)]" : "border-transparent bg-[var(--m-panel)]"
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setOpen(on ? -1 : i)}
+                      aria-expanded={on}
+                      className="flex w-full min-h-0 items-center gap-3.5 p-4 text-left sm:gap-4 sm:p-5"
+                    >
+                      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[length:calc(12px*var(--m-scale))] font-semibold tabular-nums transition-colors", on ? "bg-[var(--m-accent)] text-[var(--m-accent-text)]" : "bg-[var(--m-bg)] text-[var(--m-accent)]")}>
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span className="min-w-0 flex-1 text-[length:calc(clamp(14.5px,1.2vw,16px)*var(--m-scale))] font-semibold leading-snug">{x.q}</span>
+                      <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-300", on ? "rotate-45 bg-[var(--m-accent)] text-[var(--m-accent-text)]" : "bg-[var(--m-bg)]")}>
+                        <Plus className="h-4 w-4" />
+                      </span>
+                    </button>
+                    <div className={cn("grid transition-[grid-template-rows] duration-300", on ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
+                      <p className="m-muted overflow-hidden text-[length:calc(14px*var(--m-scale))] leading-relaxed">
+                        <span className="block px-4 pb-5 pl-[calc(1rem+2.25rem+0.875rem)] sm:px-5 sm:pl-[calc(1.25rem+2.25rem+1rem)]">{x.a}</span>
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+              {/* phones: the help card comes after the questions */}
+              {help && <div className="mt-3 lg:hidden">{help}</div>}
+            </div>
+          </div>
+        </Container>
+      </section>
+    );
+  }
   return (
     <section className="py-[clamp(40px,6vw,96px)]">
       <Container>
@@ -3208,6 +3513,7 @@ function TagCloud({ s }: { s: Record<string, string> }) {
 
 /** Three colour cards with a benefit each, mixed with four photos in a grid. */
 function BentoBenefits({ s }: { s: Record<string, string> }) {
+  const o = useSite().content.options;
   const card = (n: number, bg: string, fg: string, className?: string) =>
     s[`b${n}Title`] ? (
       <div className={cn("m-card flex flex-col items-center justify-center p-6 text-center", className)} style={{ background: bg, color: fg }}>
@@ -3232,12 +3538,12 @@ function BentoBenefits({ s }: { s: Record<string, string> }) {
           </h2>
         </div>
         <div className="m-stagger grid auto-rows-[minmax(170px,auto)] grid-cols-2 gap-2.5 sm:gap-3.5 md:grid-cols-3 md:auto-rows-[minmax(190px,auto)]">
-          {card(1, "#6B2E1F", "#FFF1E6")}
-          {card(2, "#F4A21C", "#3B1A12")}
+          {card(1, o.bento1Bg || "#6B2E1F", o.bento1Text || "#FFF1E6")}
+          {card(2, o.bento2Bg || "#F4A21C", o.bento2Text || "#3B1A12")}
           {photo(1, "row-span-2")}
           {photo(2, "row-span-2")}
           {photo(3)}
-          {card(3, "#EF6F7C", "#FFFFFF")}
+          {card(3, o.bento3Bg || "#EF6F7C", o.bento3Text || "#FFFFFF")}
           {photo(4, "col-span-2 md:col-span-1")}
         </div>
       </Container>
@@ -3250,16 +3556,27 @@ function CategoryStrip({ s }: { s: Record<string, string> }) {
   const { store } = useSite();
   const cats = activeCategories(store).filter((c) => !c.parentId);
   if (!cats.length) return null;
+  const center = s.align === "center";
   return (
     <section className="py-[clamp(36px,5vw,80px)]">
       <Container>
-        <div className="mb-6 grid gap-3 md:grid-cols-2 md:items-end">
-          <h2 className="m-h t-title">
-            <Lines text={s.heading} />
-          </h2>
-          {s.text && <p className="m-muted max-w-sm text-[length:calc(13px*var(--m-scale))] leading-relaxed md:justify-self-end">{s.text}</p>}
-        </div>
-        <div className="m-stagger m-scroll -mx-[var(--g)] flex gap-2.5 overflow-x-auto px-[var(--g)] scroll-px-[var(--g)] snap-x">
+        {center ? (
+          <div className="mx-auto mb-8 max-w-xl text-center">
+            <h2 className="m-h t-title">
+              <Lines text={s.heading} />
+            </h2>
+            {s.text && <p className="m-muted mx-auto mt-3 max-w-md text-[length:calc(13.5px*var(--m-scale))] leading-relaxed">{s.text}</p>}
+          </div>
+        ) : (
+          <div className="mb-6 grid gap-3 md:grid-cols-2 md:items-end">
+            <h2 className="m-h t-title">
+              <Lines text={s.heading} />
+            </h2>
+            {s.text && <p className="m-muted max-w-sm text-[length:calc(13px*var(--m-scale))] leading-relaxed md:justify-self-end">{s.text}</p>}
+          </div>
+        )}
+        {/* "safe center": centred while the tiles fit, from the start once they need scrolling */}
+        <div className="m-stagger m-scroll -mx-[var(--g)] flex gap-2.5 overflow-x-auto px-[var(--g)] scroll-px-[var(--g)] snap-x" style={center ? { justifyContent: "safe center" } : undefined}>
           {cats.map((c) => (
             <MLink key={c.id} to={`/category/${c.slug}`} className="group flex w-[clamp(120px,11vw,160px)] shrink-0 snap-start flex-col rounded-[var(--m-card)] bg-[var(--m-panel)] p-2.5 transition hover:-translate-y-1">
               <span className="relative aspect-square overflow-hidden rounded-[calc(var(--m-card)-6px)]">
@@ -3493,6 +3810,33 @@ function CollectionSlider({ s }: { s: Record<string, string> }) {
   // a category that has gone falls back to the best sellers, so the section never sits empty
   const products = from.length ? from : productsFromSource(store, "bestsellers", 10);
   if (!products.length) return null;
+  if (s.align === "center") {
+    return (
+      <section className="py-[clamp(36px,5vw,80px)]">
+        <Container>
+          <div className="mx-auto mb-8 max-w-xl text-center">
+            <h2 className="m-h t-title text-[var(--m-accent)]">
+              <Lines text={s.heading} />
+            </h2>
+            {s.text && <p className="m-muted mx-auto mt-3 max-w-md text-[length:calc(13.5px*var(--m-scale))] leading-relaxed">{s.text}</p>}
+          </div>
+          <div className="m-stagger m-scroll -mx-[var(--g)] flex snap-x snap-mandatory gap-3 overflow-x-auto px-[var(--g)] scroll-px-[var(--g)] md:mx-0 md:px-0 md:scroll-px-0 sm:gap-4" style={{ justifyContent: "safe center" }}>
+            {products.map((p) => (
+              <ProductCard key={p.id} product={p} className="w-[62%] shrink-0 snap-start sm:w-[calc((100%-1rem)/2.4)] lg:w-[calc((100%-3rem)/4)]" />
+            ))}
+          </div>
+          {s.buttonLabel && (
+            <div className="mt-8 flex justify-center">
+              <MLink to={s.buttonLink || "/catalog"} className="m-btn min-h-11 px-8">
+                {s.buttonLabel}
+                <ArrowRight className="h-4 w-4" />
+              </MLink>
+            </div>
+          )}
+        </Container>
+      </section>
+    );
+  }
   return (
     <section className="py-[clamp(36px,5vw,80px)]">
       <Container className="grid gap-6 md:grid-cols-[1fr_2.3fr] md:gap-10">
@@ -3927,6 +4271,75 @@ function CountdownDeals({ s }: { s: Record<string, string> }) {
   const left = useCountdown(s.endsAt);
   if (!products.length) return null;
   const two = (v: number) => String(v).padStart(2, "0");
+  if (s.style === "board") {
+    // the biggest saving is the deal of the day; the clock is the star
+    const best = [...products].sort((a, b) => discountPercent(b) - discountPercent(a))[0];
+    const off = discountPercent(best);
+    const tiles = [
+      { v: left ? two(left.h + left.d * 24) : "--", l: "hrs" },
+      { v: left ? two(left.m) : "--", l: "min" },
+      { v: left ? two(left.s) : "--", l: "sec" },
+    ];
+    return (
+      <section className="py-[clamp(28px,4vw,64px)]">
+        <Container>
+          <div className="t-deal relative grid overflow-hidden rounded-[clamp(20px,2.4vw,32px)] bg-[#111111] text-white md:grid-cols-[1.1fr_1fr]">
+            <div className="relative z-[1] flex flex-col justify-center gap-6 p-[clamp(22px,4vw,56px)]">
+              {s.label && (
+                <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[var(--mark,#d4f56a)] px-3 py-1.5 text-[length:calc(11px*var(--m-scale))] font-bold uppercase tracking-[0.12em] text-[#111111]">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#111111]" />
+                  {s.label}
+                </span>
+              )}
+              <h2 className="m-h t-section">
+                <Lines text={s.heading} />
+              </h2>
+              <div className="flex items-end gap-2" aria-label="Time left" aria-live="off">
+                {tiles.map((t, n) => (
+                  <React.Fragment key={t.l}>
+                    {n > 0 && <span className="pb-6 text-[length:calc(28px*var(--m-scale))] font-bold text-white/30">:</span>}
+                    <span className="flex flex-col items-center">
+                      <span className="t-deal-tile m-h flex h-[clamp(64px,8vw,96px)] w-[clamp(60px,7.4vw,92px)] items-center justify-center rounded-[14px] bg-white/[0.08] text-[length:calc(clamp(32px,4vw,52px)*var(--m-scale))] tabular-nums text-[var(--mark,#d4f56a)] ring-1 ring-white/10">
+                        {t.v}
+                      </span>
+                      <span className="mt-1.5 text-[length:calc(10.5px*var(--m-scale))] uppercase tracking-[0.14em] text-white/50">{t.l}</span>
+                    </span>
+                  </React.Fragment>
+                ))}
+              </div>
+              {s.moreLabel && (
+                <MLink to="/catalog?sale=1" className="inline-flex w-fit items-center gap-1.5 border-b border-white/50 pb-0.5 text-[length:calc(13px*var(--m-scale))] font-semibold">
+                  {s.moreLabel} <ArrowRight className="h-4 w-4" />
+                </MLink>
+              )}
+            </div>
+            <MLink to={`/products/${best.slug || best.id}`} className="group relative block min-h-[clamp(300px,34vw,480px)] bg-white/[0.04]">
+              {best.images?.[0] && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={best.images[0]} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
+              )}
+              {off > 0 && (
+                <span className="t-deal-off absolute right-4 top-4 flex h-[clamp(72px,8vw,96px)] w-[clamp(72px,8vw,96px)] rotate-[12deg] flex-col items-center justify-center rounded-full bg-[var(--mark,#d4f56a)] text-[#111111] shadow-lg">
+                  <span className="m-h text-[length:calc(clamp(22px,2.4vw,30px)*var(--m-scale))] leading-none">{off}%</span>
+                  <span className="text-[length:calc(10px*var(--m-scale))] font-bold uppercase tracking-[0.1em]">off</span>
+                </span>
+              )}
+              <span className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-3 rounded-[14px] bg-white p-3 pl-4 text-[#111111]">
+                <span className="min-w-0">
+                  <span className="block truncate text-[length:calc(14px*var(--m-scale))] font-semibold">{best.title}</span>
+                  <span className="text-[length:calc(13px*var(--m-scale))]">
+                    {rupees(best.price)}
+                    {off > 0 && best.compareAtPrice && <s className="ml-2 opacity-50">{rupees(best.compareAtPrice)}</s>}
+                  </span>
+                </span>
+                {s.buttonLabel && <span className="shrink-0 rounded-full bg-[#111111] px-4 py-2.5 text-[length:calc(12.5px*var(--m-scale))] font-semibold text-white">{s.buttonLabel}</span>}
+              </span>
+            </MLink>
+          </div>
+        </Container>
+      </section>
+    );
+  }
   return (
     <section className="py-[clamp(36px,5vw,80px)]">
       <Container>
@@ -3976,7 +4389,7 @@ function SpotlightCards({ s }: { s: Record<string, string> }) {
 
 /** The shop's reviews one at a time on a dark band, with a photo beside them; a quote shows until there are reviews. */
 function ReviewSpotlight({ s }: { s: Record<string, string> }) {
-  const { store } = useSite();
+  const { store, editing } = useSite();
   const list = canUseReviews(store.planId) ? (store.reviews || []).filter((r) => r.status === "approved" && r.comment) : [];
   const items = list.length
     ? list.slice(0, 6).map((r) => ({ text: r.comment!, name: r.customerName, rating: r.rating, product: store.products.find((p) => p.id === r.productId) }))
@@ -3984,44 +4397,118 @@ function ReviewSpotlight({ s }: { s: Record<string, string> }) {
       ? [{ text: s.text, name: s.name, rating: 5, product: undefined }]
       : [];
   const [at, setAt] = React.useState(0);
+  // the reviews move on by themselves, and wait while the buyer points at or uses the card
+  const [paused, setPaused] = React.useState(false);
+  const count = items.length;
+  React.useEffect(() => {
+    if (count < 2 || paused || editing) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const id = window.setInterval(() => setAt((i) => (i + 1) % count), 5500);
+    return () => window.clearInterval(id);
+  }, [count, paused, editing, at]);
   if (!items.length) return null;
   const cur = items[at % items.length];
   const photo = cur.product?.images?.[0] || s.image;
-  return (
-    <section className="py-[clamp(24px,4vw,56px)]">
-      <Container>
-        <div className="grid items-center gap-6 overflow-hidden rounded-[clamp(16px,1.8vw,26px)] bg-[#1d1f24] p-[clamp(22px,4vw,56px)] text-white md:grid-cols-[1.6fr_1fr]">
-          <div>
-            {s.label && <p className="text-[length:calc(11px*var(--m-scale))] font-semibold uppercase tracking-[0.12em] text-white/60">{s.label}</p>}
-            <span aria-hidden className="mt-3 block text-[44px] leading-none text-white/30">“</span>
-            <p key={at} className="m-page m-h -mt-3 text-[length:calc(clamp(18px,2vw,26px)*var(--m-scale))] leading-snug">
-              {cur.text}
-            </p>
-            <div className="mt-6 flex items-center gap-3 text-[length:calc(13px*var(--m-scale))]">
-              <Stars value={cur.rating} className="text-[#F5C451] [&_svg]:h-3.5 [&_svg]:w-3.5" />
-              <span className="font-semibold">{cur.name}</span>
-              {cur.product && <span className="truncate text-white/55">· {cur.product.title}</span>}
+  const two = (n: number) => String(n).padStart(2, "0");
+  if (s.style === "boutique") {
+    // quiet and centred: gold stars, the words, the name in small capitals, the piece as a small round photo
+    const step = (d: number) => setAt((i) => (i + d + items.length) % items.length);
+    return (
+      <section className="t-review-boutique py-[clamp(48px,7vw,110px)]">
+        <Container className="max-w-3xl text-center" >
+          <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
+            {s.label && <p className="text-[length:calc(10.5px*var(--m-scale))] font-semibold uppercase tracking-[0.24em] text-[var(--gold,var(--m-accent))]">{s.label}</p>}
+            <Stars value={cur.rating} className="mt-4 justify-center text-[var(--gold,#B08D57)] [&_svg]:h-3.5 [&_svg]:w-3.5" />
+            <blockquote key={at} className="m-page mx-auto mt-5 max-w-2xl text-balance text-[length:calc(clamp(19px,2.2vw,28px)*var(--m-scale))] font-normal leading-[1.4]">
+              &ldquo;{cur.text}&rdquo;
+            </blockquote>
+            <div className="mt-7 flex items-center justify-center gap-3">
+              {photo && (
+                <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full ring-1 ring-[color-mix(in_srgb,var(--gold,#B08D57)_60%,transparent)] ring-offset-2 ring-offset-[var(--m-bg)]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img key={photo} src={photo} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                </span>
+              )}
+              <span className="min-w-0 text-left">
+                <span className="block text-[length:calc(12px*var(--m-scale))] font-semibold uppercase tracking-[0.14em]">{cur.name}</span>
+                {cur.product && <span className="m-muted block truncate text-[length:calc(12px*var(--m-scale))]">{cur.product.title}</span>}
+              </span>
             </div>
             {items.length > 1 && (
-              <div className="mt-6 flex gap-2">
-                {[-1, 1].map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => setAt((i) => (i + d + items.length) % items.length)}
-                    aria-label={d < 0 ? "Previous review" : "Next review"}
-                    className="flex h-9 min-h-0 w-9 items-center justify-center rounded-full border border-white/30 transition hover:bg-white hover:text-[#1d1f24]"
-                  >
-                    <ChevronRight className={cn("h-4 w-4", d < 0 && "rotate-180")} />
-                  </button>
-                ))}
+              <div className="mt-8 flex items-center justify-center gap-4">
+                <button type="button" onClick={() => step(-1)} aria-label="Previous review" className="flex h-9 min-h-0 w-9 items-center justify-center transition hover:opacity-60">
+                  <ChevronRight className="h-4 w-4 rotate-180" strokeWidth={1.5} />
+                </button>
+                <span className="relative block h-px w-24 bg-[color-mix(in_srgb,var(--m-text)_14%,transparent)]" aria-hidden>
+                  <span className="absolute inset-y-0 left-0 bg-[var(--gold,var(--m-accent))] transition-[width] duration-500" style={{ width: `${(((at % items.length) + 1) / items.length) * 100}%` }} />
+                </span>
+                <span className="text-[length:calc(11px*var(--m-scale))] tabular-nums tracking-[0.12em]">
+                  {two((at % items.length) + 1)} / {two(items.length)}
+                </span>
+                <button type="button" onClick={() => step(1)} aria-label="Next review" className="flex h-9 min-h-0 w-9 items-center justify-center transition hover:opacity-60">
+                  <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
+                </button>
               </div>
             )}
           </div>
+        </Container>
+      </section>
+    );
+  }
+  return (
+    <section className="py-[clamp(32px,5vw,72px)]">
+      <Container>
+        <div
+          className="relative grid overflow-hidden rounded-[clamp(18px,2vw,28px)] bg-[#141518] text-white md:grid-cols-[1.35fr_1fr]"
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+          onFocus={() => setPaused(true)}
+          onBlur={() => setPaused(false)}
+        >
+          {/* a thin bar along the top fills up until the next review */}
+          {items.length > 1 && !editing && (
+            <span aria-hidden className="absolute inset-x-0 top-0 z-10 h-[3px] bg-white/10">
+              <span key={at} className="t-review-progress block h-full bg-white/70" style={{ animationPlayState: paused ? "paused" : "running" }} />
+            </span>
+          )}
+          <div className="flex min-w-0 flex-col p-[clamp(24px,4.2vw,64px)]">
+            {s.label && <p className="text-[length:calc(11px*var(--m-scale))] font-semibold uppercase tracking-[0.14em] text-white/55">{s.label}</p>}
+            <Stars value={cur.rating} className="mt-5 text-[#F5C451] [&_svg]:h-4 [&_svg]:w-4" />
+            <blockquote key={at} className="m-page m-h mb-8 mt-4 text-balance text-[length:calc(clamp(20px,2.3vw,32px)*var(--m-scale))] leading-[1.28]">
+              &ldquo;{cur.text}&rdquo;
+            </blockquote>
+            <div className="mt-auto flex items-center gap-3 border-t border-white/10 pt-6">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-[length:calc(15px*var(--m-scale))] font-semibold">
+                {(cur.name || "?").charAt(0).toUpperCase()}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block whitespace-nowrap text-[length:calc(14px*var(--m-scale))] font-semibold">{cur.name}</span>
+                {cur.product && <span className="block truncate text-[length:calc(12px*var(--m-scale))] text-white/55">{cur.product.title}</span>}
+              </span>
+              {items.length > 1 && (
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className="mr-1 hidden text-[length:calc(12px*var(--m-scale))] tabular-nums text-white/55 sm:inline">
+                    {two((at % items.length) + 1)} / {two(items.length)}
+                  </span>
+                  {[-1, 1].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setAt((i) => (i + d + items.length) % items.length)}
+                      aria-label={d < 0 ? "Previous review" : "Next review"}
+                      className="flex h-10 min-h-0 w-10 items-center justify-center rounded-full border border-white/25 transition hover:bg-white hover:text-[#141518]"
+                    >
+                      <ChevronRight className={cn("h-4 w-4", d < 0 && "rotate-180")} />
+                    </button>
+                  ))}
+                </span>
+              )}
+            </div>
+          </div>
           {photo && (
-            <div className="relative mx-auto aspect-square w-full max-w-[280px] overflow-hidden rounded-2xl bg-white/5">
+            <div className="relative order-first aspect-[4/3] md:order-none md:aspect-auto md:min-h-[clamp(360px,34vw,500px)]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photo} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+              <img key={photo} src={photo} alt="" loading="lazy" className="m-page absolute inset-0 h-full w-full object-cover" />
             </div>
           )}
         </div>
@@ -4056,6 +4543,7 @@ function MenuBoard({ s }: { s: Record<string, string> }) {
               role="tab"
               aria-selected={c.id === current.id}
               onClick={() => setTab(c.slug)}
+              aria-pressed={c.id === current.id}
               className={cn(
                 "h-10 min-h-0 shrink-0 rounded-full border-2 px-5 text-[length:calc(13px*var(--m-scale))] font-semibold transition-colors",
                 c.id === current.id ? "border-[var(--m-panel)] bg-[var(--m-panel)] text-white" : "border-[color-mix(in_srgb,var(--m-text)_20%,transparent)] hover:border-[var(--m-panel)]"
@@ -4215,11 +4703,14 @@ function ComboBuilder({ s }: { s: Record<string, string> }) {
 
 /** A heading on the left, one product photo in the middle and a word on the right. */
 function Stage({ s }: { s: Record<string, string> }) {
+  // a theme can set the heading and word colour (E01); otherwise the original gold
+  const stageColour = useSite().content.options.stageColour;
+  const tint = stageColour ? { color: stageColour } : undefined;
   return (
     <section className="overflow-hidden py-[clamp(48px,7vw,120px)]">
       <Container className="grid items-center gap-6 md:grid-cols-[1fr_1.4fr_1fr]">
         <div>
-          <h2 className="m-h t-title text-[#D9B26F]">
+          <h2 className="m-h t-title text-[#D9B26F]" style={tint}>
             <Lines text={s.heading} />
           </h2>
           {s.buttonLabel && (
@@ -4232,7 +4723,7 @@ function Stage({ s }: { s: Record<string, string> }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={s.image} alt="" loading="lazy" className="m-float t-soft mx-auto aspect-square w-full max-w-[460px] object-cover" />
         )}
-        {s.word && <p className="m-h text-center text-[length:calc(clamp(30px,3.6vw,52px)*var(--m-scale))] italic text-[#D9B26F] md:self-end md:text-right">{s.word}</p>}
+        {s.word && <p className="m-h text-center text-[length:calc(clamp(30px,3.6vw,52px)*var(--m-scale))] italic text-[#D9B26F] md:self-end md:text-right" style={tint}>{s.word}</p>}
       </Container>
     </section>
   );
@@ -5125,7 +5616,8 @@ function OfferBand({ s }: { s: Record<string, string> }) {
 
 /** Theme 31: price ranges as pills; the products in the chosen range show under them. */
 function BudgetPicker({ s }: { s: Record<string, string> }) {
-  const { store } = useSite();
+  const { store, addToBag, href } = useSite();
+  const router = useRouter();
   const ranges = labelledLines(s.ranges).map((r) => {
     const [from, to] = r.value.split("-").map((x) => x.replace(/[^0-9]/g, ""));
     return { label: r.label, min: Number(from || 0) * 100, max: to ? Number(to) * 100 : Infinity };
@@ -5137,6 +5629,168 @@ function BudgetPicker({ s }: { s: Record<string, string> }) {
     .filter((p) => p.price >= r.min && p.price <= r.max)
     .sort((a, b) => a.price - b.price)
     .slice(0, 4);
+  const countIn = (x: { min: number; max: number }) => visibleProducts(store).filter((p) => p.price >= x.min && p.price <= x.max).length;
+  if (s.style === "boutique") {
+    // a quiet band: a centred heading, the ranges as text tabs between small diamonds, the theme's own cards under them
+    return (
+      <section className="t-budget-boutique bg-[var(--m-panel)] py-[clamp(40px,6vw,96px)]">
+        <Container>
+          <div className="text-center">
+            {s.heading && (
+              <h2 className="m-h t-section">
+                <Lines text={s.heading} />
+              </h2>
+            )}
+            {s.text && <p className="m-muted mx-auto mt-2 max-w-md text-[length:calc(13.5px*var(--m-scale))]">{s.text}</p>}
+          </div>
+          {/* three small gift cards, each with a piece from its range; the picked one is framed in gold */}
+          <div className="mx-auto mt-7 grid max-w-2xl gap-2.5 sm:gap-4" style={{ gridTemplateColumns: `repeat(${ranges.length}, minmax(0, 1fr))` }} role="tablist">
+            {ranges.map((x, i) => {
+              const on = i === pick;
+              const face = visibleProducts(store)
+                .filter((p) => p.price >= x.min && p.price <= x.max && p.images?.[0])
+                .sort((a, b) => a.price - b.price)[0];
+              return (
+                <button
+                  key={x.label}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => setPick(i)}
+                  className={cn(
+                    "group relative flex min-h-0 min-w-0 flex-col bg-[var(--m-bg)] p-1.5 text-center transition-shadow duration-300 sm:p-2",
+                    on ? "shadow-[inset_0_0_0_1.5px_var(--gold,var(--m-accent))]" : "shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--m-text)_10%,transparent)] hover:shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--gold,var(--m-accent))_60%,transparent)]"
+                  )}
+                >
+                  <span className="m-panel relative block aspect-square overflow-hidden">
+                    {face && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={face.images![0]} alt="" loading="lazy" className={cn("absolute inset-0 h-full w-full object-cover transition duration-700", on ? "scale-105" : "opacity-80 group-hover:opacity-100")} />
+                    )}
+                  </span>
+                  <span className="block px-0.5 pb-1.5 pt-2.5 text-[length:calc(11px*var(--m-scale))] font-semibold uppercase leading-snug tracking-[0.08em]">{x.label}</span>
+                  <span className="m-faint pb-1 text-[length:calc(10.5px*var(--m-scale))]">
+                    {countIn(x)} {countIn(x) === 1 ? "piece" : "pieces"}
+                  </span>
+                  {on && <span aria-hidden className="absolute -top-[5px] left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-[var(--gold,var(--m-accent))]" />}
+                </button>
+              );
+            })}
+          </div>
+          <div key={pick} className="m-page mt-[clamp(20px,3vw,36px)]">
+            {products.length ? (
+              <div className="m-stagger mx-auto grid max-w-5xl grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-5 lg:grid-cols-4">
+                {products.map((p) => (
+                  <ProductCard key={p.id} product={p} />
+                ))}
+              </div>
+            ) : (
+              <p className="m-muted py-8 text-center text-[length:calc(13px*var(--m-scale))]">Nothing in this range right now. Try another one.</p>
+            )}
+          </div>
+          {s.buttonLabel && (
+            <div className="mt-8 text-center">
+              <MLink
+                to="/catalog"
+                className="inline-flex h-11 items-center gap-2 border border-[var(--gold,var(--m-accent))] px-6 text-[length:calc(11.5px*var(--m-scale))] font-semibold uppercase tracking-[0.16em] transition hover:bg-[var(--m-text)] hover:text-[var(--m-bg)]"
+              >
+                {s.buttonLabel} <ArrowRight className="h-3.5 w-3.5" />
+              </MLink>
+            </div>
+          )}
+        </Container>
+      </section>
+    );
+  }
+  if (s.style === "panel") {
+    // a coloured panel: big range tiles on the left, compact product rows with the price and an add button on the right
+    return (
+      <section className="py-[clamp(36px,5vw,80px)]">
+        <Container>
+          <div className="t-budget grid grid-cols-1 gap-6 rounded-[clamp(20px,2.4vw,32px)] bg-[var(--m-accent)] p-[clamp(18px,3.6vw,48px)] text-[var(--m-accent-text)] lg:grid-cols-[1fr_1.35fr] lg:gap-10">
+            <div className="flex min-w-0 flex-col">
+              {s.heading && (
+                <h2 className="m-h t-section">
+                  <Lines text={s.heading} />
+                </h2>
+              )}
+              {s.text && <p className="mt-2 text-[length:calc(13.5px*var(--m-scale))] opacity-80">{s.text}</p>}
+              <div className="mt-6 grid grid-cols-2 gap-2" role="tablist">
+                {ranges.map((x, i) => (
+                  <button
+                    key={x.label}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === pick}
+                    onClick={() => setPick(i)}
+                    className={cn(
+                      "min-h-0 min-w-0 rounded-[14px] p-3 text-left transition-colors sm:p-3.5",
+                      i === pick ? "bg-[var(--m-accent-text)] text-[var(--m-accent)]" : "bg-white/10 hover:bg-white/20"
+                    )}
+                  >
+                    <span className="m-h block break-words text-[length:calc(clamp(13.5px,1.3vw,17px)*var(--m-scale))] leading-tight">{x.label}</span>
+                    <span className="mt-1 block text-[length:calc(11.5px*var(--m-scale))] opacity-70">
+                      {countIn(x)} {countIn(x) === 1 ? "product" : "products"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {s.buttonLabel && (
+                <MLink to="/catalog" className="mt-auto hidden items-center gap-1.5 self-start pt-6 text-[length:calc(13px*var(--m-scale))] font-semibold underline underline-offset-4 lg:inline-flex">
+                  {s.buttonLabel}
+                </MLink>
+              )}
+            </div>
+            <div key={pick} className="m-page grid min-w-0 content-center gap-2.5">
+              {products.length ? (
+                products.map((p) => {
+                  const to = `/products/${p.slug || p.id}`;
+                  const needsChoice = (p.options || []).some((o) => o.options?.length);
+                  return (
+                    <div key={p.id} className="flex min-w-0 items-center gap-3 rounded-[16px] bg-[var(--m-bg)] p-2.5 pr-3 text-[var(--m-text)]">
+                      <MLink to={to} className="m-panel relative h-16 w-16 shrink-0 overflow-hidden rounded-[12px]" aria-label={p.title}>
+                        {p.images?.[0] && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.images[0]} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                        )}
+                      </MLink>
+                      <MLink to={to} className="min-w-0 flex-1">
+                        <span className="line-clamp-2 block text-[length:calc(13.5px*var(--m-scale))] font-semibold leading-snug sm:line-clamp-1">{p.title}</span>
+                        <span className="m-muted hidden truncate text-[length:calc(12px*var(--m-scale))] sm:block">{p.description}</span>
+                      </MLink>
+                      <span className="m-h shrink-0 text-[length:calc(clamp(15px,1.4vw,19px)*var(--m-scale))] tabular-nums">{rupees(p.price)}</span>
+                      {p.stock > 0 && (
+                        <button
+                          type="button"
+                          aria-label={needsChoice ? `Choose options for ${p.title}` : `Add ${p.title} to bag`}
+                          onClick={() => (needsChoice ? router.push(href(to)) : addToBag(p))}
+                          className="flex h-9 min-h-0 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--m-accent)] text-[var(--m-accent-text)] transition hover:opacity-85"
+                        >
+                          <Plus className="h-4 w-4" strokeWidth={2.4} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="rounded-[16px] bg-white/10 p-6 text-center text-[length:calc(13px*var(--m-scale))]">Nothing in this range right now. Try another one.</p>
+              )}
+              {products.length > 0 && products.length < 4 && (
+                <MLink to="/catalog" className="flex min-h-[64px] items-center justify-center gap-1.5 rounded-[16px] border border-dashed border-white/40 text-[length:calc(13px*var(--m-scale))] font-semibold transition-colors hover:bg-white/10">
+                  Browse all products <ArrowRight className="h-4 w-4" />
+                </MLink>
+              )}
+              {s.buttonLabel && (
+                <MLink to="/catalog" className="mt-2 inline-flex items-center gap-1.5 justify-self-start text-[length:calc(13px*var(--m-scale))] font-semibold underline underline-offset-4 lg:hidden">
+                  {s.buttonLabel}
+                </MLink>
+              )}
+            </div>
+          </div>
+        </Container>
+      </section>
+    );
+  }
   return (
     <section className="py-[clamp(36px,5vw,80px)]">
       <Container>
@@ -5192,7 +5846,7 @@ function SizeFinder({ s }: { s: Record<string, string> }) {
   const [pick, setPick] = React.useState(start);
   if (!sizes.length) return null;
   const cur = sizes[Math.min(pick, sizes.length - 1)];
-  const names = ["Bust", "Waist", "Hip"];
+  const names = (s.measureNames || "Bust / Waist / Hip").split("/").map((x) => x.trim()).filter(Boolean);
   return (
     <section className="m-panel py-[clamp(44px,6vw,96px)]">
       <Container className="grid items-center gap-8 md:grid-cols-[1fr_1.2fr] md:gap-14">
@@ -5227,13 +5881,13 @@ function SizeFinder({ s }: { s: Record<string, string> }) {
           </div>
           <div key={pick} className="m-page mt-5 rounded-[var(--m-card)] bg-[var(--m-bg)] p-[clamp(18px,2.4vw,28px)]">
             <p className="m-muted text-[length:calc(12px*var(--m-scale))]">
-              Size <span className="font-semibold uppercase text-[var(--m-text)]">{cur.size}</span> fits, in inches
+              Size <span className="font-semibold uppercase text-[var(--m-text)]">{cur.size}</span> {s.unitNote ?? "fits, in inches"}
             </p>
             <div className="mt-3 grid grid-cols-3 gap-3">
               {names.map((n, i) => (
                 <div key={n}>
-                  <p className="m-h text-[length:calc(clamp(26px,3vw,40px)*var(--m-scale))] italic text-[var(--m-accent)]">{cur.parts[i] || "–"}″</p>
-                  <p className="m-muted mt-1 text-[length:calc(11.5px*var(--m-scale))] lowercase">{n}</p>
+                  <p className="m-h text-[length:calc(clamp(26px,3vw,40px)*var(--m-scale))] italic text-[var(--m-accent)]">{cur.parts[i] || "–"}{cur.parts[i] ? s.unitMark ?? "″" : ""}</p>
+                  <p className="m-muted mt-1 text-[length:calc(11.5px*var(--m-scale))]">{n}</p>
                 </div>
               ))}
             </div>
@@ -6113,6 +6767,28 @@ export function SectionBody({ section }: { section: SiteSection }) {
       return <PetPicker s={s} />;
     case "pastel-tiles":
       return <PastelTiles s={s} />;
+    case "glaze-picker":
+      return <GlazePicker s={s} />;
+    case "care-guide":
+      return <CareGuide s={s} />;
+    case "batch-calendar":
+      return <BatchCalendar s={s} />;
+    case "review-board":
+      return <ReviewBoard s={s} />;
+    case "word-story":
+      return <WordStory s={s} />;
+    case "scatter-gallery":
+      return <ScatterGallery s={s} />;
+    case "studio-prints":
+      return <StudioPrints s={s} />;
+    case "wood-planks":
+      return <WoodPlanks s={s} />;
+    case "table-sizer":
+      return <TableSizer s={s} />;
+    case "spec-index":
+      return <SpecIndex s={s} />;
+    case "drop-clock":
+      return <DropClock s={s} />;
   }
 }
 
@@ -6215,6 +6891,7 @@ export function SiteHome({ selectedId }: { selectedId?: string }) {
           key={section.id}
           data-editor-section={section.id}
           data-reveal={i > 0 ? "" : undefined}
+          data-type={section.type}
           data-selected={editing && selectedId === section.id}
           style={{ "--m-hs": String(headingScale(section.settings.headingSize)) } as React.CSSProperties}
           onClickCapture={
