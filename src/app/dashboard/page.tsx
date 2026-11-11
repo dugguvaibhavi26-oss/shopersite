@@ -41,6 +41,7 @@ import { SubscriptionPaymentModal } from "@/components/dashboard/subscription-pa
 import { RazorpayPaymentsCard } from "@/components/dashboard/razorpay-payments";
 import { GeneralSettings } from "@/components/dashboard/general-settings";
 import { DomainSettings } from "@/components/dashboard/domain-settings";
+import { StaffAccounts, useEnsureStoreCode } from "@/components/dashboard/staff-accounts";
 import { PluginsHub, type PluginId } from "@/components/dashboard/plugins-hub";
 import { InvoiceButton, ShiprocketShip, WhatsAppUpdates } from "@/components/dashboard/order-tools";
 import { GST_RATES } from "@/lib/invoice";
@@ -709,6 +710,7 @@ function DashboardPageContent() {
   const platformThemes = storeService.getPlatformThemes();
   const allThemes = useMemo(() => getAllThemes(), [platformThemes]);
 
+  useEnsureStoreCode(store);
   const ownerName = useMemo(() => {
     if (store?.ownerName) return store.ownerName;
     if (user?.displayName) return user.displayName;
@@ -1476,6 +1478,7 @@ function DashboardPageContent() {
     { id: "billing", label: "Plan & billing", icon: ICard, dot: planNeedsAttention },
     { id: "store", label: "Store link & logo", icon: IImage },
     { id: "domain", label: "Domain", icon: IGlobe, tag: store.planId === "pro" ? undefined : "Pro" },
+    { id: "staff", label: "Staff", icon: IProfile, tag: store.planId === "pro" ? undefined : "Pro" },
     { id: "payments", label: "Payments", icon: IRupee },
     { id: "checkout", label: "Checkout", icon: IOrders },
     { id: "accounts", label: "Customer accounts", icon: ICustomers },
@@ -1497,6 +1500,7 @@ function DashboardPageContent() {
     billing: { title: "Plan & billing", text: "Your ShoperSite plan, its limits and your past payments." },
     store: { title: "Store link & logo", text: "Your web address, logo and the message at the top of your store." },
     domain: { title: "Domain", text: "Use your own web address, like www.yourbrand.com, for your store." },
+    staff: { title: "Staff", text: "Give your team their own logins. Each role sees only its own work." },
     payments: { title: "Payments", text: "Choose how buyers can pay. Money always goes straight to you." },
     checkout: { title: "Checkout", text: "Rules for placing an order: minimum amount, cash-on-delivery limit and what buyers fill in." },
     accounts: { title: "Customer accounts", text: "Whether buyers can order as guests or must sign in first." },
@@ -5814,6 +5818,7 @@ function DashboardPageContent() {
               <GeneralSettings store={store} onChanged={refreshStore} onOpenPolicies={() => setActiveTab("policies")} />
             )}
             {settingsSection === "domain" && <DomainSettings store={store} onUpgrade={() => openSettings("billing")} />}
+            {settingsSection === "staff" && <StaffAccounts store={store} onUpgrade={() => openSettings("billing")} />}
             {settingsSection === "checkout" && <CheckoutSettings store={store} onChanged={refreshStore} />}
             {settingsSection === "accounts" && <AccountSettings store={store} onChanged={refreshStore} />}
             {settingsSection === "taxes" && <TaxSettings store={store} onChanged={refreshStore} />}
@@ -6453,7 +6458,7 @@ function DashboardPageContent() {
 }
 
 /** Settings pages that live inside the Settings tab (Policies, Plan & billing and Emails to buyers are their own tabs, shown in the same frame). */
-const SETTINGS_SECTIONS = ["general", "store", "domain", "payments", "checkout", "accounts", "delivery", "taxes", "notifications", "events", "privacy"] as const;
+const SETTINGS_SECTIONS = ["general", "store", "domain", "staff", "payments", "checkout", "accounts", "delivery", "taxes", "notifications", "events", "privacy"] as const;
 type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 /** Full-screen holding state for the dashboard (loading, or about to redirect), in the app's style. */

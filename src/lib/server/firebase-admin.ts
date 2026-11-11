@@ -1,4 +1,5 @@
 import "server-only";
+import { createHmac } from "node:crypto";
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { firebaseConfig } from "../firebase-config";
@@ -43,6 +44,21 @@ function adminApp(): App {
 
 export function adminDb(): Firestore {
   return getFirestore(adminApp());
+}
+
+/**
+ * A signing key for one purpose (e.g. staff sign-in cookies), derived from the service account's
+ * private key, so no extra secret has to be set up. Never leaves the server.
+ */
+export function serverSecret(purpose: string): Buffer {
+  return createHmac("sha256", readServiceAccount().privateKey).update(`shopersite:${purpose}`).digest();
+}
+
+/** A short-lived Google access token for the service account (for Cloud Storage uploads). */
+export async function adminAccessToken(): Promise<string> {
+  const credential = adminApp().options.credential;
+  if (!credential) throw new ApiError(503, "The server isn't set up for uploads yet.");
+  return (await credential.getAccessToken()).access_token;
 }
 
 /** The signed-in seller behind an `Authorization: Bearer <Firebase ID token>` header. */

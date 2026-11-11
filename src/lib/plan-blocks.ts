@@ -101,8 +101,8 @@ export const PLAN_BLOCKS: PlanBlock[] = [
     title: "App & team",
     rows: [
       { feature: "Your store as an Android app", free: false, growth: false, pro: true, soon: true },
-      { feature: "Staff & team accounts", free: false, growth: false, pro: true, soon: true },
-      { feature: "Role-based permissions", free: false, growth: false, pro: true, soon: true },
+      { feature: "Staff & team accounts", free: false, growth: false, pro: true },
+      { feature: "Role-based permissions", free: false, growth: false, pro: true },
     ],
   },
   {

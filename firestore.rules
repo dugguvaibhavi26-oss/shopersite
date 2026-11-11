@@ -50,7 +50,7 @@ service cloud.firestore {
     // public fields an owner may never change, plus private fields that never belong here
     function lockedPublicKeys() {
       return ['id', 'subdomain', 'ownerId', 'ownerEmail', 'planId', 'planPaidUntil', 'ownedThemes',
-              'isPaused', 'pauseMessage', 'status', 'createdAt', 'customDomain',
+              'isPaused', 'pauseMessage', 'status', 'createdAt', 'customDomain', 'storeCode',
               'orders', 'customers', 'subscribers', 'pendingSubscription', 'subscriptionHistory', 'themePurchases',
               'planBilling'];
     }

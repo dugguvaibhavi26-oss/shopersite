@@ -40,6 +40,8 @@ export const OWNER_LOCKED_KEYS = [
   "createdAt",
   // set by the server once a domain is connected (Settings → Domain)
   "customDomain",
+  // the 5-digit store ID staff sign in with (the server keeps the real list in store_codes)
+  "storeCode",
 ] as const;
 
 const PRIVATE = new Set<string>(PRIVATE_STORE_KEYS);

@@ -265,6 +265,8 @@ export interface StoreData {
   cookieBanner?: boolean;
   /** Settings → Domain (Pro): the seller's own domain, written only by the server once connected */
   customDomain?: string;
+  /** the store's 5-digit ID, which staff type to sign in; written only by the server */
+  storeCode?: string;
   upiId: string; // Direct UPI ID for customer QR payments
   codEnabled: boolean;
   codFee: number; // paise
