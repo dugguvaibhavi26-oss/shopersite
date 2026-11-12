@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { siteConfig } from "@/lib/config/site";
+import { HOME_FAQS as FAQS } from "@/lib/home-faqs";
 import { usePlatformSettings } from "@/lib/use-platform-settings";
 import { PLATFORM_PLANS, priceAfterTrial, trialLength, planDiscountPercent, calculatePlanPrice, type BillingCycle } from "@/lib/plans";
 import { PLATFORM_THEMES, getTheme, themeThumb, type ThemeDefinition } from "@/lib/themes";
@@ -69,7 +70,7 @@ const PLATFORM_TABS = [
   {
     key: "paid",
     title: "Get paid directly",
-    text: "Buyers pay with any UPI app, COD or your payment link. Money lands straight in your bank — we never hold it.",
+    text: "Cash on delivery on every plan. On Growth and Pro, buyers pay by UPI, card or net banking through your own Razorpay account, straight to your bank. We never hold the money.",
     visual: "upi",
   },
   {
@@ -92,28 +93,6 @@ const STEPS = [
   { n: "03", title: "Start selling", text: "Share your link on Instagram and WhatsApp. Orders and payments start flowing in." },
 ];
 
-const FAQS = [
-  {
-    q: `What is ${siteConfig.name} and how does it work?`,
-    a: `${siteConfig.name} is a store builder for social sellers. You claim a subdomain, add products and pick a theme. Buyers browse your store and pay you directly via UPI, COD or your own payment link.`,
-  },
-  {
-    q: "How much does it cost?",
-    a: `You can start free with up to ${PLATFORM_PLANS.free.maxProducts} products. Every theme is free. Paid plans unlock more products, the website editor, custom domains and marketing tools. We never take a commission on your sales.`,
-  },
-  {
-    q: "Do you hold or process my customers' money?",
-    a: "No. Payments go directly from your buyer to your bank account or UPI ID. We only charge a flat subscription for paid plans.",
-  },
-  {
-    q: "Can I use my own domain name?",
-    a: "Yes. Custom domains are available on the Pro plan. Every plan includes a free subdomain.",
-  },
-  {
-    q: "Do I need to be a designer or developer?",
-    a: "Not at all. Every theme is ready to go. Just add your logo, colours and products — your store looks professional from day one.",
-  },
-];
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -698,7 +677,7 @@ function FeatureCards() {
           title="Keep 100% of every sale"
           delay={120}
           from="right"
-          text="Buyers pay with GPay, PhonePe, Paytm or COD. Money goes straight to your bank — we never touch it."
+          text="Cash on delivery on every plan, and UPI, cards and net banking through your own Razorpay account on Growth and Pro. Money goes straight to your bank — we never touch it."
         >
           <UpiMockup />
         </FeatureCard>
@@ -1165,7 +1144,7 @@ function FinalCta({ onClaim }: { onClaim: (v: string) => void }) {
             </div>
           </div>
           <ul className="space-y-4 text-base">
-            {["Free forever starter plan", "0% commission on every sale", "Direct UPI to your bank", "Cancel or switch plans anytime"].map(
+            {["Free forever starter plan", "0% commission on every sale", "Payments straight to your bank", "Cancel or switch plans anytime"].map(
               (t, i) => (
                 <Reveal as="li" key={t} delay={200 + i * 110} variant="left" className="flex items-center gap-3">
                   <span className="w-7 h-7 rounded-full bg-white text-black flex items-center justify-center shrink-0">

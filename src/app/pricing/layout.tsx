@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { pageMeta } from "@/lib/seo";
+import { PlanFacts } from "@/components/seo/plan-facts";
 
 export const metadata: Metadata = pageMeta({
   title: "Pricing: Free, Growth and Pro plans",
@@ -9,5 +10,13 @@ export const metadata: Metadata = pageMeta({
 });
 
 export default function PricingLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return (
+    <>
+      {children}
+      {/* the same plans in plain text, readable without the toggle (search engines and AI assistants) */}
+      <div className="bg-white font-[Inter,sans-serif] text-neutral-950">
+        <PlanFacts />
+      </div>
+    </>
+  );
 }

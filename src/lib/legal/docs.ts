@@ -122,7 +122,7 @@ export function buildLegalDocs(C: Company): LegalDoc[] {
         id: "payments",
         title: "Payments between buyers and sellers",
         body: [
-          `Buyers pay Sellers directly: to the Seller's UPI ID, by cash on delivery, or through a payment gateway account (such as Razorpay) that the Seller opens and connects in their own name. ${B} does not collect, hold, pool, escrow or settle any money paid for a Seller's products, and is not a payment aggregator or payment system operator.`,
+          `Buyers pay Sellers directly: by cash on delivery, or through a payment gateway account (such as Razorpay) that the Seller opens and connects in their own name. ${B} does not collect, hold, pool, escrow or settle any money paid for a Seller's products, and is not a payment aggregator or payment system operator.`,
           "Chargebacks, refunds, disputes, gateway fees, settlements and the Seller's agreement with their payment gateway are matters between the Seller, the Buyer and that gateway. Our Payments Policy has more detail.",
         ],
       },
@@ -282,7 +282,7 @@ export function buildLegalDocs(C: Company): LegalDoc[] {
           "From sellers:",
           list(
             "Name, email address, phone number and sign-in details (passwords are handled by Google Firebase Authentication; we never see or store them).",
-            "Shop details: shop name, address, logo, products, policies, UPI ID, delivery settings and contact details you choose to show.",
+            "Shop details: shop name, address, logo, products, policies, delivery settings and contact details you choose to show.",
             "Plan and theme purchases, payment references (such as UPI transaction IDs) and invoices.",
             "Payment-gateway connection details you give us, such as API keys. Secret keys are stored encrypted.",
             "Messages you send us, such as help requests."
@@ -517,7 +517,7 @@ export function buildLegalDocs(C: Company): LegalDoc[] {
     group: "Sellers",
     summary: [
       `${B} never touches buyers' money. Payments go straight from the buyer to the seller.`,
-      "Sellers connect their own UPI ID or their own payment-gateway account, and complete KYC with the gateway themselves.",
+      "Sellers take cash on delivery, or connect their own payment-gateway account and complete KYC with the gateway themselves.",
       "Chargebacks, refunds and gateway fees are between the seller, the buyer and the gateway.",
       "Test-mode gateway keys only work for the shop owner, so no real buyer can place a fake paid order.",
     ],
@@ -529,7 +529,6 @@ export function buildLegalDocs(C: Company): LegalDoc[] {
         body: [
           "A Seller can offer one or more of these at checkout:",
           list(
-            "UPI to the Seller's own UPI ID. The buyer pays from their UPI app and enters the 12-digit UPI reference; the Seller confirms they received it.",
             "Online payment through a payment gateway account (such as Razorpay) opened and verified in the Seller's own name. Money settles from the gateway to the Seller's bank account.",
             "Cash on delivery, collected by the Seller or their courier."
           ),

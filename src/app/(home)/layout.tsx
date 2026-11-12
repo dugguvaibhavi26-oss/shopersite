@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/resources/blocks";
 import { organizationLd, ogImage, softwareLd, websiteLd } from "@/lib/seo";
+import { HOME_FAQS } from "@/lib/home-faqs";
 
 /** The homepage's own metadata and the site-wide structured data (Organization, WebSite, SoftwareApplication). */
 export const metadata: Metadata = {
@@ -32,6 +33,13 @@ export default function HomeLayout({ children }: { children: React.ReactNode }) 
       <JsonLd data={organizationLd()} />
       <JsonLd data={websiteLd()} />
       <JsonLd data={softwareLd()} />
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: HOME_FAQS.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
+        }}
+      />
       {children}
     </>
   );

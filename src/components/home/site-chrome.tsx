@@ -249,6 +249,7 @@ const FOOTER_COLUMNS = [
   {
     title: "Support",
     links: [
+      { label: "About Shopersite", href: "/about" },
       { label: "Documentation", href: "/docs" },
       { label: "FAQ", href: "/#faq" },
       { label: "How it works", href: "/#how-it-works" },

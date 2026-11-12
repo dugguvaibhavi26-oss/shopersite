@@ -11,6 +11,17 @@ import { siteConfig } from "@/lib/config/site";
 export const SITE_URL = `https://www.${siteConfig.domain}`;
 export const BRAND = "Shopersite";
 
+/**
+ * The one sentence that says what Shopersite is. The same words go on the homepage, About page and
+ * structured data (and should be used for directory listings), so search engines and AI assistants
+ * see one consistent description. Keep it true: change it when the product changes.
+ */
+export const BRAND_DEFINITION =
+  "Shopersite is an online store builder for Indian sellers: a free plan, 0% commission on sales, cash on delivery, and online payments through the seller's own Razorpay account, on the seller's own shopersite.in address.";
+
+/** Other ways people write the name (and the name it gets confused with in search). */
+export const BRAND_ALIASES = ["ShoperSite", "Shoper Site", "shopersite.in"];
+
 export function ogImage(title: string, kicker = "Shopersite") {
   return `/og?title=${encodeURIComponent(title)}&kicker=${encodeURIComponent(kicker)}`;
 }
@@ -37,9 +48,10 @@ export function organizationLd() {
     "@type": "Organization",
     "@id": `${SITE_URL}/#organization`,
     name: BRAND,
+    alternateName: BRAND_ALIASES,
     url: SITE_URL,
-    logo: `${SITE_URL}/icon.svg`,
-    description: "Free online store builder for Indian sellers.",
+    logo: `${SITE_URL}/icon-512.png`,
+    description: BRAND_DEFINITION,
     areaServed: "IN",
   };
 }
@@ -50,6 +62,7 @@ export function websiteLd() {
     "@type": "WebSite",
     "@id": `${SITE_URL}/#website`,
     name: BRAND,
+    alternateName: BRAND_ALIASES,
     url: SITE_URL,
     inLanguage: "en-IN",
     publisher: { "@id": `${SITE_URL}/#organization` },
@@ -67,7 +80,7 @@ export function softwareLd() {
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web, Android",
     url: SITE_URL,
-    description: "Free online store builder for Indian sellers.",
+    description: BRAND_DEFINITION,
     publisher: { "@id": `${SITE_URL}/#organization` },
     offers: plans.map((p) => ({
       "@type": "Offer",

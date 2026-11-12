@@ -192,24 +192,27 @@ export function SalesChart({ className, dark = false }: { className?: string; da
   );
 }
 
-/** UPI QR checkout panel. */
+/** Checkout payment choice: online (the seller's Razorpay) or cash on delivery. */
 export function UpiMockup({ className }: { className?: string }) {
-  // Deterministic pseudo-QR pattern
-  const cells = Array.from({ length: 121 }, (_, i) => ((i * 7919) % 13) % 3 !== 0);
   return (
     <div className={cn("rounded-[11px] bg-white border border-neutral-200 shadow-xl p-5 w-64", className)}>
-      <div className="text-[11px] text-neutral-500">Pay with any UPI app</div>
+      <div className="text-[11px] text-neutral-500">Choose how to pay</div>
       <div className="text-xl font-bold tracking-tight">₹1,299.00</div>
-      <div className="mt-4 mx-auto w-36 h-36 grid grid-cols-11 gap-[2px] p-2 border border-neutral-200 rounded-[6px]">
-        {cells.map((on, i) => (
-          <span key={i} className={on ? "bg-black rounded-[1px]" : ""} />
+      <div className="mt-4 space-y-2 text-[12px]">
+        {[
+          { t: "Pay online", d: "UPI, card or net banking", on: true },
+          { t: "Cash on delivery", d: "Pay when it arrives", on: false },
+        ].map((m) => (
+          <div key={m.t} className={cn("flex items-center gap-2.5 rounded-[8px] border px-3 py-2.5", m.on ? "border-black" : "border-neutral-200")}>
+            <span className={cn("h-3.5 w-3.5 shrink-0 rounded-full border-2", m.on ? "border-black bg-black" : "border-neutral-300")} />
+            <span className="min-w-0">
+              <span className="block font-semibold">{m.t}</span>
+              <span className="block text-[10px] text-neutral-500">{m.d}</span>
+            </span>
+          </div>
         ))}
       </div>
-      <div className="mt-4 flex flex-wrap justify-center gap-1.5 text-[10px] font-medium text-neutral-600">
-        {["GPay", "PhonePe", "Paytm", "BHIM"].map((app) => (
-          <span key={app} className="px-2 py-1 rounded-[7px] bg-neutral-100">{app}</span>
-        ))}
-      </div>
+      <div className="mt-3 text-center text-[10px] text-neutral-400">Paid to the shop&apos;s own Razorpay account</div>
     </div>
   );
 }
@@ -226,7 +229,7 @@ export function ChatMockup({ className }: { className?: string }) {
         Hi! I&apos;d like to order the Classic Watch 🙌
       </div>
       <div className="ml-auto max-w-[85%] rounded-[11px] rounded-tr-sm bg-black text-white px-3 py-2 text-[11px]">
-        Order #1042 confirmed ✓ Pay via UPI at checkout.
+        Order #1042 confirmed ✓ Paid online.
       </div>
       <div className="ml-auto max-w-[85%] rounded-[11px] rounded-tr-sm bg-black text-white px-3 py-2 text-[11px]">
         Shipped! Track it here: /orders/a8f…
