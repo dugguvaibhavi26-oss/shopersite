@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const d = DOC_BY_SLUG[slug];
   if (!d) return { title: "Help Center | Shopersite" };
   return {
-    title: `${d.title} | Shopersite Help Center`,
+    title: `${d.title} | Shopersite Help Center`.length <= 60 ? `${d.title} | Shopersite Help Center` : `${d.title} | Shopersite`.length <= 60 ? `${d.title} | Shopersite` : d.title,
     description: d.summary,
     keywords: d.keywords,
     alternates: { canonical: `/docs/${d.slug}` },

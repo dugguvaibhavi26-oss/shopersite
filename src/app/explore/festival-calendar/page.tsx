@@ -13,7 +13,7 @@ export const revalidate = 86400;
 export const metadata: Metadata = {
   title: "Festival selling calendar for Indian online shops | Shopersite",
   description:
-    "Every Indian festival, gifting day and sale season in one calendar — what sells, offer ideas and how early to plan: Diwali, Raksha Bandhan, Navratri, wedding season, Holi, Eid and more.",
+    "Every Indian festival, gifting day and sale season in one calendar, with what sells, offer ideas and how early to plan: Diwali, Rakhi, weddings and more.",
   keywords: ["festival calendar india", "festive season sales", "diwali sale planning", "ecommerce calendar india", "marketing calendar india"],
   alternates: { canonical: "/explore/festival-calendar" },
   openGraph: { title: "Festival selling calendar for Indian online shops", description: "What sells, when to start, and offer ideas for every season.", url: `${SITE_URL}/explore/festival-calendar`, type: "article", images: [{ url: ogImage("The Indian seller's festival calendar", "Explore"), width: 1200, height: 630 }] },

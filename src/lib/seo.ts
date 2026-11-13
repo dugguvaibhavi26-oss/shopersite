@@ -28,7 +28,8 @@ export function ogImage(title: string, kicker = "Shopersite") {
 
 /** Title, description, canonical, Open Graph and X card for one page. */
 export function pageMeta({ title, description, path, keywords, kicker, type = "website", noBrandSuffix }: { title: string; description: string; path: string; keywords?: string[]; kicker?: string; type?: "website" | "article"; noBrandSuffix?: boolean }): Metadata {
-  const full = noBrandSuffix ? title : `${title} | ${BRAND}`;
+  // the brand goes on the end only when it still fits in what Google shows (about 60 characters)
+  const full = noBrandSuffix || `${title} | ${BRAND}`.length > 60 ? title : `${title} | ${BRAND}`;
   const image = ogImage(title, kicker);
   return {
     title: full,

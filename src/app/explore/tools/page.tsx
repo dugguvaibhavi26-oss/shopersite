@@ -8,9 +8,9 @@ import { CodCalculator, DiscountCalculator, GstCalculator, PriceCalculator } fro
 import { SITE_URL, breadcrumbLd } from "@/lib/resources";
 
 export const metadata: Metadata = {
-  title: "Free seller calculators: profit, GST, COD and discounts | Shopersite",
+  title: "Free seller calculators: profit, GST and COD | Shopersite",
   description:
-    "Free calculators for Indian online sellers: find the right selling price and profit margin, split or add GST, see what COD returns cost you, and check a sale discount.",
+    "Free calculators for Indian online sellers: selling price and profit margin, GST, what COD returns cost you, and sale discounts.",
   keywords: ["profit margin calculator", "gst calculator india", "selling price calculator", "rto cost calculator", "discount calculator"],
   alternates: { canonical: "/explore/tools" },
   openGraph: { title: "Free calculators for online sellers", description: "Profit, GST, COD returns and discount calculators.", url: `${SITE_URL}/explore/tools`, type: "website", images: [{ url: ogImage("Free calculators for online sellers", "Seller tools"), width: 1200, height: 630 }] },

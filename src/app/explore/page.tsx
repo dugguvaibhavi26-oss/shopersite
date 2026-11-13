@@ -14,9 +14,9 @@ import { SITE_URL, breadcrumbLd, searchIndex } from "@/lib/resources";
 export const revalidate = 86400;
 
 export const metadata: Metadata = {
-  title: "Explore — guides to start and grow your online shop in India | Shopersite",
+  title: "Guides for Indian online sellers | Shopersite",
   description:
-    "Free guides for Indian online sellers: how to start an online store, sell on Instagram and WhatsApp, price products, cut COD returns, ship, handle GST, and plan festival sales.",
+    "Free guides for Indian online sellers: start a store, sell on Instagram and WhatsApp, price products, cut COD returns, ship, handle GST and plan sales.",
   alternates: { canonical: "/explore" },
   openGraph: {
     title: "Explore — guides for Indian online sellers",

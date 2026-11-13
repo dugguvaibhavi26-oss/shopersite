@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const g = GUIDE_BY_SLUG[slug];
   if (!g) return { title: "Explore | Shopersite" };
   return {
-    title: `${g.title} | Shopersite`,
+    title: `${g.title} | Shopersite`.length <= 60 ? `${g.title} | Shopersite` : g.title,
     description: g.summary,
     keywords: g.keywords,
     alternates: { canonical: `/explore/${g.slug}` },

@@ -16,8 +16,8 @@ import { PLATFORM_PLANS } from "@/lib/plans";
 export const revalidate = 3600;
 
 export const metadata: Metadata = pageMeta({
-  title: "About Shopersite: the free online store builder for Indian sellers",
-  description: BRAND_DEFINITION,
+  title: "About Shopersite: free online store builder for India",
+  description: "Shopersite is a free online store builder for Indian sellers: 0% commission, cash on delivery and Razorpay payments on your own shop address.",
   path: "/about",
   kicker: "About",
 });

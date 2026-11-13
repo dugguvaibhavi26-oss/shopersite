@@ -97,8 +97,8 @@ export const FREE_GUIDES: Guide[] = [
   {
     slug: "best-free-ecommerce-website-builders-india",
     category: "Compare",
-    title: "Free ecommerce website builders in India: what “free” really means",
-    summary: "How free plans differ across store builders — product limits, payment rules, transaction fees and branding — and how to choose. Check each provider's current pricing.",
+    title: "Free ecommerce website builders in India: what free means",
+    summary: "How free plans differ across store builders: product limits, payment rules, fees and branding, and how to choose. Check each provider's current pricing.",
     keywords: ["best free ecommerce website builder india", "free ecommerce platform", "free online store builder india", "free website builder for online store"],
     minutes: 8,
     date: "2026-11-10",

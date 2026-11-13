@@ -218,7 +218,7 @@ export const DOCS: DocArticle[] = [
     slug: "bulk-upload",
     category: "products",
     title: "Upload many products at once (CSV)",
-    summary: "Add your whole catalog from Excel or Google Sheets with one CSV file.",
+    summary: "Add your whole catalog at once from Excel or Google Sheets with one CSV file, instead of adding products one by one.",
     keywords: ["csv import", "excel upload", "import products", "catalog upload"],
     plan: "Growth",
     minutes: 3,
@@ -713,7 +713,7 @@ export const DOCS: DocArticle[] = [
     slug: "customer-accounts",
     category: "settings",
     title: "Guest checkout or sign-in",
-    summary: "Let buyers order as guests, or ask them to create an account first.",
+    summary: "Let buyers order as guests, or ask them to create an account first, and see how each choice affects your checkout.",
     keywords: ["guest checkout", "customer login", "buyer account"],
     minutes: 1,
     body: [
@@ -739,7 +739,7 @@ export const DOCS: DocArticle[] = [
     slug: "notifications",
     category: "settings",
     title: "Order email notifications",
-    summary: "Get an email the moment an order is placed or paid.",
+    summary: "Choose which emails you get: new orders, products running low and new reviews, and which staff also get order emails.",
     keywords: ["email alerts", "new order email", "notifications"],
     minutes: 1,
     body: [
@@ -860,7 +860,7 @@ export const DOCS: DocArticle[] = [
     slug: "request-a-plugin",
     category: "apps",
     title: "Request a plugin",
-    summary: "Tell the Shopersite team which app you'd like connected next.",
+    summary: "Tell the Shopersite team which app or service you'd like connected to your shop next, and how requests are picked.",
     keywords: ["integrations", "plugins", "feature request"],
     minutes: 1,
     body: [

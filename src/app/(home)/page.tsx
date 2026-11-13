@@ -282,7 +282,7 @@ function Hero({ onClaim }: { onClaim: (v: string) => void }) {
           </a>
 
           <h1 style={{ animationDelay: "90ms" }} className="hero-rise sm:mt-5 text-[1.65rem] leading-[1.1] sm:text-[2.5rem] lg:text-[2.9rem] font-medium !tracking-[-0.04em] mx-auto text-neutral-950 text-balance">
-            Your shop, online
+            Your free online store,
             <br />
             in{" "}
             <span className="relative inline-block whitespace-nowrap">

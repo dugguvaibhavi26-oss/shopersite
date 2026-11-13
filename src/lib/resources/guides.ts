@@ -159,7 +159,7 @@ const CORE_GUIDES: Guide[] = [
     slug: "how-to-price-your-products",
     category: "Sell more",
     title: "How to price your products for profit",
-    summary: "Work out your true cost per order, pick a margin (not a markup), price for cash on delivery and returns, and use MRP, bundles and free-delivery thresholds the right way.",
+    summary: "Work out your true cost per order, pick a margin not a markup, price for COD and returns, and use MRP, bundles and free-delivery thresholds well.",
     keywords: ["pricing strategy", "product pricing", "profit margin", "how to calculate selling price", "how to price products online india", "selling price formula"],
     minutes: 12,
     date: "2026-11-13",

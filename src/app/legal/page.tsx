@@ -8,6 +8,7 @@ import { LegalShell } from "@/components/legal/legal-shell";
 export const metadata: Metadata = {
   title: `Legal & policies · ${company.brand}`,
   description: "ShoperSite's terms, privacy, refund, payments, acceptable use and other policies.",
+  alternates: { canonical: "/legal" },
 };
 
 const GROUP_INFO: Record<(typeof LEGAL_GROUPS)[number], { icon: React.ElementType; text: string }> = {

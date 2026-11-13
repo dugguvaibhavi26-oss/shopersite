@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ doc: stri
   const { doc } = await params;
   const d = LEGAL_DOCS.find((x) => x.slug === doc);
   if (!d) return { title: defaultCompany.brand };
-  return { title: `${d.title} · ${defaultCompany.brand}`, description: d.blurb };
+  return { title: `${d.title} · ${defaultCompany.brand}`, description: d.blurb, alternates: { canonical: `/legal/${d.slug}` } };
 }
 
 export default async function LegalPage({ params }: { params: Promise<{ doc: string }> }) {

@@ -403,7 +403,7 @@ export function buildLegalDocs(C: Company): LegalDoc[] {
     slug: "refunds",
     title: "Refund & Cancellation Policy",
     short: "Refunds & Cancellations",
-    blurb: "Refunds and cancellations for ShoperSite plans and themes.",
+    blurb: "Refunds and cancellations for ShoperSite plans: free trials, monthly renewals, how to cancel and when money is returned.",
     group: "Sellers",
     summary: [
       "This covers what sellers pay ShoperSite (plans and themes). Refunds for products bought from a shop are handled by that shop.",
@@ -583,7 +583,7 @@ export function buildLegalDocs(C: Company): LegalDoc[] {
     slug: "acceptable-use",
     title: "Acceptable Use & Prohibited Items Policy",
     short: "Acceptable Use",
-    blurb: "What can't be sold or done on ShoperSite, and what happens if it is.",
+    blurb: "What can't be sold or done on ShoperSite, how to report a shop that breaks the rules, and what happens next.",
     group: "Trust & safety",
     summary: [
       "No illegal, counterfeit, dangerous or adult products, and no scams.",
@@ -919,7 +919,7 @@ export function buildLegalDocs(C: Company): LegalDoc[] {
     slug: "grievance",
     title: "Grievance Redressal",
     short: "Grievance Redressal",
-    blurb: "How to raise a complaint, our Grievance Officer, and response times.",
+    blurb: "How to raise a complaint with ShoperSite, who our Grievance Officer is, and how quickly we respond under Indian rules.",
     group: "Trust & safety",
     summary: [
       "Complaints about the Service, a shop, content, privacy or IP all come to our Grievance Officer.",
@@ -1037,7 +1037,7 @@ export function buildLegalDocs(C: Company): LegalDoc[] {
     slug: "contact",
     title: "Contact Us",
     short: "Contact",
-    blurb: "How to reach the ShoperSite team.",
+    blurb: "How to reach the ShoperSite team: support email, WhatsApp, grievance officer and our company details.",
     group: "Core",
     summary: [
       `Email ${E}. We reply within 1 working day.`,

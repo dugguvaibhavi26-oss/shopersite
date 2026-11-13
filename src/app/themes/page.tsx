@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Check, ChevronDown, ExternalLink, Lock, Monitor, Play, Search, ShoppingBag, Smartphone, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { usePlatformSettings } from "@/lib/use-platform-settings";
-import { getAllThemes, type ThemeDefinition } from "@/lib/themes";
+import { PLATFORM_THEMES, getAllThemes, type ThemeDefinition } from "@/lib/themes";
 import { getCustomTheme } from "@/lib/site-content";
 import { PLATFORM_PLANS } from "@/lib/plans";
 import { formatThemePrice, getThemePlan, getThemePrice, THEME_SALES } from "@/lib/theme-pricing";
@@ -61,9 +61,47 @@ const isRecent = (slug: string) => {
 
 export default function ThemesPage() {
   return (
-    <React.Suspense fallback={null}>
+    <React.Suspense fallback={<ThemeListStatic />}>
       <ThemeMarketplace />
     </React.Suspense>
+  );
+}
+
+/**
+ * The marketplace as plain HTML: the same title and every built-in theme with its description. It's
+ * what the server sends (search engines and AI assistants read it), and the interactive marketplace
+ * replaces it as soon as the page runs in the browser.
+ */
+function ThemeListStatic() {
+  const themes = Object.values(PLATFORM_THEMES);
+  return (
+    <div className="home-sans flex min-h-screen flex-col overflow-x-clip bg-white font-[Inter,sans-serif] text-neutral-950">
+      <SiteHeader user={false} onSignOut={() => {}} />
+      <main className="flex-1">
+        <section className="mx-auto max-w-7xl px-4 py-14 text-center sm:px-6 sm:py-20">
+          <h1 className="text-[32px] font-semibold tracking-[-0.025em] text-neutral-950 sm:text-[42px]">Theme marketplace</h1>
+          <p className="mx-auto mt-3 max-w-xl text-[15px] text-neutral-600">
+            {themes.length} ready-made online store designs for Indian shops. Preview each on phone and desktop, then start your shop with the one you like. Free plan: 1 theme. Growth: 7. Pro: every theme.
+          </p>
+        </section>
+        <ul className="mx-auto grid max-w-7xl gap-4 px-4 pb-16 sm:grid-cols-2 sm:px-6 lg:grid-cols-3">
+          {themes.map((t) => (
+            <li key={t.slug} className="rounded-[14px] border border-neutral-200 p-5">
+              <h2 className="text-lg font-semibold">
+                <Link href={previewUrl(t.slug)}>{t.name}</Link>
+              </h2>
+              <p className="text-sm text-neutral-500">
+                {t.tagline}
+                {t.category ? ` · ${t.category}` : ""}
+              </p>
+              <p className="mt-2 text-sm text-neutral-700">{t.description}</p>
+              <p className="mt-2 text-xs font-medium text-neutral-500">{offerFor(t.slug).label}</p>
+            </li>
+          ))}
+        </ul>
+      </main>
+      <SiteFooter />
+    </div>
   );
 }
 

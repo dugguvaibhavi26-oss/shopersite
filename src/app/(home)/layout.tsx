@@ -7,7 +7,7 @@ import { HOME_FAQS } from "@/lib/home-faqs";
 export const metadata: Metadata = {
   title: { absolute: "Shopersite – Free Online Store Builder for Indian Sellers" },
   description:
-    "Build your online store for free with Shopersite. Create a professional ecommerce website, manage products, receive orders and start selling online. No credit card required.",
+    "Build your online store for free with Shopersite. Add products, take orders with cash on delivery or Razorpay, and start selling online. No card needed.",
   keywords: ["free online store builder", "free ecommerce website builder", "online store builder India", "create online store for free", "website for Instagram sellers"],
   alternates: { canonical: "/" },
   openGraph: {

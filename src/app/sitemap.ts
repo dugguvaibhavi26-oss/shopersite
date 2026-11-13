@@ -16,7 +16,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/themes`, changeFrequency: "weekly", priority: 0.8 },
     { url: `${base}/pricing`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/about`, lastModified: "2026-11-13", changeFrequency: "monthly", priority: 0.8 },
-    { url: `${base}/register`, changeFrequency: "yearly", priority: 0.6 },
     { url: `${base}/explore`, lastModified: latestGuide, changeFrequency: "weekly", priority: 0.8 },
     { url: `${base}/explore/tools`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${base}/explore/festival-calendar`, changeFrequency: "monthly", priority: 0.7 },

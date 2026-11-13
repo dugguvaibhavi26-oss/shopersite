@@ -201,7 +201,7 @@ export const LANDINGS: Landing[] = [
     slug: "online-store-builder-india",
     keyword: "online store builder India",
     secondary: ["free online store builder India", "create ecommerce website free India", "free ecommerce platform for Indian sellers"],
-    metaTitle: "Online Store Builder for India — COD, UPI, GST and Indian Couriers",
+    metaTitle: "Online Store Builder for India: COD, UPI, GST, Couriers",
     metaDescription: "An online store builder made for India: cash on delivery, UPI and cards via Razorpay, rupee prices with GST, Shiprocket couriers and WhatsApp updates. Free to start.",
     crumb: "Online store builder for India",
     cardText: "COD, UPI, GST and couriers — built for Indian sellers.",

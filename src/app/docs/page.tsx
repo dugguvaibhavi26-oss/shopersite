@@ -13,7 +13,7 @@ import { SITE_URL, breadcrumbLd, searchIndex } from "@/lib/resources";
 export const metadata: Metadata = {
   title: "Help Center — set up and run your online shop | Shopersite",
   description:
-    "Step-by-step guides for Shopersite sellers: create your shop, add products, take payments with COD and Razorpay, ship with Shiprocket, design your website and grow sales.",
+    "Step-by-step help for Shopersite sellers: create your shop, add products, take COD and Razorpay payments, ship orders and design your website.",
   alternates: { canonical: "/docs" },
   openGraph: {
     title: "Shopersite Help Center",
