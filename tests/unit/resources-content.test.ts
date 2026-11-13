@@ -5,7 +5,7 @@ import { LEGACY_DOC_IDS, LEGACY_EXPLORE_SECTIONS } from "@/lib/resources/legacy"
 import { plainText } from "@/lib/resources/types";
 import { LANDINGS } from "@/lib/landings";
 
-const STATIC_PAGES = new Set(["/", "/register", "/themes", "/explore", "/explore/tools", "/explore/festival-calendar", "/docs", "/legal/contact", ...LANDINGS.map((l) => `/${l.slug}`)]);
+const STATIC_PAGES = new Set(["/", "/register", "/themes", "/explore", "/explore/tools", "/explore/festival-calendar", "/docs", "/legal/contact", "/pricing", "/about", ...LANDINGS.map((l) => `/${l.slug}`)]);
 const exists = (href: string) => {
   const path = href.split("#")[0];
   if (STATIC_PAGES.has(path)) return true;
